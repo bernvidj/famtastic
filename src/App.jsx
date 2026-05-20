@@ -1,5 +1,5 @@
 // ============================================
-// FamTastic — App (router + auth gate)
+// FamTastic — App (router + auth gate + child login)
 // ============================================
 
 import React, { useState, useEffect } from 'react';
@@ -24,8 +24,22 @@ export function App() {
   const [memberData, setMemberData] = useState(null);
   const [allMembers, setAllMembers] = useState([]);
   const [page, setPage] = useState('home');
+  const [childSession, setChildSession] = useState(null);
 
   useEffect(() => {
+    // Check for saved child session
+    const saved = sessionStorage.getItem('famtastic_child');
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        setChildSession(data);
+        loadFamilyForChild(data);
+        return;
+      } catch (e) {
+        sessionStorage.removeItem('famtastic_child');
+      }
+    }
+
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       if (s) {
@@ -38,9 +52,9 @@ export function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, s) => {
         setSession(s);
-        if (s) {
+        if (s && !childSession) {
           loadFamily(s.user.id);
-        } else {
+        } else if (!s && !childSession) {
           setFamilyId(null);
           setMemberData(null);
           setAllMembers([]);
@@ -54,7 +68,6 @@ export function App() {
 
   async function loadFamily(userId) {
     setLoading(true);
-
     const { data: me } = await supabase
       .from('family_members')
       .select('id, family_id, name, role, avatar, color')
@@ -65,21 +78,49 @@ export function App() {
     if (me) {
       setFamilyId(me.family_id);
       setMemberData(me);
-
-      const { data: members } = await supabase
-        .from('family_members')
-        .select('id, name, role, avatar, color')
-        .eq('family_id', me.family_id)
-        .order('created_at');
-
-      setAllMembers(members || []);
+      await loadMembers(me.family_id);
     } else {
       setFamilyId(null);
       setMemberData(null);
       setAllMembers([]);
     }
-
     setLoading(false);
+  }
+
+  async function loadFamilyForChild(childData) {
+    setLoading(true);
+    setFamilyId(childData.family_id);
+    setMemberData(childData);
+    await loadMembers(childData.family_id);
+    setLoading(false);
+  }
+
+  async function loadMembers(fId) {
+    const { data: members } = await supabase
+      .from('family_members')
+      .select('id, name, role, avatar, color')
+      .eq('family_id', fId)
+      .order('created_at');
+    setAllMembers(members || []);
+  }
+
+  function handleChildLogin(childData) {
+    sessionStorage.setItem('famtastic_child', JSON.stringify(childData));
+    setChildSession(childData);
+    loadFamilyForChild(childData);
+  }
+
+  function handleLogout() {
+    if (childSession) {
+      sessionStorage.removeItem('famtastic_child');
+      setChildSession(null);
+      setFamilyId(null);
+      setMemberData(null);
+      setAllMembers([]);
+      setPage('home');
+    } else {
+      supabase.auth.signOut();
+    }
   }
 
   if (loading) {
@@ -90,11 +131,13 @@ export function App() {
     );
   }
 
-  if (!session) {
-    return <Login />;
+  // Not logged in (neither parent nor child)
+  if (!session && !childSession) {
+    return <Login onChildLogin={handleChildLogin} />;
   }
 
-  if (!familyId) {
+  // Parent logged in but no family
+  if (session && !childSession && !familyId) {
     return (
       <FamilySetup
         userId={session.user.id}
@@ -102,6 +145,17 @@ export function App() {
       />
     );
   }
+
+  // No family data loaded yet
+  if (!familyId) {
+    return (
+      <div style={styles.loading}>
+        <HomeIcon size={32} color={C.primary} />
+      </div>
+    );
+  }
+
+  const isChild = memberData?.role === 'child';
 
   function renderPage() {
     switch (page) {
@@ -123,8 +177,11 @@ export function App() {
             familyId={familyId}
             member={memberData}
             members={allMembers}
-            onUpdate={() => loadFamily(session.user.id)}
-            onLogout={() => supabase.auth.signOut()}
+            onUpdate={() => {
+              if (childSession) loadFamilyForChild(childSession);
+              else if (session) loadFamily(session.user.id);
+            }}
+            onLogout={handleLogout}
           />
         );
       default:
