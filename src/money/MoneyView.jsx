@@ -32,8 +32,8 @@ export function MoneyView({ familyId, member, members }) {
   const [saving, setSaving] = useState(false);
   const [showAllTx, setShowAllTx] = useState(false);
   const [showAllocate, setShowAllocate] = useState(false);
-  const [showCreateGoal, setShowCreateGoal] = useState(false);
-
+  const [showCreateGoal, setShowCreateGoal] = useState(false);   
+  const [refreshKey, setRefreshKey] = useState(0);
   const isParent = member.role === 'admin' || member.role === 'parent';
   const children = members.filter(m => m.role === 'child');
 
@@ -92,6 +92,7 @@ export function MoneyView({ familyId, member, members }) {
   function loadAll() {
     loadChildData();
     loadFamilyGoals();
+    setRefreshKey(k => k + 1);
   }
 
   function getBalance() {
