@@ -1,5 +1,5 @@
 // ============================================
-// FamTastic — MoneyView (balance + transactions)
+// FamTastic — MoneyView (balance + transactions + family goal)
 // ============================================
 
 import React, { useState, useEffect } from 'react';
@@ -7,7 +7,9 @@ import { supabase } from '../supabaseClient';
 import { C, F, S, formatKr } from '../data';
 import { SavingsGoal } from './SavingsGoal';
 import { AllocateMoney } from './AllocateMoney';
-import { PiggyBank, Plus, ArrowUpCircle, TrendingUp, ChevronDown, ChevronUp, Wallet } from 'lucide-react';
+import { FamilyGoalCard } from './FamilyGoalCard';
+import { CreateFamilyGoal } from './CreateFamilyGoal';
+import { PiggyBank, Plus, TrendingUp, ChevronDown, ChevronUp, Wallet, Target } from 'lucide-react';
 
 const TX_ICONS = {
   base_allowance: { icon: '💰', label: 'Veckopeng' },
@@ -23,12 +25,14 @@ export function MoneyView({ familyId, member, members }) {
   const [selectedChild, setSelectedChild] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [goals, setGoals] = useState([]);
+  const [familyGoals, setFamilyGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddTx, setShowAddTx] = useState(false);
   const [txForm, setTxForm] = useState({ amount: '', type: 'gift', description: '' });
   const [saving, setSaving] = useState(false);
   const [showAllTx, setShowAllTx] = useState(false);
   const [showAllocate, setShowAllocate] = useState(false);
+  const [showCreateGoal, setShowCreateGoal] = useState(false);
 
   const isParent = member.role === 'admin' || member.role === 'parent';
   const children = members.filter(m => m.role === 'child');
@@ -37,13 +41,24 @@ export function MoneyView({ familyId, member, members }) {
     if (children.length > 0 && !selectedChild) {
       setSelectedChild(children[0].id);
     }
+    loadFamilyGoals();
   }, [members]);
 
   useEffect(() => {
-    if (selectedChild) loadData();
+    if (selectedChild) loadChildData();
   }, [selectedChild, familyId]);
 
-  async function loadData() {
+  async function loadFamilyGoals() {
+    const { data } = await supabase
+      .from('savings_goals')
+      .select('*')
+      .eq('family_id', familyId)
+      .eq('is_family_goal', true)
+      .is('achieved_at', null);
+    setFamilyGoals(data || []);
+  }
+
+  async function loadChildData() {
     setLoading(true);
 
     const [txRes, goalRes] = await Promise.all([
@@ -54,14 +69,14 @@ export function MoneyView({ familyId, member, members }) {
         .limit(50),
       supabase.from('savings_goals').select('*')
         .eq('family_id', familyId)
-        .or(`member_id.eq.${selectedChild},is_family_goal.eq.true`)
+        .eq('member_id', selectedChild)
+        .eq('is_family_goal', false)
         .is('achieved_at', null),
     ]);
 
     const txData = txRes.data || [];
     const goalData = goalRes.data || [];
 
-    // Calculate saved amount per goal
     const goalsWithSaved = goalData.map(g => {
       const saved = txData
         .filter(tx => tx.savings_goal_id === g.id)
@@ -72,6 +87,11 @@ export function MoneyView({ familyId, member, members }) {
     setTransactions(txData);
     setGoals(goalsWithSaved);
     setLoading(false);
+  }
+
+  function loadAll() {
+    loadChildData();
+    loadFamilyGoals();
   }
 
   function getBalance() {
@@ -86,21 +106,17 @@ export function MoneyView({ familyId, member, members }) {
     monday.setHours(0, 0, 0, 0);
 
     const weekTx = transactions.filter(tx => new Date(tx.created_at) >= monday);
-
     const base = weekTx.filter(tx => tx.type === 'base_allowance').reduce((s, tx) => s + tx.amount, 0);
     const bonus = weekTx.filter(tx => tx.type === 'chore_bonus').reduce((s, tx) => s + tx.amount, 0);
     const spent = weekTx.filter(tx => tx.amount < 0).reduce((s, tx) => s + tx.amount, 0);
-
     return { base, bonus, spent };
   }
 
   async function handleAddTx() {
     if (!txForm.amount || Number(txForm.amount) === 0) return;
     setSaving(true);
-
     const isNegative = ['withdrawal', 'spent', 'saving', 'family_goal'].includes(txForm.type);
     const amountOre = Math.round(Math.abs(Number(txForm.amount)) * 100);
-
     await supabase.from('money_transactions').insert({
       family_id: familyId,
       member_id: selectedChild,
@@ -108,19 +124,17 @@ export function MoneyView({ familyId, member, members }) {
       type: txForm.type,
       description: txForm.description.trim() || null,
     });
-
     setTxForm({ amount: '', type: 'gift', description: '' });
     setShowAddTx(false);
     setSaving(false);
-    loadData();
+    loadAll();
   }
 
   const balance = getBalance();
   const week = getWeekSummary();
   const child = members.find(m => m.id === selectedChild);
   const visibleTx = showAllTx ? transactions : transactions.slice(0, 8);
-  const personalGoals = goals.filter(g => !g.is_family_goal);
-  const familyGoals = goals.filter(g => g.is_family_goal);
+  const allGoalsForAllocate = [...goals, ...familyGoals];
 
   if (children.length === 0) {
     return (
@@ -140,6 +154,28 @@ export function MoneyView({ familyId, member, members }) {
       <div style={styles.header}>
         <h1 style={styles.pageTitle}>Pengar</h1>
       </div>
+
+      {/* Family goal (prominent, always visible) */}
+      {familyGoals.length > 0 && (
+        <div style={styles.goalSection}>
+          {familyGoals.map(fg => (
+            <FamilyGoalCard key={fg.id} goal={fg} familyId={familyId} members={members} />
+          ))}
+        </div>
+      )}
+
+      {/* Create family goal button (parent, if none exists) */}
+      {isParent && familyGoals.length === 0 && (
+        <div style={styles.goalSection}>
+          <button onClick={() => setShowCreateGoal(true)} style={styles.createGoalBtn}>
+            <Target size={20} color={C.primary} />
+            <div>
+              <span style={styles.createGoalTitle}>Skapa ett episkt familjemål</span>
+              <span style={styles.createGoalDesc}>Hela familjen sparar tillsammans!</span>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* Child selector */}
       {children.length > 1 && (
@@ -172,38 +208,28 @@ export function MoneyView({ familyId, member, members }) {
               <span style={styles.balanceAvatar}>{child?.avatar}</span>
               <div>
                 <p style={styles.balanceLabel}>{child?.name}s saldo</p>
-                <p style={{
-                  ...styles.balanceAmount,
-                  color: balance >= 0 ? C.text : C.error,
-                }}>
+                <p style={{ ...styles.balanceAmount, color: balance >= 0 ? C.text : C.error }}>
                   {formatKr(balance)}
                 </p>
               </div>
             </div>
-
             <div style={styles.weekRow}>
               {week.base > 0 && (
                 <div style={styles.weekItem}>
                   <span style={styles.weekItemLabel}>Veckopeng</span>
-                  <span style={{ ...styles.weekItemValue, color: C.success }}>
-                    +{formatKr(week.base)}
-                  </span>
+                  <span style={{ ...styles.weekItemValue, color: C.success }}>+{formatKr(week.base)}</span>
                 </div>
               )}
               {week.bonus > 0 && (
                 <div style={styles.weekItem}>
                   <span style={styles.weekItemLabel}>Bonus</span>
-                  <span style={{ ...styles.weekItemValue, color: C.primary }}>
-                    +{formatKr(week.bonus)}
-                  </span>
+                  <span style={{ ...styles.weekItemValue, color: C.primary }}>+{formatKr(week.bonus)}</span>
                 </div>
               )}
               {week.spent < 0 && (
                 <div style={styles.weekItem}>
                   <span style={styles.weekItemLabel}>Uttag/köp</span>
-                  <span style={{ ...styles.weekItemValue, color: C.error }}>
-                    {formatKr(week.spent)}
-                  </span>
+                  <span style={{ ...styles.weekItemValue, color: C.error }}>{formatKr(week.spent)}</span>
                 </div>
               )}
               {week.base === 0 && week.bonus === 0 && week.spent === 0 && (
@@ -212,29 +238,23 @@ export function MoneyView({ familyId, member, members }) {
             </div>
           </div>
 
-          {/* Action buttons */}
+          {/* Actions */}
           <div style={styles.actionRow}>
             {balance > 0 && (
-              <button
-                onClick={() => setShowAllocate(true)}
-                style={{ ...S.button, ...S.buttonPrimary, flex: 1, padding: '10px 12px' }}
-              >
+              <button onClick={() => setShowAllocate(true)}
+                style={{ ...S.button, ...S.buttonPrimary, flex: 1, padding: '10px 12px' }}>
                 <Wallet size={16} /> Fördela pengar
               </button>
             )}
             {isParent && (
-              <>
-                <button
-                  onClick={() => { setShowAddTx(!showAddTx); setTxForm({ amount: '', type: 'gift', description: '' }); }}
-                  style={{ ...S.button, ...S.buttonSecondary, flex: 1, padding: '10px 12px' }}
-                >
-                  <Plus size={16} /> Lägg till
-                </button>
-              </>
+              <button onClick={() => { setShowAddTx(!showAddTx); setTxForm({ amount: '', type: 'gift', description: '' }); }}
+                style={{ ...S.button, ...S.buttonSecondary, flex: 1, padding: '10px 12px' }}>
+                <Plus size={16} /> Lägg till
+              </button>
             )}
           </div>
 
-          {/* Add transaction form (parent) */}
+          {/* Add transaction form */}
           {showAddTx && isParent && (
             <div style={styles.txForm}>
               <div style={styles.txTypeRow}>
@@ -246,53 +266,24 @@ export function MoneyView({ familyId, member, members }) {
                   { value: 'spent', label: '🛍️ Köp' },
                   { value: 'saving', label: '🐷 Sparande' },
                 ].map(t => (
-                  <button
-                    key={t.value}
-                    onClick={() => setTxForm(prev => ({ ...prev, type: t.value }))}
+                  <button key={t.value} onClick={() => setTxForm(prev => ({ ...prev, type: t.value }))}
                     style={{
                       ...styles.txTypeBtn,
                       background: txForm.type === t.value ? C.primaryLight : C.bgCard,
                       border: txForm.type === t.value ? `2px solid ${C.primary}` : `2px solid ${C.border}`,
-                    }}
-                  >
+                    }}>
                     {t.label}
                   </button>
                 ))}
               </div>
-
-              <input
-                type="number"
-                placeholder="Belopp (kr)"
-                value={txForm.amount}
-                onChange={e => setTxForm(prev => ({ ...prev, amount: e.target.value }))}
-                style={S.input}
-                min="0"
-                step="1"
-              />
-
-              <input
-                type="text"
-                placeholder="Beskrivning (valfritt)"
-                value={txForm.description}
-                onChange={e => setTxForm(prev => ({ ...prev, description: e.target.value }))}
-                style={{ ...S.input, marginTop: 8 }}
-              />
-
+              <input type="number" placeholder="Belopp (kr)" value={txForm.amount}
+                onChange={e => setTxForm(prev => ({ ...prev, amount: e.target.value }))} style={S.input} min="0" step="1" />
+              <input type="text" placeholder="Beskrivning (valfritt)" value={txForm.description}
+                onChange={e => setTxForm(prev => ({ ...prev, description: e.target.value }))} style={{ ...S.input, marginTop: 8 }} />
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                <button
-                  onClick={() => setShowAddTx(false)}
-                  style={{ ...S.button, ...S.buttonSecondary, flex: 1 }}
-                >
-                  Avbryt
-                </button>
-                <button
-                  onClick={handleAddTx}
-                  disabled={saving || !txForm.amount}
-                  style={{
-                    ...S.button, ...S.buttonPrimary, flex: 1,
-                    opacity: saving || !txForm.amount ? 0.5 : 1,
-                  }}
-                >
+                <button onClick={() => setShowAddTx(false)} style={{ ...S.button, ...S.buttonSecondary, flex: 1 }}>Avbryt</button>
+                <button onClick={handleAddTx} disabled={saving || !txForm.amount}
+                  style={{ ...S.button, ...S.buttonPrimary, flex: 1, opacity: saving || !txForm.amount ? 0.5 : 1 }}>
                   {saving ? 'Sparar...' : 'Spara'}
                 </button>
               </div>
@@ -300,44 +291,18 @@ export function MoneyView({ familyId, member, members }) {
           )}
 
           {/* Personal savings goals */}
-          {personalGoals.length > 0 && (
+          {goals.length > 0 && (
             <div style={styles.section}>
-              <h2 style={styles.sectionTitle}>
-                <PiggyBank size={18} color={C.primary} /> Sparmål
-              </h2>
-              {personalGoals.map(goal => (
-                <SavingsGoal
-                  key={goal.id}
-                  goal={goal}
-                  saved={goal._saved || 0}
-                  members={members}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Family goals */}
-          {familyGoals.length > 0 && (
-            <div style={styles.section}>
-              <h2 style={styles.sectionTitle}>
-                <PiggyBank size={18} color={C.accent} /> Familjemål
-              </h2>
-              {familyGoals.map(goal => (
-                <SavingsGoal
-                  key={goal.id}
-                  goal={goal}
-                  saved={goal._saved || 0}
-                  members={members}
-                />
+              <h2 style={styles.sectionTitle}><PiggyBank size={18} color={C.primary} /> Sparmål</h2>
+              {goals.map(goal => (
+                <SavingsGoal key={goal.id} goal={goal} saved={goal._saved || 0} members={members} />
               ))}
             </div>
           )}
 
           {/* Transactions */}
           <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>
-              <TrendingUp size={18} color={C.primary} /> Historik
-            </h2>
+            <h2 style={styles.sectionTitle}><TrendingUp size={18} color={C.primary} /> Historik</h2>
             {transactions.length === 0 ? (
               <p style={styles.emptyText}>Inga transaktioner ännu</p>
             ) : (
@@ -349,32 +314,18 @@ export function MoneyView({ familyId, member, members }) {
                     <div key={tx.id} style={styles.txRow}>
                       <span style={styles.txIcon}>{info.icon}</span>
                       <div style={styles.txContent}>
-                        <span style={styles.txLabel}>
-                          {tx.description || info.label}
-                        </span>
-                        <span style={styles.txDate}>
-                          {new Date(tx.created_at).toLocaleDateString('sv-SE')}
-                        </span>
+                        <span style={styles.txLabel}>{tx.description || info.label}</span>
+                        <span style={styles.txDate}>{new Date(tx.created_at).toLocaleDateString('sv-SE')}</span>
                       </div>
-                      <span style={{
-                        ...styles.txAmount,
-                        color: isPositive ? C.success : C.error,
-                      }}>
+                      <span style={{ ...styles.txAmount, color: isPositive ? C.success : C.error }}>
                         {isPositive ? '+' : ''}{formatKr(tx.amount)}
                       </span>
                     </div>
                   );
                 })}
                 {transactions.length > 8 && (
-                  <button
-                    onClick={() => setShowAllTx(!showAllTx)}
-                    style={styles.showMoreBtn}
-                  >
-                    {showAllTx ? (
-                      <><ChevronUp size={14} /> Visa färre</>
-                    ) : (
-                      <><ChevronDown size={14} /> Visa alla ({transactions.length})</>
-                    )}
+                  <button onClick={() => setShowAllTx(!showAllTx)} style={styles.showMoreBtn}>
+                    {showAllTx ? <><ChevronUp size={14} /> Visa färre</> : <><ChevronDown size={14} /> Visa alla ({transactions.length})</>}
                   </button>
                 )}
               </>
@@ -385,216 +336,54 @@ export function MoneyView({ familyId, member, members }) {
 
       <div style={{ height: 80 }} />
 
-      {/* Allocate modal */}
       {showAllocate && (
-        <AllocateMoney
-          familyId={familyId}
-          memberId={selectedChild}
-          balance={balance}
-          goals={goals}
-          onComplete={loadData}
-          onClose={() => setShowAllocate(false)}
-        />
+        <AllocateMoney familyId={familyId} memberId={selectedChild} balance={balance}
+          goals={allGoalsForAllocate} onComplete={loadAll} onClose={() => setShowAllocate(false)} />
+      )}
+
+      {showCreateGoal && (
+        <CreateFamilyGoal familyId={familyId} onCreated={loadAll} onClose={() => setShowCreateGoal(false)} />
       )}
     </div>
   );
 }
 
 const styles = {
-  page: {
-    minHeight: '100vh',
-    background: C.bg,
-    fontFamily: F.body,
-  },
-  header: {
-    padding: '16px 16px 8px',
-  },
-  pageTitle: {
-    fontFamily: F.heading,
-    fontSize: F.sizes.xl,
-    fontWeight: F.weights.extra,
-    color: C.text,
-    margin: 0,
-  },
-  childRow: {
-    display: 'flex',
-    gap: 8,
-    padding: '8px 16px',
-    overflowX: 'auto',
-  },
-  childBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '8px 14px',
-    borderRadius: 12,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    fontFamily: F.heading,
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.bold,
-  },
-  childName: {
-    fontSize: F.sizes.sm,
-  },
-  loadingText: {
-    textAlign: 'center',
-    color: C.textMuted,
-    padding: 32,
-  },
-  balanceCard: {
-    margin: '8px 16px',
-    padding: 20,
-    background: C.bgCard,
-    borderRadius: 16,
-    border: `1px solid ${C.borderLight}`,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-  },
-  balanceTop: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 16,
-  },
-  balanceAvatar: {
-    fontSize: 40,
-  },
-  balanceLabel: {
-    fontSize: F.sizes.sm,
-    color: C.textMuted,
-    margin: '0 0 2px',
-  },
-  balanceAmount: {
-    fontFamily: F.heading,
-    fontSize: F.sizes.hero,
-    fontWeight: F.weights.extra,
-    margin: 0,
-  },
-  weekRow: {
-    display: 'flex',
-    gap: 12,
-    paddingTop: 14,
-    borderTop: `1px solid ${C.borderLight}`,
-  },
-  weekItem: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
-  },
-  weekItemLabel: {
-    fontSize: F.sizes.xs,
-    color: C.textMuted,
-  },
-  weekItemValue: {
-    fontSize: F.sizes.md,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-  },
-  weekEmpty: {
-    fontSize: F.sizes.xs,
-    color: C.textMuted,
-    margin: 0,
-  },
-  actionRow: {
-    display: 'flex',
-    gap: 8,
-    padding: '8px 16px',
-  },
-  txForm: {
-    margin: '4px 16px 12px',
-    padding: 16,
-    background: C.bgCard,
-    borderRadius: 14,
-    border: `1px solid ${C.border}`,
-  },
-  txTypeRow: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 12,
-  },
-  txTypeBtn: {
-    padding: '6px 10px',
-    borderRadius: 8,
-    fontSize: F.sizes.xs,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-    cursor: 'pointer',
-  },
-  section: {
-    padding: '12px 16px 0',
-  },
-  sectionTitle: {
-    fontFamily: F.heading,
-    fontSize: F.sizes.md,
-    fontWeight: F.weights.bold,
-    color: C.text,
-    margin: '0 0 10px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-  },
-  txRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    padding: '10px 0',
-    borderBottom: `1px solid ${C.borderLight}`,
-  },
-  txIcon: {
-    fontSize: 20,
-    flexShrink: 0,
-  },
-  txContent: {
-    flex: 1,
-    minWidth: 0,
-  },
-  txLabel: {
-    display: 'block',
-    fontSize: F.sizes.sm,
-    color: C.text,
-    fontWeight: F.weights.semi,
-  },
-  txDate: {
-    fontSize: F.sizes.xs,
-    color: C.textMuted,
-  },
-  txAmount: {
-    fontSize: F.sizes.md,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-    flexShrink: 0,
-  },
-  showMoreBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    width: '100%',
-    padding: '10px 0',
-    background: 'none',
-    border: 'none',
-    color: C.primary,
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-    cursor: 'pointer',
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: '40px 20px',
-  },
-  emptyTitle: {
-    fontFamily: F.heading,
-    fontSize: F.sizes.lg,
-    fontWeight: F.weights.bold,
-    color: C.text,
-    margin: '12px 0 4px',
-  },
-  emptyText: {
-    fontSize: F.sizes.sm,
-    color: C.textMuted,
-    margin: '4px 0',
-  },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body },
+  header: { padding: '16px 16px 8px' },
+  pageTitle: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: 0 },
+  goalSection: { padding: '4px 16px' },
+  createGoalBtn: { display: 'flex', alignItems: 'center', gap: 14, width: '100%', padding: 18, background: C.bgCard, borderRadius: 16, border: `2px dashed ${C.primary}`, cursor: 'pointer', textAlign: 'left' },
+  createGoalTitle: { display: 'block', fontFamily: F.heading, fontSize: F.sizes.md, fontWeight: F.weights.bold, color: C.primary },
+  createGoalDesc: { display: 'block', fontSize: F.sizes.sm, color: C.textMuted, marginTop: 2 },
+  childRow: { display: 'flex', gap: 8, padding: '8px 16px', overflowX: 'auto' },
+  childBtn: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 12, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: F.heading, fontSize: F.sizes.sm, fontWeight: F.weights.bold },
+  childName: { fontSize: F.sizes.sm },
+  loadingText: { textAlign: 'center', color: C.textMuted, padding: 32 },
+  balanceCard: { margin: '8px 16px', padding: 20, background: C.bgCard, borderRadius: 16, border: `1px solid ${C.borderLight}`, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  balanceTop: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 },
+  balanceAvatar: { fontSize: 40 },
+  balanceLabel: { fontSize: F.sizes.sm, color: C.textMuted, margin: '0 0 2px' },
+  balanceAmount: { fontFamily: F.heading, fontSize: F.sizes.hero, fontWeight: F.weights.extra, margin: 0 },
+  weekRow: { display: 'flex', gap: 12, paddingTop: 14, borderTop: `1px solid ${C.borderLight}` },
+  weekItem: { flex: 1, display: 'flex', flexDirection: 'column', gap: 2 },
+  weekItemLabel: { fontSize: F.sizes.xs, color: C.textMuted },
+  weekItemValue: { fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading },
+  weekEmpty: { fontSize: F.sizes.xs, color: C.textMuted, margin: 0 },
+  actionRow: { display: 'flex', gap: 8, padding: '8px 16px' },
+  txForm: { margin: '4px 16px 12px', padding: 16, background: C.bgCard, borderRadius: 14, border: `1px solid ${C.border}` },
+  txTypeRow: { display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+  txTypeBtn: { padding: '6px 10px', borderRadius: 8, fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer' },
+  section: { padding: '12px 16px 0' },
+  sectionTitle: { fontFamily: F.heading, fontSize: F.sizes.md, fontWeight: F.weights.bold, color: C.text, margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6 },
+  txRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid ${C.borderLight}` },
+  txIcon: { fontSize: 20, flexShrink: 0 },
+  txContent: { flex: 1, minWidth: 0 },
+  txLabel: { display: 'block', fontSize: F.sizes.sm, color: C.text, fontWeight: F.weights.semi },
+  txDate: { fontSize: F.sizes.xs, color: C.textMuted },
+  txAmount: { fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, flexShrink: 0 },
+  showMoreBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%', padding: '10px 0', background: 'none', border: 'none', color: C.primary, fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer' },
+  emptyState: { textAlign: 'center', padding: '40px 20px' },
+  emptyTitle: { fontFamily: F.heading, fontSize: F.sizes.lg, fontWeight: F.weights.bold, color: C.text, margin: '12px 0 4px' },
+  emptyText: { fontSize: F.sizes.sm, color: C.textMuted, margin: '4px 0' },
 };
