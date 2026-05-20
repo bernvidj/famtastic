@@ -1,5 +1,5 @@
 // ============================================
-// FamTastic — App (router + auth gate + child login)
+// FamTastic — App (router + auth + child mode)
 // ============================================
 
 import React, { useState, useEffect } from 'react';
@@ -14,6 +14,7 @@ import { MealPlan } from './meals/MealPlan';
 import { ShoppingView } from './shopping/ShoppingView';
 import { CalendarView } from './calendar/CalendarView';
 import { SettingsView } from './settings/SettingsView';
+import { ChildApp } from './ChildApp';
 import { C } from './data';
 import { Home as HomeIcon } from 'lucide-react';
 
@@ -27,13 +28,14 @@ export function App() {
   const [childSession, setChildSession] = useState(null);
 
   useEffect(() => {
-    // Check for saved child session
     const saved = sessionStorage.getItem('famtastic_child');
     if (saved) {
       try {
         const data = JSON.parse(saved);
         setChildSession(data);
-        loadFamilyForChild(data);
+        setFamilyId(data.family_id);
+        setMemberData(data);
+        setLoading(false);
         return;
       } catch (e) {
         sessionStorage.removeItem('famtastic_child');
@@ -78,7 +80,12 @@ export function App() {
     if (me) {
       setFamilyId(me.family_id);
       setMemberData(me);
-      await loadMembers(me.family_id);
+      const { data: members } = await supabase
+        .from('family_members')
+        .select('id, name, role, avatar, color')
+        .eq('family_id', me.family_id)
+        .order('created_at');
+      setAllMembers(members || []);
     } else {
       setFamilyId(null);
       setMemberData(null);
@@ -87,27 +94,12 @@ export function App() {
     setLoading(false);
   }
 
-  async function loadFamilyForChild(childData) {
-    setLoading(true);
-    setFamilyId(childData.family_id);
-    setMemberData(childData);
-    await loadMembers(childData.family_id);
-    setLoading(false);
-  }
-
-  async function loadMembers(fId) {
-    const { data: members } = await supabase
-      .from('family_members')
-      .select('id, name, role, avatar, color')
-      .eq('family_id', fId)
-      .order('created_at');
-    setAllMembers(members || []);
-  }
-
   function handleChildLogin(childData) {
     sessionStorage.setItem('famtastic_child', JSON.stringify(childData));
     setChildSession(childData);
-    loadFamilyForChild(childData);
+    setFamilyId(childData.family_id);
+    setMemberData(childData);
+    setLoading(false);
   }
 
   function handleLogout() {
@@ -131,12 +123,10 @@ export function App() {
     );
   }
 
-  // Not logged in (neither parent nor child)
   if (!session && !childSession) {
     return <Login onChildLogin={handleChildLogin} />;
   }
 
-  // Parent logged in but no family
   if (session && !childSession && !familyId) {
     return (
       <FamilySetup
@@ -146,7 +136,6 @@ export function App() {
     );
   }
 
-  // No family data loaded yet
   if (!familyId) {
     return (
       <div style={styles.loading}>
@@ -155,8 +144,12 @@ export function App() {
     );
   }
 
-  const isChild = memberData?.role === 'child';
+  // --- Child mode ---
+  if (childSession) {
+    return <ChildApp familyId={familyId} member={memberData} onLogout={handleLogout} />;
+  }
 
+  // --- Parent mode ---
   function renderPage() {
     switch (page) {
       case 'home':
@@ -174,13 +167,8 @@ export function App() {
       case 'settings':
         return (
           <SettingsView
-            familyId={familyId}
-            member={memberData}
-            members={allMembers}
-            onUpdate={() => {
-              if (childSession) loadFamilyForChild(childSession);
-              else if (session) loadFamily(session.user.id);
-            }}
+            familyId={familyId} member={memberData} members={allMembers}
+            onUpdate={() => loadFamily(session.user.id)}
             onLogout={handleLogout}
           />
         );
