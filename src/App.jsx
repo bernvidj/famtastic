@@ -12,6 +12,7 @@ import { ChoresView } from './chores/ChoresView';
 import { MoneyView } from './money/MoneyView';
 import { MealPlan } from './meals/MealPlan';
 import { ShoppingView } from './shopping/ShoppingView';
+import { CalendarView } from './calendar/CalendarView';
 import { C, F } from './data';
 import { Home as HomeIcon } from 'lucide-react';
 
@@ -104,48 +105,17 @@ export function App() {
   function renderPage() {
     switch (page) {
       case 'home':
-        return (
-          <Home
-            familyId={familyId}
-            member={memberData}
-            members={allMembers}
-          />
-        );
-      case 'chores':
-        return (
-          <ChoresView
-            familyId={familyId}
-            member={memberData}
-            members={allMembers}
-          />
-        );
-      case 'money':
-        return (
-          <MoneyView
-            familyId={familyId}
-            member={memberData}
-            members={allMembers}
-          />
-        );
-      case 'meals':
-        return (
-          <MealPlan
-            familyId={familyId}
-            member={memberData}
-            members={allMembers}
-            onGenerateShopping={() => setPage('shopping')}
-          />
-        );
-      case 'shopping':
-        return (
-          <ShoppingView
-            familyId={familyId}
-            member={memberData}
-            members={allMembers}
-          />
-        );
+        return <Home familyId={familyId} member={memberData} members={allMembers} />;
       case 'calendar':
-        return <Placeholder title="Kalender" emoji="📅" />;
+        return <CalendarView familyId={familyId} member={memberData} members={allMembers} />;
+      case 'chores':
+        return <ChoresView familyId={familyId} member={memberData} members={allMembers} />;
+      case 'money':
+        return <MoneyView familyId={familyId} member={memberData} members={allMembers} />;
+      case 'meals':
+        return <MealPlan familyId={familyId} member={memberData} members={allMembers} onGenerateShopping={() => setPage('shopping')} />;
+      case 'shopping':
+        return <ShoppingView familyId={familyId} member={memberData} members={allMembers} />;
       case 'settings':
         return (
           <div style={styles.settingsPage}>
@@ -175,17 +145,6 @@ export function App() {
   );
 }
 
-function Placeholder({ title, emoji }) {
-  return (
-    <div style={styles.placeholder}>
-      <span style={{ fontSize: 48 }}>{emoji}</span>
-      <h2 style={styles.placeholderTitle}>{title}</h2>
-      <p style={styles.placeholderText}>Kommer snart!</p>
-      <div style={{ height: 80 }} />
-    </div>
-  );
-}
-
 const styles = {
   loading: {
     minHeight: '100vh',
@@ -193,27 +152,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     background: C.bg,
-  },
-  placeholder: {
-    minHeight: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: C.bg,
-    fontFamily: F.heading,
-    textAlign: 'center',
-    padding: 24,
-  },
-  placeholderTitle: {
-    fontSize: F.sizes.xxl,
-    fontWeight: F.weights.extra,
-    color: C.text,
-    margin: '12px 0 4px',
-  },
-  placeholderText: {
-    fontSize: F.sizes.md,
-    color: C.textMuted,
   },
   settingsPage: {
     minHeight: '100vh',
