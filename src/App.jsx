@@ -8,6 +8,7 @@ import { Login } from './Login';
 import { FamilySetup } from './FamilySetup';
 import { Nav } from './Nav';
 import { Home } from './Home';
+import { ChoresView } from './chores/ChoresView';
 import { C, F } from './data';
 import { Home as HomeIcon } from 'lucide-react';
 
@@ -49,7 +50,6 @@ export function App() {
   async function loadFamily(userId) {
     setLoading(true);
 
-    // Get current user's membership
     const { data: me } = await supabase
       .from('family_members')
       .select('id, family_id, name, role, avatar, color')
@@ -61,7 +61,6 @@ export function App() {
       setFamilyId(me.family_id);
       setMemberData(me);
 
-      // Load all family members
       const { data: members } = await supabase
         .from('family_members')
         .select('id, name, role, avatar, color')
@@ -113,10 +112,16 @@ export function App() {
             members={allMembers}
           />
         );
+      case 'chores':
+        return (
+          <ChoresView
+            familyId={familyId}
+            member={memberData}
+            members={allMembers}
+          />
+        );
       case 'calendar':
         return <Placeholder title="Kalender" emoji="📅" />;
-      case 'chores':
-        return <Placeholder title="Sysslor" emoji="✅" />;
       case 'money':
         return <Placeholder title="Pengar" emoji="💰" />;
       case 'meals':
@@ -152,7 +157,6 @@ export function App() {
   );
 }
 
-// Placeholder for pages not yet built
 function Placeholder({ title, emoji }) {
   return (
     <div style={styles.placeholder}>
