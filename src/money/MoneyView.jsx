@@ -4,9 +4,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { C, F, S, formatKr, safeArray } from '../data';
+import { C, F, S, formatKr } from '../data';
 import { SavingsGoal } from './SavingsGoal';
-import { PiggyBank, Plus, Minus, ArrowDownCircle, ArrowUpCircle, Gift, TrendingUp, ChevronDown, ChevronUp } from 'lucide-react';
+import { AllocateMoney } from './AllocateMoney';
+import { PiggyBank, Plus, ArrowUpCircle, TrendingUp, ChevronDown, ChevronUp, Wallet } from 'lucide-react';
 
 const TX_ICONS = {
   base_allowance: { icon: '💰', label: 'Veckopeng' },
@@ -27,6 +28,7 @@ export function MoneyView({ familyId, member, members }) {
   const [txForm, setTxForm] = useState({ amount: '', type: 'gift', description: '' });
   const [saving, setSaving] = useState(false);
   const [showAllTx, setShowAllTx] = useState(false);
+  const [showAllocate, setShowAllocate] = useState(false);
 
   const isParent = member.role === 'admin' || member.role === 'parent';
   const children = members.filter(m => m.role === 'child');
@@ -56,17 +58,26 @@ export function MoneyView({ familyId, member, members }) {
         .is('achieved_at', null),
     ]);
 
-    setTransactions(txRes.data || []);
-    setGoals(goalRes.data || []);
+    const txData = txRes.data || [];
+    const goalData = goalRes.data || [];
+
+    // Calculate saved amount per goal
+    const goalsWithSaved = goalData.map(g => {
+      const saved = txData
+        .filter(tx => tx.savings_goal_id === g.id)
+        .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+      return { ...g, _saved: saved };
+    });
+
+    setTransactions(txData);
+    setGoals(goalsWithSaved);
     setLoading(false);
   }
 
-  // --- Balance ---
   function getBalance() {
     return transactions.reduce((sum, tx) => sum + tx.amount, 0);
   }
 
-  // --- This week summary ---
   function getWeekSummary() {
     const now = new Date();
     const dayNum = now.getDay() || 7;
@@ -74,24 +85,15 @@ export function MoneyView({ familyId, member, members }) {
     monday.setDate(now.getDate() - dayNum + 1);
     monday.setHours(0, 0, 0, 0);
 
-    const weekTx = transactions.filter(tx =>
-      new Date(tx.created_at) >= monday
-    );
+    const weekTx = transactions.filter(tx => new Date(tx.created_at) >= monday);
 
-    const base = weekTx
-      .filter(tx => tx.type === 'base_allowance')
-      .reduce((s, tx) => s + tx.amount, 0);
-    const bonus = weekTx
-      .filter(tx => tx.type === 'chore_bonus')
-      .reduce((s, tx) => s + tx.amount, 0);
-    const spent = weekTx
-      .filter(tx => tx.amount < 0)
-      .reduce((s, tx) => s + tx.amount, 0);
+    const base = weekTx.filter(tx => tx.type === 'base_allowance').reduce((s, tx) => s + tx.amount, 0);
+    const bonus = weekTx.filter(tx => tx.type === 'chore_bonus').reduce((s, tx) => s + tx.amount, 0);
+    const spent = weekTx.filter(tx => tx.amount < 0).reduce((s, tx) => s + tx.amount, 0);
 
     return { base, bonus, spent };
   }
 
-  // --- Add transaction ---
   async function handleAddTx() {
     if (!txForm.amount || Number(txForm.amount) === 0) return;
     setSaving(true);
@@ -113,18 +115,12 @@ export function MoneyView({ familyId, member, members }) {
     loadData();
   }
 
-  // --- Savings goal progress ---
-  function goalProgress(goal) {
-    const saved = transactions
-      .filter(tx => tx.type === 'saving' || tx.type === 'family_goal')
-      .reduce((s, tx) => s + Math.abs(tx.amount), 0);
-    return saved;
-  }
-
   const balance = getBalance();
   const week = getWeekSummary();
   const child = members.find(m => m.id === selectedChild);
   const visibleTx = showAllTx ? transactions : transactions.slice(0, 8);
+  const personalGoals = goals.filter(g => !g.is_family_goal);
+  const familyGoals = goals.filter(g => g.is_family_goal);
 
   if (children.length === 0) {
     return (
@@ -141,7 +137,6 @@ export function MoneyView({ familyId, member, members }) {
 
   return (
     <div style={styles.page}>
-      {/* Header */}
       <div style={styles.header}>
         <h1 style={styles.pageTitle}>Pengar</h1>
       </div>
@@ -186,7 +181,6 @@ export function MoneyView({ familyId, member, members }) {
               </div>
             </div>
 
-            {/* Week summary */}
             <div style={styles.weekRow}>
               {week.base > 0 && (
                 <div style={styles.weekItem}>
@@ -218,25 +212,29 @@ export function MoneyView({ familyId, member, members }) {
             </div>
           </div>
 
-          {/* Parent actions */}
-          {isParent && (
-            <div style={styles.actionRow}>
+          {/* Action buttons */}
+          <div style={styles.actionRow}>
+            {balance > 0 && (
               <button
-                onClick={() => { setShowAddTx(!showAddTx); setTxForm({ amount: '', type: 'gift', description: '' }); }}
+                onClick={() => setShowAllocate(true)}
                 style={{ ...S.button, ...S.buttonPrimary, flex: 1, padding: '10px 12px' }}
               >
-                <Plus size={16} /> Lägg till
+                <Wallet size={16} /> Fördela pengar
               </button>
-              <button
-                onClick={() => { setShowAddTx(true); setTxForm({ amount: '', type: 'withdrawal', description: 'Utbetalning' }); }}
-                style={{ ...S.button, ...S.buttonSecondary, flex: 1, padding: '10px 12px' }}
-              >
-                <ArrowUpCircle size={16} /> Betala ut
-              </button>
-            </div>
-          )}
+            )}
+            {isParent && (
+              <>
+                <button
+                  onClick={() => { setShowAddTx(!showAddTx); setTxForm({ amount: '', type: 'gift', description: '' }); }}
+                  style={{ ...S.button, ...S.buttonSecondary, flex: 1, padding: '10px 12px' }}
+                >
+                  <Plus size={16} /> Lägg till
+                </button>
+              </>
+            )}
+          </div>
 
-          {/* Add transaction form */}
+          {/* Add transaction form (parent) */}
           {showAddTx && isParent && (
             <div style={styles.txForm}>
               <div style={styles.txTypeRow}>
@@ -262,17 +260,15 @@ export function MoneyView({ familyId, member, members }) {
                 ))}
               </div>
 
-              <div style={styles.txInputRow}>
-                <input
-                  type="number"
-                  placeholder="Belopp (kr)"
-                  value={txForm.amount}
-                  onChange={e => setTxForm(prev => ({ ...prev, amount: e.target.value }))}
-                  style={{ ...S.input, flex: 1 }}
-                  min="0"
-                  step="1"
-                />
-              </div>
+              <input
+                type="number"
+                placeholder="Belopp (kr)"
+                value={txForm.amount}
+                onChange={e => setTxForm(prev => ({ ...prev, amount: e.target.value }))}
+                style={S.input}
+                min="0"
+                step="1"
+              />
 
               <input
                 type="text"
@@ -303,17 +299,34 @@ export function MoneyView({ familyId, member, members }) {
             </div>
           )}
 
-          {/* Savings goals */}
-          {goals.length > 0 && (
+          {/* Personal savings goals */}
+          {personalGoals.length > 0 && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle}>
                 <PiggyBank size={18} color={C.primary} /> Sparmål
               </h2>
-              {goals.map(goal => (
+              {personalGoals.map(goal => (
                 <SavingsGoal
                   key={goal.id}
                   goal={goal}
-                  saved={goalProgress(goal)}
+                  saved={goal._saved || 0}
+                  members={members}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Family goals */}
+          {familyGoals.length > 0 && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>
+                <PiggyBank size={18} color={C.accent} /> Familjemål
+              </h2>
+              {familyGoals.map(goal => (
+                <SavingsGoal
+                  key={goal.id}
+                  goal={goal}
+                  saved={goal._saved || 0}
                   members={members}
                 />
               ))}
@@ -371,6 +384,18 @@ export function MoneyView({ familyId, member, members }) {
       )}
 
       <div style={{ height: 80 }} />
+
+      {/* Allocate modal */}
+      {showAllocate && (
+        <AllocateMoney
+          familyId={familyId}
+          memberId={selectedChild}
+          balance={balance}
+          goals={goals}
+          onComplete={loadData}
+          onClose={() => setShowAllocate(false)}
+        />
+      )}
     </div>
   );
 }
@@ -496,10 +521,6 @@ const styles = {
     fontWeight: F.weights.bold,
     fontFamily: F.heading,
     cursor: 'pointer',
-  },
-  txInputRow: {
-    display: 'flex',
-    gap: 8,
   },
   section: {
     padding: '12px 16px 0',
