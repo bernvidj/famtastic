@@ -13,6 +13,7 @@ const MEMBER_COLORS = C.memberColors;
 export function FamilySetup({ userId, onComplete }) {
   const [step, setStep] = useState(1);
   const [familyName, setFamilyName] = useState('');
+  const [adminName, setAdminName] = useState('');
   const [members, setMembers] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -26,7 +27,7 @@ export function FamilySetup({ userId, onComplete }) {
         name: '',
         role,
         avatar: role === 'child' ? '😀' : '😎',
-        color: MEMBER_COLORS[prev.length % MEMBER_COLORS.length],
+        color: MEMBER_COLORS[(prev.length + 1) % MEMBER_COLORS.length],
         pin: '',
       },
     ]);
@@ -48,38 +49,28 @@ export function FamilySetup({ userId, onComplete }) {
     setError('');
 
     try {
-      // 1. Create family
-      const { data: family, error: famErr } = await supabase
-        .from('families')
-        .insert({ name: familyName.trim() })
-        .select()
-        .single();
-
-      if (famErr) throw famErr;
-
-      // 2. Create admin member (current user)
-      const { error: adminErr } = await supabase
-        .from('family_members')
-        .insert({
-          family_id: family.id,
-          auth_user_id: userId,
-          name: 'Jag',
-          role: 'admin',
-          avatar: '👑',
-          color: MEMBER_COLORS[0],
+      // 1. Create family + admin via RPC
+      const { data: result, error: rpcErr } = await supabase
+        .rpc('create_family_with_admin', {
+          family_name: familyName.trim(),
+          admin_name: adminName.trim() || 'Admin',
+          admin_avatar: '👑',
+          admin_color: MEMBER_COLORS[0],
         });
 
-      if (adminErr) throw adminErr;
+      if (rpcErr) throw rpcErr;
 
-      // 3. Create other members
+      const familyId = result.family_id;
+
+      // 2. Create other members
       if (members.length > 0) {
         const rows = members.map(m => ({
-          family_id: family.id,
+          family_id: familyId,
           name: m.name.trim() || (m.role === 'child' ? 'Barn' : 'Förälder'),
           role: m.role,
           avatar: m.avatar,
           color: m.color,
-          pin_hash: m.role === 'child' && m.pin ? m.pin : null, // TODO: hash PIN via RPC
+          pin_hash: m.role === 'child' && m.pin ? m.pin : null,
         }));
 
         const { error: memErr } = await supabase
@@ -89,7 +80,7 @@ export function FamilySetup({ userId, onComplete }) {
         if (memErr) throw memErr;
       }
 
-      onComplete(family.id);
+      onComplete(familyId);
     } catch (err) {
       setError(err.message || 'Något gick fel');
       setSaving(false);
@@ -98,7 +89,7 @@ export function FamilySetup({ userId, onComplete }) {
 
   // --- RENDER ---
 
-  // Step 1: Family name
+  // Step 1: Family name + your name
   if (step === 1) {
     return (
       <div style={styles.page}>
@@ -107,8 +98,9 @@ export function FamilySetup({ userId, onComplete }) {
             <Home size={32} color="#fff" />
           </div>
           <h1 style={styles.title}>Skapa din familj</h1>
-          <p style={styles.desc}>Vad heter er familj? Du kan ändra det senare.</p>
+          <p style={styles.desc}>Vi behöver bara ett par saker för att komma igång.</p>
 
+          <label style={styles.label}>Familjens namn</label>
           <input
             type="text"
             placeholder="T.ex. Familjen Andersson"
@@ -116,6 +108,15 @@ export function FamilySetup({ userId, onComplete }) {
             onChange={e => setFamilyName(e.target.value)}
             style={S.input}
             autoFocus
+          />
+
+          <label style={{ ...styles.label, marginTop: 16 }}>Ditt namn</label>
+          <input
+            type="text"
+            placeholder="T.ex. Joacim"
+            value={adminName}
+            onChange={e => setAdminName(e.target.value)}
+            style={S.input}
           />
 
           <button
@@ -146,14 +147,13 @@ export function FamilySetup({ userId, onComplete }) {
         </div>
         <h1 style={styles.title}>Lägg till familjemedlemmar</h1>
         <p style={styles.desc}>
-          Du är redan med som admin. Lägg till resten av familjen — du kan alltid ändra senare.
+          Du ({adminName || 'Admin'}) är redan med. Lägg till resten av familjen.
         </p>
 
         {/* Member list */}
         {members.map(m => (
           <div key={m.tempId} style={styles.memberCard}>
             <div style={styles.memberHeader}>
-              {/* Avatar picker */}
               <select
                 value={m.avatar}
                 onChange={e => updateMember(m.tempId, 'avatar', e.target.value)}
@@ -164,7 +164,6 @@ export function FamilySetup({ userId, onComplete }) {
                 ))}
               </select>
 
-              {/* Name */}
               <input
                 type="text"
                 placeholder={m.role === 'child' ? 'Barnets namn' : 'Förälders namn'}
@@ -173,7 +172,6 @@ export function FamilySetup({ userId, onComplete }) {
                 style={styles.nameInput}
               />
 
-              {/* Remove */}
               <button
                 onClick={() => removeMember(m.tempId)}
                 style={styles.removeBtn}
@@ -182,7 +180,6 @@ export function FamilySetup({ userId, onComplete }) {
               </button>
             </div>
 
-            {/* Role badge */}
             <span style={{
               ...styles.roleBadge,
               background: m.role === 'child' ? C.accentLight : C.secondaryLight,
@@ -191,7 +188,6 @@ export function FamilySetup({ userId, onComplete }) {
               {m.role === 'child' ? '🧒 Barn' : '👤 Förälder'}
             </span>
 
-            {/* PIN for children */}
             {m.role === 'child' && (
               <input
                 type="text"
@@ -203,11 +199,10 @@ export function FamilySetup({ userId, onComplete }) {
                   const v = e.target.value.replace(/\D/g, '').slice(0, 4);
                   updateMember(m.tempId, 'pin', v);
                 }}
-                style={{ ...styles.pinInput }}
+                style={styles.pinInput}
               />
             )}
 
-            {/* Color picker */}
             <div style={styles.colorRow}>
               <span style={styles.colorLabel}>Färg:</span>
               {MEMBER_COLORS.map(c => (
@@ -245,7 +240,6 @@ export function FamilySetup({ userId, onComplete }) {
           <div style={styles.errorBox}>{error}</div>
         )}
 
-        {/* Save */}
         <button
           onClick={handleSave}
           disabled={saving}
@@ -257,12 +251,7 @@ export function FamilySetup({ userId, onComplete }) {
             opacity: saving ? 0.6 : 1,
           }}
         >
-          {saving ? (
-            <>
-              <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
-              Sparar...
-            </>
-          ) : (
+          {saving ? 'Sparar...' : (
             <>
               Skapa familjen
               <ArrowRight size={18} />
@@ -320,6 +309,13 @@ const styles = {
     color: C.textMuted,
     margin: '0 0 20px',
     lineHeight: 1.5,
+  },
+  label: {
+    display: 'block',
+    fontSize: F.sizes.sm,
+    fontWeight: F.weights.semi,
+    color: C.text,
+    marginBottom: 6,
   },
   memberCard: {
     background: C.bg,
