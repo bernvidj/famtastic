@@ -1,13 +1,22 @@
 // ============================================
-// FamTastic — CalendarView (week + day detail)
+// FamTastic — CalendarView (week + day + recurring)
 // ============================================
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F, S, getWeekNumber, todayStr, safeArray } from '../data';
-import { ChevronLeft, ChevronRight, Plus, X, Save, Clock, MapPin, Users, CheckSquare, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, X, Save, Clock, Users, CheckSquare, Trash2, Repeat } from 'lucide-react';
 
-const WEEKDAYS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
+const WEEKDAYS_SHORT = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
+const WEEKDAYS_PICK = [
+  { value: 1, label: 'Mån' },
+  { value: 2, label: 'Tis' },
+  { value: 3, label: 'Ons' },
+  { value: 4, label: 'Tor' },
+  { value: 5, label: 'Fre' },
+  { value: 6, label: 'Lör' },
+  { value: 7, label: 'Sön' },
+];
 const CATEGORIES = [
   { value: 'activity', label: 'Aktivitet', icon: '⚽' },
   { value: 'school', label: 'Skola', icon: '📚' },
@@ -38,6 +47,11 @@ function fmtTime(t) {
   return t.slice(0, 5);
 }
 
+function dateToDow(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.getDay() || 7; // 1=Mon, 7=Sun
+}
+
 const EMPTY_EVENT = {
   title: '',
   description: '',
@@ -47,6 +61,8 @@ const EMPTY_EVENT = {
   category: 'other',
   member_ids: [],
   color: '',
+  is_recurring: false,
+  recurrence_rule: { frequency: 'weekly', days: [] },
 };
 
 export function CalendarView({ familyId, member, members }) {
@@ -56,7 +72,7 @@ export function CalendarView({ familyId, member, members }) {
   const [completions, setCompletions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(null);
-  const [editing, setEditing] = useState(null); // null | 'new' | event
+  const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_EVENT);
 
   const weekDates = getWeekDates(weekOffset);
@@ -74,10 +90,10 @@ export function CalendarView({ familyId, member, members }) {
     const endDate = fmtDate(weekDates[6]);
 
     const [evRes, chRes, compRes] = await Promise.all([
+      // Get events for this week + all recurring events
       supabase.from('calendar_events').select('*')
         .eq('family_id', familyId)
-        .gte('event_date', startDate)
-        .lte('event_date', endDate)
+        .or(`and(event_date.gte.${startDate},event_date.lte.${endDate}),is_recurring.eq.true`)
         .order('start_time'),
       supabase.from('chores').select('*')
         .eq('family_id', familyId),
@@ -93,11 +109,23 @@ export function CalendarView({ familyId, member, members }) {
     setLoading(false);
   }
 
+  // --- Get events for a specific date (including recurring) ---
+  function getEventsForDate(dateStr) {
+    const dow = dateToDow(dateStr);
+    return events.filter(ev => {
+      // Non-recurring: exact date match
+      if (!ev.is_recurring) return ev.event_date === dateStr;
+      // Recurring: check day of week
+      const days = safeArray(ev.recurrence_rule?.days);
+      if (days.length > 0) return days.includes(dow);
+      // Recurring without specific days: show on same weekday as created
+      return dateToDow(ev.event_date) === dow;
+    });
+  }
+
   // --- Chores for a specific date ---
   function getChoresForDate(dateStr) {
-    const d = new Date(dateStr + 'T12:00:00');
-    const dow = d.getDay() || 7;
-
+    const dow = dateToDow(dateStr);
     return chores.filter(c => {
       if (c.is_recurring && c.recurrence_rule) {
         const days = safeArray(c.recurrence_rule.days);
@@ -114,17 +142,6 @@ export function CalendarView({ familyId, member, members }) {
     );
   }
 
-  // --- Events for a date ---
-  function getEventsForDate(dateStr) {
-    return events.filter(e => e.event_date === dateStr);
-  }
-
-  // --- Count items per day (for week strip) ---
-  function dayItemCount(dateStr) {
-    return getEventsForDate(dateStr).length + getChoresForDate(dateStr).length;
-  }
-
-  // --- Member helpers ---
   function getMember(id) {
     return members.find(m => m.id === id);
   }
@@ -151,8 +168,23 @@ export function CalendarView({ familyId, member, members }) {
       category: event.category || 'other',
       member_ids: safeArray(event.member_ids),
       color: event.color || '',
+      is_recurring: event.is_recurring || false,
+      recurrence_rule: event.recurrence_rule || { frequency: 'weekly', days: [] },
     });
     setEditing(event);
+  }
+
+  function toggleFormDay(day) {
+    setForm(prev => {
+      const rule = { ...prev.recurrence_rule };
+      const days = Array.isArray(rule.days) ? [...rule.days] : [];
+      if (days.includes(day)) {
+        rule.days = days.filter(d => d !== day);
+      } else {
+        rule.days = [...days, day].sort((a, b) => a - b);
+      }
+      return { ...prev, recurrence_rule: rule };
+    });
   }
 
   async function handleSave() {
@@ -168,6 +200,8 @@ export function CalendarView({ familyId, member, members }) {
       category: form.category,
       member_ids: form.member_ids,
       color: form.color || null,
+      is_recurring: form.is_recurring,
+      recurrence_rule: form.is_recurring ? form.recurrence_rule : null,
       created_by: member.id,
     };
 
@@ -196,12 +230,8 @@ export function CalendarView({ familyId, member, members }) {
     }));
   }
 
-  // --- Day detail data ---
-  const dayEvents = selectedDate ? getEventsForDate(selectedDate) : [];
-  const dayChores = selectedDate ? getChoresForDate(selectedDate) : [];
   const children = members.filter(m => m.role === 'child');
 
-  // --- RENDER ---
   return (
     <div style={styles.page}>
       {/* Header */}
@@ -225,9 +255,7 @@ export function CalendarView({ familyId, member, members }) {
         <div style={styles.weekTitle}>
           <span style={styles.weekLabel}>Vecka {weekNum}</span>
           {weekOffset !== 0 && (
-            <button onClick={() => { setWeekOffset(0); setSelectedDate(today); }} style={styles.todayBtn}>
-              Idag
-            </button>
+            <button onClick={() => { setWeekOffset(0); setSelectedDate(today); }} style={styles.todayBtn}>Idag</button>
           )}
         </div>
         <button onClick={() => setWeekOffset(w => w + 1)} style={styles.weekBtn}>
@@ -257,7 +285,7 @@ export function CalendarView({ familyId, member, members }) {
                 ...styles.dayName,
                 color: isSelected ? '#fff' : isToday ? C.primary : C.textMuted,
               }}>
-                {WEEKDAYS[i]}
+                {WEEKDAYS_SHORT[i]}
               </span>
               <span style={{
                 ...styles.dayNum,
@@ -266,10 +294,9 @@ export function CalendarView({ familyId, member, members }) {
               }}>
                 {d.getDate()}
               </span>
-              {/* Event dots */}
               <div style={styles.dotRow}>
-                {eventsForDay.slice(0, 3).map(ev => (
-                  <div key={ev.id} style={{
+                {eventsForDay.slice(0, 3).map((ev, ei) => (
+                  <div key={ev.id + '-' + ei} style={{
                     ...styles.dot,
                     background: isSelected ? 'rgba(255,255,255,0.7)' : (ev.color || getMemberColor(safeArray(ev.member_ids))),
                   }} />
@@ -283,7 +310,7 @@ export function CalendarView({ familyId, member, members }) {
       {loading ? (
         <p style={styles.loadingText}>Laddar...</p>
       ) : !selectedDate ? (
-        /* --- No day selected: show week overview --- */
+        /* --- Week overview --- */
         <div style={styles.content}>
           {weekDates.map((d, i) => {
             const dateStr = fmtDate(d);
@@ -303,15 +330,12 @@ export function CalendarView({ familyId, member, members }) {
                 }}
               >
                 <div style={styles.weekDayHeader}>
-                  <span style={{
-                    ...styles.weekDayName,
-                    color: isToday ? C.primary : C.text,
-                  }}>
-                    {WEEKDAYS[i]} {d.getDate()}/{d.getMonth() + 1}
+                  <span style={{ ...styles.weekDayName, color: isToday ? C.primary : C.text }}>
+                    {WEEKDAYS_SHORT[i]} {d.getDate()}/{d.getMonth() + 1}
                   </span>
                 </div>
-                {evs.map(ev => (
-                  <div key={ev.id} style={styles.weekEventRow}>
+                {evs.map((ev, ei) => (
+                  <div key={ev.id + '-' + ei} style={styles.weekEventRow}>
                     <div style={{
                       ...styles.weekEventDot,
                       background: ev.color || getMemberColor(safeArray(ev.member_ids)),
@@ -320,6 +344,7 @@ export function CalendarView({ familyId, member, members }) {
                       {ev.start_time ? fmtTime(ev.start_time) + ' ' : ''}
                       {ev.title}
                     </span>
+                    {ev.is_recurring && <Repeat size={10} color={C.textMuted} />}
                   </div>
                 ))}
                 {chs.length > 0 && (
@@ -341,37 +366,33 @@ export function CalendarView({ familyId, member, members }) {
             <div style={styles.emptyState}>
               <span style={{ fontSize: 40 }}>📅</span>
               <p style={styles.emptyTitle}>Lugn vecka!</p>
-              <p style={styles.emptyText}>Inga händelser denna vecka. Klicka på en dag för att lägga till.</p>
+              <p style={styles.emptyText}>Klicka på en dag för att lägga till händelser.</p>
             </div>
           )}
         </div>
       ) : (
-        /* --- Day detail view --- */
+        /* --- Day detail --- */
         <div style={styles.content}>
           <div style={styles.dayDetailHeader}>
             <h2 style={styles.dayDetailTitle}>
-              {WEEKDAYS[new Date(selectedDate + 'T12:00:00').getDay() === 0 ? 6 : new Date(selectedDate + 'T12:00:00').getDay() - 1]}{' '}
-              {new Date(selectedDate + 'T12:00:00').getDate()}/{new Date(selectedDate + 'T12:00:00').getMonth() + 1}
+              {WEEKDAYS_SHORT[dateToDow(selectedDate) - 1]} {new Date(selectedDate + 'T12:00:00').getDate()}/{new Date(selectedDate + 'T12:00:00').getMonth() + 1}
             </h2>
             {isParent && (
-              <button
-                onClick={() => openNewEvent(selectedDate)}
-                style={styles.addEventBtn}
-              >
+              <button onClick={() => openNewEvent(selectedDate)} style={styles.addEventBtn}>
                 <Plus size={14} /> Lägg till
               </button>
             )}
           </div>
 
           {/* Events */}
-          {dayEvents.length > 0 && (
+          {getEventsForDate(selectedDate).length > 0 && (
             <div style={styles.section}>
               <h3 style={styles.sectionLabel}>Händelser</h3>
-              {dayEvents.map(ev => {
+              {getEventsForDate(selectedDate).map((ev, ei) => {
                 const catInfo = CATEGORIES.find(c => c.value === ev.category) || CATEGORIES[3];
                 return (
                   <button
-                    key={ev.id}
+                    key={ev.id + '-' + ei}
                     onClick={() => isParent && openEditEvent(ev)}
                     style={{
                       ...styles.eventCard,
@@ -381,27 +402,24 @@ export function CalendarView({ familyId, member, members }) {
                     <div style={styles.eventTop}>
                       <span style={styles.eventIcon}>{catInfo.icon}</span>
                       <div style={styles.eventContent}>
-                        <span style={styles.eventTitle}>{ev.title}</span>
+                        <span style={styles.eventTitle}>
+                          {ev.title}
+                          {ev.is_recurring && <Repeat size={12} color={C.textMuted} style={{ marginLeft: 6 }} />}
+                        </span>
                         {(ev.start_time || ev.end_time) && (
                           <span style={styles.eventTime}>
                             <Clock size={12} color={C.textMuted} />
                             {fmtTime(ev.start_time)}{ev.end_time ? ` – ${fmtTime(ev.end_time)}` : ''}
                           </span>
                         )}
-                        {ev.description && (
-                          <span style={styles.eventDesc}>{ev.description}</span>
-                        )}
+                        {ev.description && <span style={styles.eventDesc}>{ev.description}</span>}
                       </div>
                     </div>
                     {safeArray(ev.member_ids).length > 0 && (
                       <div style={styles.eventMembers}>
                         {safeArray(ev.member_ids).map(mid => {
                           const m = getMember(mid);
-                          return m ? (
-                            <span key={mid} style={styles.eventMemberBadge}>
-                              {m.avatar} {m.name}
-                            </span>
-                          ) : null;
+                          return m ? <span key={mid} style={styles.eventMemberBadge}>{m.avatar} {m.name}</span> : null;
                         })}
                       </div>
                     )}
@@ -411,36 +429,26 @@ export function CalendarView({ familyId, member, members }) {
             </div>
           )}
 
-          {/* Chores for this day */}
-          {dayChores.length > 0 && (
+          {/* Chores */}
+          {getChoresForDate(selectedDate).length > 0 && (
             <div style={styles.section}>
               <h3 style={styles.sectionLabel}>Sysslor</h3>
               {children.map(child => {
-                const childChores = dayChores.filter(c =>
+                const childChores = getChoresForDate(selectedDate).filter(c =>
                   !c.assigned_to || c.assigned_to === child.id
                 );
                 if (childChores.length === 0) return null;
-
                 return (
                   <div key={child.id} style={styles.choreGroup}>
                     <span style={styles.choreGroupLabel}>{child.avatar} {child.name}</span>
                     {childChores.map(chore => {
                       const done = isChoreCompleted(chore.id, child.id, selectedDate);
                       return (
-                        <div key={chore.id} style={{
-                          ...styles.choreItem,
-                          opacity: done ? 0.5 : 1,
-                        }}>
-                          <span style={{
-                            ...styles.choreCheck,
-                            color: done ? C.success : C.border,
-                          }}>
+                        <div key={chore.id} style={{ ...styles.choreItem, opacity: done ? 0.5 : 1 }}>
+                          <span style={{ ...styles.choreCheck, color: done ? C.success : C.border }}>
                             {done ? '✅' : '○'}
                           </span>
-                          <span style={{
-                            ...styles.choreName,
-                            textDecoration: done ? 'line-through' : 'none',
-                          }}>
+                          <span style={{ ...styles.choreName, textDecoration: done ? 'line-through' : 'none' }}>
                             {chore.icon} {chore.title}
                           </span>
                           {chore.chore_type === 'bonus' && chore.points > 0 && (
@@ -458,7 +466,7 @@ export function CalendarView({ familyId, member, members }) {
             </div>
           )}
 
-          {dayEvents.length === 0 && dayChores.length === 0 && (
+          {getEventsForDate(selectedDate).length === 0 && getChoresForDate(selectedDate).length === 0 && (
             <div style={styles.emptyDay}>
               <p style={styles.emptyDayText}>Inget planerat denna dag</p>
             </div>
@@ -556,6 +564,54 @@ export function CalendarView({ familyId, member, members }) {
                 ))}
               </div>
 
+              {/* Recurring */}
+              <label style={{ ...styles.label, marginTop: 14 }}>Återkommande</label>
+              <div style={styles.toggleRow}>
+                <button
+                  onClick={() => setForm(prev => ({ ...prev, is_recurring: false }))}
+                  style={{
+                    ...styles.toggleBtn,
+                    background: !form.is_recurring ? C.text : C.bgCard,
+                    color: !form.is_recurring ? '#fff' : C.text,
+                  }}
+                >
+                  Engång
+                </button>
+                <button
+                  onClick={() => setForm(prev => ({ ...prev, is_recurring: true }))}
+                  style={{
+                    ...styles.toggleBtn,
+                    background: form.is_recurring ? C.text : C.bgCard,
+                    color: form.is_recurring ? '#fff' : C.text,
+                  }}
+                >
+                  Varje vecka
+                </button>
+              </div>
+
+              {form.is_recurring && (
+                <div style={styles.dayPickRow}>
+                  {WEEKDAYS_PICK.map(d => {
+                    const days = Array.isArray(form.recurrence_rule?.days) ? form.recurrence_rule.days : [];
+                    const active = days.includes(d.value);
+                    return (
+                      <button
+                        key={d.value}
+                        onClick={() => toggleFormDay(d.value)}
+                        style={{
+                          ...styles.dayPickBtn,
+                          background: active ? C.primary : C.bgCard,
+                          color: active ? '#fff' : C.text,
+                          border: active ? `2px solid ${C.primary}` : `2px solid ${C.border}`,
+                        }}
+                      >
+                        {d.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
               <label style={{ ...styles.label, marginTop: 14 }}>Beskrivning (valfritt)</label>
               <input
                 type="text"
@@ -591,7 +647,6 @@ export function CalendarView({ familyId, member, members }) {
   );
 }
 
-// --- Styles ---
 const styles = {
   page: { minHeight: '100vh', background: C.bg, fontFamily: F.body },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 16px 8px' },
@@ -609,8 +664,6 @@ const styles = {
   dot: { width: 6, height: 6, borderRadius: 3 },
   content: { padding: '0 16px' },
   loadingText: { textAlign: 'center', color: C.textMuted, padding: 32 },
-
-  // Week overview
   weekDayRow: { display: 'block', width: '100%', padding: '10px 14px', borderRadius: 12, border: `1px solid ${C.borderLight}`, marginBottom: 6, cursor: 'pointer', textAlign: 'left' },
   weekDayHeader: { marginBottom: 4 },
   weekDayName: { fontFamily: F.heading, fontSize: F.sizes.sm, fontWeight: F.weights.bold },
@@ -619,26 +672,20 @@ const styles = {
   weekEventTitle: { fontSize: F.sizes.sm, color: C.text },
   weekChoreRow: { display: 'flex', alignItems: 'center', gap: 4, padding: '3px 0' },
   weekChoreText: { fontSize: F.sizes.xs, color: C.textMuted },
-
-  // Day detail
   dayDetailHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   dayDetailTitle: { fontFamily: F.heading, fontSize: F.sizes.lg, fontWeight: F.weights.extra, color: C.text, margin: 0 },
   addEventBtn: { display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 8, border: `1px dashed ${C.primary}`, background: C.primaryLight, color: C.primary, fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer' },
   section: { marginBottom: 16 },
   sectionLabel: { fontFamily: F.heading, fontSize: F.sizes.sm, fontWeight: F.weights.bold, color: C.textMuted, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: 0.5 },
-
-  // Event cards
   eventCard: { display: 'block', width: '100%', padding: '12px 14px', background: C.bgCard, borderRadius: 12, border: `1px solid ${C.borderLight}`, marginBottom: 6, cursor: 'pointer', textAlign: 'left' },
   eventTop: { display: 'flex', gap: 10 },
   eventIcon: { fontSize: 20, flexShrink: 0, paddingTop: 2 },
   eventContent: { flex: 1 },
-  eventTitle: { display: 'block', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text, marginBottom: 2 },
+  eventTitle: { display: 'flex', alignItems: 'center', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text, marginBottom: 2 },
   eventTime: { display: 'flex', alignItems: 'center', gap: 4, fontSize: F.sizes.xs, color: C.textMuted, marginBottom: 2 },
   eventDesc: { display: 'block', fontSize: F.sizes.sm, color: C.textMuted },
   eventMembers: { display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 },
   eventMemberBadge: { padding: '2px 8px', borderRadius: 6, background: C.bg, fontSize: F.sizes.xs, color: C.text },
-
-  // Chores in day view
   choreGroup: { marginBottom: 10 },
   choreGroupLabel: { display: 'block', fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text, marginBottom: 6 },
   choreItem: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: C.bgCard, borderRadius: 10, border: `1px solid ${C.borderLight}`, marginBottom: 4 },
@@ -646,14 +693,11 @@ const styles = {
   choreName: { flex: 1, fontSize: F.sizes.sm, color: C.text },
   chorePoints: { fontSize: F.sizes.xs, fontWeight: F.weights.bold, color: C.accent, background: C.accentLight, padding: '2px 6px', borderRadius: 4 },
   choreBase: { fontSize: F.sizes.xs, fontWeight: F.weights.bold, color: C.secondary, background: C.secondaryLight, padding: '2px 6px', borderRadius: 4 },
-
   emptyState: { textAlign: 'center', padding: '32px 20px' },
   emptyTitle: { fontFamily: F.heading, fontSize: F.sizes.lg, fontWeight: F.weights.bold, color: C.text, margin: '10px 0 4px' },
   emptyText: { fontSize: F.sizes.sm, color: C.textMuted, margin: 0 },
   emptyDay: { textAlign: 'center', padding: 24 },
   emptyDayText: { fontSize: F.sizes.sm, color: C.textMuted },
-
-  // Modal
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 200 },
   modal: { width: '100%', maxWidth: 500, maxHeight: '90vh', background: C.bgCard, borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `1px solid ${C.borderLight}` },
@@ -666,6 +710,10 @@ const styles = {
   catBtn: { padding: '6px 12px', borderRadius: 8, fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer' },
   memberRow: { display: 'flex', flexWrap: 'wrap', gap: 6 },
   memberBtn: { padding: '6px 12px', borderRadius: 8, fontSize: F.sizes.sm, fontWeight: F.weights.semi, fontFamily: F.heading, cursor: 'pointer' },
+  toggleRow: { display: 'flex', gap: 6, marginBottom: 4 },
+  toggleBtn: { padding: '8px 16px', borderRadius: 10, border: `1px solid ${C.border}`, fontSize: F.sizes.sm, fontWeight: F.weights.semi, fontFamily: F.heading, cursor: 'pointer' },
+  dayPickRow: { display: 'flex', gap: 4, marginTop: 10 },
+  dayPickBtn: { flex: 1, padding: '8px 2px', borderRadius: 8, fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', textAlign: 'center' },
   modalFooter: { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 20px env(safe-area-inset-bottom, 12px)', borderTop: `1px solid ${C.borderLight}` },
   deleteBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px', borderRadius: 10, border: 'none', background: C.errorLight, color: C.error, fontSize: F.sizes.sm, fontWeight: F.weights.semi, cursor: 'pointer' },
 };
