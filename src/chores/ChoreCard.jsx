@@ -12,10 +12,21 @@ const DIFFICULTY_LABELS = {
   hard: { label: 'Svårt', color: C.error, bg: C.errorLight },
 };
 
-export function ChoreCard({ chore, completed, pending, onToggle, memberName, memberAvatar, canToggle }) {
+export function ChoreCard({
+  chore,
+  completed,
+  pending,
+  onToggle,
+  memberAvatar,
+  memberName,
+  canToggle,
+  weekProgress,   // { done: 1, total: 3 }
+  weekEarned,     // total kr earned this week for this chore
+}) {
   const [animating, setAnimating] = useState(false);
   const diff = DIFFICULTY_LABELS[chore.difficulty] || DIFFICULTY_LABELS.medium;
   const isBase = chore.chore_type === 'base';
+  const hasWeekProgress = weekProgress && weekProgress.total > 1;
 
   function handleClick() {
     if (!canToggle) return;
@@ -69,14 +80,14 @@ export function ChoreCard({ chore, completed, pending, onToggle, memberName, mem
               {isBase ? 'Grundsyssla' : 'Bonus'}
             </span>
 
-            {/* Points */}
+            {/* Points per time */}
             {!isBase && chore.points > 0 && (
               <span style={{
                 ...styles.badge,
                 background: C.accentLight,
                 color: C.warning,
               }}>
-                <Star size={11} /> {chore.points} kr
+                <Star size={11} /> {chore.points} kr/gång
               </span>
             )}
 
@@ -100,6 +111,25 @@ export function ChoreCard({ chore, completed, pending, onToggle, memberName, mem
               </span>
             )}
           </div>
+
+          {/* Week progress bar */}
+          {hasWeekProgress && (
+            <div style={styles.progressRow}>
+              <div style={styles.progressBarBg}>
+                <div style={{
+                  ...styles.progressBarFill,
+                  width: `${(weekProgress.done / weekProgress.total) * 100}%`,
+                  background: weekProgress.done >= weekProgress.total ? C.success : C.primary,
+                }} />
+              </div>
+              <span style={styles.progressText}>
+                {weekProgress.done}/{weekProgress.total} denna vecka
+                {!isBase && chore.points > 0 && weekEarned > 0 && (
+                  <> · {weekEarned} kr intjänat</>
+                )}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Assignee */}
@@ -160,6 +190,25 @@ const styles = {
     borderRadius: 6,
     fontSize: F.sizes.xs,
     fontWeight: F.weights.bold,
+  },
+  progressRow: {
+    marginTop: 8,
+  },
+  progressBarBg: {
+    height: 6,
+    background: C.borderLight,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+    transition: 'width 0.3s',
+  },
+  progressText: {
+    fontSize: F.sizes.xs,
+    color: C.textMuted,
   },
   assignee: {
     display: 'flex',
