@@ -159,7 +159,7 @@ export function MoneyView({ familyId, member, members }) {
       {familyGoals.length > 0 && (
         <div style={styles.goalSection}>
           {familyGoals.map(fg => (
-            <FamilyGoalCard key={fg.id} goal={fg} familyId={familyId} members={members} />
+            <FamilyGoalCard key={fg.id + '-' + loading} goal={fg} familyId={familyId} members={members} />
           ))}
         </div>
       )}
