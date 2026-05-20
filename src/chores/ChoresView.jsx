@@ -16,12 +16,12 @@ export function ChoresView({ familyId, member, members }) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
   const [filterMember, setFilterMember] = useState(null);
+  const [toastMsg, setToastMsg] = useState(null);
 
   const today = todayStr();
   const todayDow = new Date().getDay() || 7;
   const isParent = member.role === 'admin' || member.role === 'parent';
 
-  // Week boundaries
   const now = new Date();
   const dayNum = now.getDay() || 7;
   const monday = new Date(now);
@@ -37,7 +37,6 @@ export function ChoresView({ familyId, member, members }) {
 
   async function loadData() {
     setLoading(true);
-
     const [chRes, compRes] = await Promise.all([
       supabase.from('chores').select('*')
         .eq('family_id', familyId)
@@ -47,7 +46,6 @@ export function ChoresView({ familyId, member, members }) {
         .gte('completed_date', weekStart)
         .lte('completed_date', weekEnd),
     ]);
-
     setChores(chRes.data || []);
     setCompletions(compRes.data || []);
     setLoading(false);
@@ -57,21 +55,18 @@ export function ChoresView({ familyId, member, members }) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
-  // --- How many times per week should this chore be done? ---
   function weekTotal(chore) {
     if (!chore.is_recurring || !chore.recurrence_rule) return 1;
     const days = safeArray(chore.recurrence_rule.days);
     return days.length > 0 ? days.length : 1;
   }
 
-  // --- How many times has this member completed it this week? ---
   function weekDone(choreId, memberId) {
     return completions.filter(
       c => c.chore_id === choreId && c.member_id === memberId
     ).length;
   }
 
-  // --- Total kr earned this week for a chore by a member ---
   function weekEarned(chore, memberId) {
     if (chore.chore_type === 'base') return 0;
     return completions
@@ -79,7 +74,6 @@ export function ChoresView({ familyId, member, members }) {
       .reduce((sum, c) => sum + (c.points_earned || 0), 0);
   }
 
-  // --- Is it completed today? ---
   function isCompletedToday(choreId, memberId) {
     return completions.some(
       c => c.chore_id === choreId && c.member_id === memberId && c.completed_date === today
@@ -93,7 +87,6 @@ export function ChoresView({ familyId, member, members }) {
     );
   }
 
-  // --- Filter today's chores ---
   function getTodayChores() {
     return chores.filter(c => {
       if (c.is_recurring && c.recurrence_rule) {
@@ -107,32 +100,42 @@ export function ChoresView({ familyId, member, members }) {
     });
   }
 
-  // --- Toggle chore ---
+  // --- Toggle via RPC ---
   async function toggleChore(choreId, memberId) {
     const mid = memberId || member.id;
     const done = isCompletedToday(choreId, mid);
 
     if (done) {
-      await supabase.from('chore_completions')
-        .delete()
-        .eq('chore_id', choreId)
-        .eq('member_id', mid)
-        .eq('completed_date', today);
+      const { error } = await supabase.rpc('uncomplete_chore', {
+        p_chore_id: choreId,
+        p_member_id: mid,
+        p_completed_date: today,
+      });
+      if (error) {
+        showToast('Kunde inte ångra: ' + error.message);
+      }
     } else {
       const chore = chores.find(c => c.id === choreId);
-      await supabase.from('chore_completions')
-        .insert({
-          chore_id: choreId,
-          family_id: familyId,
-          member_id: mid,
-          completed_date: today,
-          points_earned: chore?.chore_type === 'bonus' ? (chore?.points || 0) : 0,
-        });
+      const { data, error } = await supabase.rpc('complete_chore', {
+        p_chore_id: choreId,
+        p_family_id: familyId,
+        p_member_id: mid,
+        p_completed_date: today,
+      });
+      if (error) {
+        showToast('Kunde inte bocka av: ' + error.message);
+      } else if (data?.points_earned > 0) {
+        showToast(`🎉 +${data.points_earned} kr för ${chore?.title}!`);
+      }
     }
     loadData();
   }
 
-  // --- Save/delete chore ---
+  function showToast(msg) {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(null), 3000);
+  }
+
   async function handleSave(data) {
     if (editing && editing !== 'new' && editing.id) {
       await supabase.from('chores').update(data).eq('id', editing.id);
@@ -149,11 +152,9 @@ export function ChoresView({ familyId, member, members }) {
     loadData();
   }
 
-  // --- Group chores by assigned member ---
   function groupByMember(choreList) {
     const groups = {};
     const children = members.filter(m => m.role === 'child');
-
     children.forEach(child => {
       groups[child.id] = {
         member: child,
@@ -162,11 +163,9 @@ export function ChoresView({ familyId, member, members }) {
         ),
       };
     });
-
     return Object.values(groups).filter(g => g.chores.length > 0);
   }
 
-  // --- Week summary per child ---
   function weekSummary(childId) {
     const childCompletions = completions.filter(c => c.member_id === childId);
     const bonusEarned = childCompletions.reduce((sum, c) => sum + (c.points_earned || 0), 0);
@@ -174,9 +173,13 @@ export function ChoresView({ familyId, member, members }) {
     return { totalDone, bonusEarned };
   }
 
-  // --- RENDER ---
   return (
     <div style={styles.page}>
+      {/* Toast */}
+      {toastMsg && (
+        <div style={styles.toast}>{toastMsg}</div>
+      )}
+
       {/* Header */}
       <div style={styles.header}>
         <h1 style={styles.title}>Sysslor</h1>
@@ -247,7 +250,6 @@ export function ChoresView({ familyId, member, members }) {
       {loading ? (
         <p style={styles.loadingText}>Laddar...</p>
       ) : tab === 'today' ? (
-        /* --- TODAY VIEW --- */
         <div style={styles.content}>
           {getTodayChores().length === 0 ? (
             <div style={styles.emptyState}>
@@ -292,7 +294,6 @@ export function ChoresView({ familyId, member, members }) {
           )}
         </div>
       ) : (
-        /* --- ALL CHORES VIEW --- */
         <div style={styles.content}>
           {chores.length === 0 ? (
             <div style={styles.emptyState}>
@@ -378,6 +379,22 @@ const styles = {
     minHeight: '100vh',
     background: C.bg,
     fontFamily: F.body,
+  },
+  toast: {
+    position: 'fixed',
+    top: 16,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    background: C.text,
+    color: '#fff',
+    padding: '10px 20px',
+    borderRadius: 12,
+    fontSize: F.sizes.sm,
+    fontWeight: F.weights.bold,
+    fontFamily: F.heading,
+    zIndex: 300,
+    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+    animation: 'fadeIn 0.2s ease',
   },
   header: {
     display: 'flex',
