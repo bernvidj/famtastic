@@ -1,30 +1,66 @@
 // ============================================
-// FamTastic — App (auth gate)
+// FamTastic — App (auth gate + family check)
 // ============================================
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { Login } from './Login';
+import { FamilySetup } from './FamilySetup';
 import { C, F } from './data';
 import { Home } from 'lucide-react';
 
 export function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [familyId, setFamilyId] = useState(null);
+  const [memberData, setMemberData] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
-      setLoading(false);
+      if (s) {
+        loadFamily(s.user.id);
+      } else {
+        setLoading(false);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, s) => setSession(s)
+      (_event, s) => {
+        setSession(s);
+        if (s) {
+          loadFamily(s.user.id);
+        } else {
+          setFamilyId(null);
+          setMemberData(null);
+          setLoading(false);
+        }
+      }
     );
 
     return () => subscription.unsubscribe();
   }, []);
 
+  async function loadFamily(userId) {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('family_members')
+      .select('id, family_id, name, role, avatar, color')
+      .eq('auth_user_id', userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (data) {
+      setFamilyId(data.family_id);
+      setMemberData(data);
+    } else {
+      setFamilyId(null);
+      setMemberData(null);
+    }
+    setLoading(false);
+  }
+
+  // --- Loading ---
   if (loading) {
     return (
       <div style={styles.loading}>
@@ -33,15 +69,29 @@ export function App() {
     );
   }
 
+  // --- Not logged in ---
   if (!session) {
     return <Login />;
   }
 
-  // Logged in — placeholder for now
+  // --- No family yet ---
+  if (!familyId) {
+    return (
+      <FamilySetup
+        userId={session.user.id}
+        onComplete={(fId) => loadFamily(session.user.id)}
+      />
+    );
+  }
+
+  // --- Logged in with family — placeholder ---
   return (
     <div style={styles.loggedIn}>
       <h1 style={styles.title}>Välkommen till FamTastic! 🎉</h1>
-      <p style={styles.email}>Inloggad som: {session.user.email}</p>
+      <p style={styles.info}>
+        {memberData?.avatar} {memberData?.name} — {memberData?.role}
+      </p>
+      <p style={styles.sub}>Familj-ID: {familyId}</p>
       <button
         style={styles.logoutBtn}
         onClick={() => supabase.auth.signOut()}
@@ -77,8 +127,13 @@ const styles = {
     color: C.primary,
     margin: '0 0 8px',
   },
-  email: {
-    fontSize: F.sizes.md,
+  info: {
+    fontSize: F.sizes.lg,
+    color: C.text,
+    margin: '0 0 4px',
+  },
+  sub: {
+    fontSize: F.sizes.sm,
     color: C.textMuted,
     margin: '0 0 24px',
   },
