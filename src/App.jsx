@@ -9,6 +9,7 @@ import { FamilySetup } from './FamilySetup';
 import { Nav } from './Nav';
 import { Home } from './Home';
 import { ChoresView } from './chores/ChoresView';
+import { MoneyView } from './money/MoneyView';
 import { C, F } from './data';
 import { Home as HomeIcon } from 'lucide-react';
 
@@ -77,7 +78,6 @@ export function App() {
     setLoading(false);
   }
 
-  // --- Loading ---
   if (loading) {
     return (
       <div style={styles.loading}>
@@ -86,12 +86,10 @@ export function App() {
     );
   }
 
-  // --- Not logged in ---
   if (!session) {
     return <Login />;
   }
 
-  // --- No family yet ---
   if (!familyId) {
     return (
       <FamilySetup
@@ -101,7 +99,6 @@ export function App() {
     );
   }
 
-  // --- Main app ---
   function renderPage() {
     switch (page) {
       case 'home':
@@ -120,10 +117,16 @@ export function App() {
             members={allMembers}
           />
         );
+      case 'money':
+        return (
+          <MoneyView
+            familyId={familyId}
+            member={memberData}
+            members={allMembers}
+          />
+        );
       case 'calendar':
         return <Placeholder title="Kalender" emoji="📅" />;
-      case 'money':
-        return <Placeholder title="Pengar" emoji="💰" />;
       case 'meals':
         return <Placeholder title="Mat" emoji="🍕" />;
       case 'shopping':
