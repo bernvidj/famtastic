@@ -70,6 +70,13 @@ export function App() {
 
   async function loadFamily(userId) {
     setLoading(true);
+
+    // Try to auto-link if this is a new parent login
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.email) {
+      await supabase.rpc('link_auth_to_member', { p_email: user.email });
+    }
+
     const { data: me } = await supabase
       .from('family_members')
       .select('id, family_id, name, role, avatar, color')
