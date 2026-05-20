@@ -10,6 +10,8 @@ import { Nav } from './Nav';
 import { Home } from './Home';
 import { ChoresView } from './chores/ChoresView';
 import { MoneyView } from './money/MoneyView';
+import { MealPlan } from './meals/MealPlan';
+import { ShoppingView } from './shopping/ShoppingView';
 import { C, F } from './data';
 import { Home as HomeIcon } from 'lucide-react';
 
@@ -125,12 +127,25 @@ export function App() {
             members={allMembers}
           />
         );
+      case 'meals':
+        return (
+          <MealPlan
+            familyId={familyId}
+            member={memberData}
+            members={allMembers}
+            onGenerateShopping={() => setPage('shopping')}
+          />
+        );
+      case 'shopping':
+        return (
+          <ShoppingView
+            familyId={familyId}
+            member={memberData}
+            members={allMembers}
+          />
+        );
       case 'calendar':
         return <Placeholder title="Kalender" emoji="📅" />;
-      case 'meals':
-        return <Placeholder title="Mat" emoji="🍕" />;
-      case 'shopping':
-        return <Placeholder title="Handla" emoji="🛒" />;
       case 'settings':
         return (
           <div style={styles.settingsPage}>
