@@ -10,16 +10,26 @@ import { ChoreEditor } from './ChoreEditor';
 import { Plus, List, CalendarDays, Filter } from 'lucide-react';
 
 export function ChoresView({ familyId, member, members }) {
-  const [tab, setTab] = useState('today'); // 'today' | 'all'
+  const [tab, setTab] = useState('today');
   const [chores, setChores] = useState([]);
   const [completions, setCompletions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(null); // null | 'new' | chore object
-  const [filterMember, setFilterMember] = useState(null); // null = all
+  const [editing, setEditing] = useState(null);
+  const [filterMember, setFilterMember] = useState(null);
 
   const today = todayStr();
-  const todayDow = new Date().getDay() || 7; // 1=Mon, 7=Sun
+  const todayDow = new Date().getDay() || 7;
   const isParent = member.role === 'admin' || member.role === 'parent';
+
+  // Week boundaries
+  const now = new Date();
+  const dayNum = now.getDay() || 7;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - dayNum + 1);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const weekStart = fmtDate(monday);
+  const weekEnd = fmtDate(sunday);
 
   useEffect(() => {
     loadData();
@@ -28,24 +38,14 @@ export function ChoresView({ familyId, member, members }) {
   async function loadData() {
     setLoading(true);
 
-    // Get week start/end for completions
-    const now = new Date();
-    const day = now.getDay() || 7;
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - day + 1);
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    const startDate = fmtDate(monday);
-    const endDate = fmtDate(sunday);
-
     const [chRes, compRes] = await Promise.all([
       supabase.from('chores').select('*')
         .eq('family_id', familyId)
         .order('created_at'),
       supabase.from('chore_completions').select('*')
         .eq('family_id', familyId)
-        .gte('completed_date', startDate)
-        .lte('completed_date', endDate),
+        .gte('completed_date', weekStart)
+        .lte('completed_date', weekEnd),
     ]);
 
     setChores(chRes.data || []);
@@ -57,23 +57,30 @@ export function ChoresView({ familyId, member, members }) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
-  // --- Filter today's chores ---
-  function getTodayChores() {
-    return chores.filter(c => {
-      // Recurring: check if today's day is in the schedule
-      if (c.is_recurring && c.recurrence_rule) {
-        const days = safeArray(c.recurrence_rule.days);
-        if (days.length > 0 && !days.includes(todayDow)) return false;
-      }
-      // Filter by member
-      if (filterMember) {
-        if (c.assigned_to && c.assigned_to !== filterMember) return false;
-      }
-      return true;
-    });
+  // --- How many times per week should this chore be done? ---
+  function weekTotal(chore) {
+    if (!chore.is_recurring || !chore.recurrence_rule) return 1;
+    const days = safeArray(chore.recurrence_rule.days);
+    return days.length > 0 ? days.length : 1;
   }
 
-  function isCompleted(choreId, memberId) {
+  // --- How many times has this member completed it this week? ---
+  function weekDone(choreId, memberId) {
+    return completions.filter(
+      c => c.chore_id === choreId && c.member_id === memberId
+    ).length;
+  }
+
+  // --- Total kr earned this week for a chore by a member ---
+  function weekEarned(chore, memberId) {
+    if (chore.chore_type === 'base') return 0;
+    return completions
+      .filter(c => c.chore_id === chore.id && c.member_id === memberId)
+      .reduce((sum, c) => sum + (c.points_earned || 0), 0);
+  }
+
+  // --- Is it completed today? ---
+  function isCompletedToday(choreId, memberId) {
     return completions.some(
       c => c.chore_id === choreId && c.member_id === memberId && c.completed_date === today
     );
@@ -86,9 +93,24 @@ export function ChoresView({ familyId, member, members }) {
     );
   }
 
+  // --- Filter today's chores ---
+  function getTodayChores() {
+    return chores.filter(c => {
+      if (c.is_recurring && c.recurrence_rule) {
+        const days = safeArray(c.recurrence_rule.days);
+        if (days.length > 0 && !days.includes(todayDow)) return false;
+      }
+      if (filterMember) {
+        if (c.assigned_to && c.assigned_to !== filterMember) return false;
+      }
+      return true;
+    });
+  }
+
+  // --- Toggle chore ---
   async function toggleChore(choreId, memberId) {
     const mid = memberId || member.id;
-    const done = isCompleted(choreId, mid);
+    const done = isCompletedToday(choreId, mid);
 
     if (done) {
       await supabase.from('chore_completions')
@@ -113,7 +135,6 @@ export function ChoresView({ familyId, member, members }) {
   // --- Save/delete chore ---
   async function handleSave(data) {
     if (editing && editing !== 'new' && editing.id) {
-      const { id, ...rest } = data;
       await supabase.from('chores').update(data).eq('id', editing.id);
     } else {
       await supabase.from('chores').insert(data);
@@ -247,18 +268,25 @@ export function ChoresView({ familyId, member, members }) {
                     }
                   </span>
                 </div>
-                {group.chores.map(chore => (
-                  <ChoreCard
-                    key={chore.id}
-                    chore={chore}
-                    completed={isCompleted(chore.id, group.member.id)}
-                    pending={isPending(chore.id, group.member.id)}
-                    onToggle={() => toggleChore(chore.id, group.member.id)}
-                    canToggle={member.id === group.member.id || isParent}
-                    memberAvatar={null}
-                    memberName={null}
-                  />
-                ))}
+                {group.chores.map(chore => {
+                  const total = weekTotal(chore);
+                  const done = weekDone(chore.id, group.member.id);
+                  const earned = weekEarned(chore, group.member.id);
+                  return (
+                    <ChoreCard
+                      key={chore.id}
+                      chore={chore}
+                      completed={isCompletedToday(chore.id, group.member.id)}
+                      pending={isPending(chore.id, group.member.id)}
+                      onToggle={() => toggleChore(chore.id, group.member.id)}
+                      canToggle={member.id === group.member.id || isParent}
+                      memberAvatar={null}
+                      memberName={null}
+                      weekProgress={{ done, total }}
+                      weekEarned={earned}
+                    />
+                  );
+                })}
               </div>
             ))
           )}
@@ -274,7 +302,6 @@ export function ChoresView({ familyId, member, members }) {
             </div>
           ) : (
             <>
-              {/* Base chores */}
               {chores.filter(c => c.chore_type === 'base').length > 0 && (
                 <div style={styles.choreGroup}>
                   <h3 style={styles.groupTitle}>Grundsysslor (ingår i veckopeng)</h3>
@@ -292,13 +319,14 @@ export function ChoresView({ familyId, member, members }) {
                         canToggle={isParent}
                         memberAvatar={assignee?.avatar}
                         memberName={assignee?.name}
+                        weekProgress={null}
+                        weekEarned={0}
                       />
                     );
                   })}
                 </div>
               )}
 
-              {/* Bonus chores */}
               {chores.filter(c => c.chore_type !== 'base').length > 0 && (
                 <div style={styles.choreGroup}>
                   <h3 style={styles.groupTitle}>Bonussysslor (extra pengar)</h3>
@@ -316,6 +344,8 @@ export function ChoresView({ familyId, member, members }) {
                         canToggle={isParent}
                         memberAvatar={assignee?.avatar}
                         memberName={assignee?.name}
+                        weekProgress={null}
+                        weekEarned={0}
                       />
                     );
                   })}
@@ -326,10 +356,8 @@ export function ChoresView({ familyId, member, members }) {
         </div>
       )}
 
-      {/* Bottom padding for nav */}
       <div style={{ height: 80 }} />
 
-      {/* Editor modal */}
       {editing && (
         <ChoreEditor
           chore={editing === 'new' ? null : editing}
