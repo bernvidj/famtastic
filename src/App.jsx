@@ -13,7 +13,8 @@ import { MoneyView } from './money/MoneyView';
 import { MealPlan } from './meals/MealPlan';
 import { ShoppingView } from './shopping/ShoppingView';
 import { CalendarView } from './calendar/CalendarView';
-import { C, F } from './data';
+import { SettingsView } from './settings/SettingsView';
+import { C } from './data';
 import { Home as HomeIcon } from 'lucide-react';
 
 export function App() {
@@ -118,19 +119,13 @@ export function App() {
         return <ShoppingView familyId={familyId} member={memberData} members={allMembers} />;
       case 'settings':
         return (
-          <div style={styles.settingsPage}>
-            <h1 style={styles.settingsTitle}>Inställningar</h1>
-            <p style={styles.settingsInfo}>
-              {memberData?.avatar} {memberData?.name} — {memberData?.role}
-            </p>
-            <button
-              style={styles.logoutBtn}
-              onClick={() => supabase.auth.signOut()}
-            >
-              Logga ut
-            </button>
-            <div style={{ height: 80 }} />
-          </div>
+          <SettingsView
+            familyId={familyId}
+            member={memberData}
+            members={allMembers}
+            onUpdate={() => loadFamily(session.user.id)}
+            onLogout={() => supabase.auth.signOut()}
+          />
         );
       default:
         return null;
@@ -152,38 +147,5 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     background: C.bg,
-  },
-  settingsPage: {
-    minHeight: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: C.bg,
-    fontFamily: F.heading,
-    padding: 24,
-    textAlign: 'center',
-  },
-  settingsTitle: {
-    fontSize: F.sizes.xxl,
-    fontWeight: F.weights.extra,
-    color: C.text,
-    margin: '0 0 8px',
-  },
-  settingsInfo: {
-    fontSize: F.sizes.lg,
-    color: C.textMuted,
-    margin: '0 0 24px',
-  },
-  logoutBtn: {
-    padding: '12px 24px',
-    borderRadius: 12,
-    border: 'none',
-    background: C.primaryLight,
-    color: C.primary,
-    fontSize: F.sizes.md,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-    cursor: 'pointer',
   },
 };
