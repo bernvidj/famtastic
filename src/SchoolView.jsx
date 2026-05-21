@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { C, F, S, todayStr, safeArray } from './data';
 import { SchoolSetup } from './SchoolSetup';
-import { Plus, Edit3, Calendar, AlertTriangle } from 'lucide-react';
+import { Plus, Edit3, Calendar, AlertTriangle, Trash2 } from 'lucide-react';
 
 const DAYS = [
   { value: 1, label: 'Måndag' },
@@ -97,6 +97,24 @@ export function SchoolView({ familyId, member, members }) {
     });
     setAddingEvent(null);
     setEventForm({ title: '', event_date: '', period: 'full_day' });
+    loadData();
+  }
+
+  async function handleDeleteSchedule(child) {
+    if (!window.confirm(`Ta bort ${child.name}s hela schema? Kopplade påminnelser och auto-sysslor tas också bort.`)) return;
+
+    // Delete auto-generated chores (those with reference_id, assigned to this child)
+    await supabase.from('chores')
+      .delete()
+      .eq('family_id', familyId)
+      .eq('assigned_to', child.id)
+      .not('reference_id', 'is', null);
+
+    // Delete rules, schedule, special events
+    await supabase.from('school_rules').delete().eq('member_id', child.id);
+    await supabase.from('school_schedule').delete().eq('member_id', child.id);
+    await supabase.from('school_special_events').delete().eq('member_id', child.id);
+
     loadData();
   }
 
@@ -214,13 +232,23 @@ export function SchoolView({ familyId, member, members }) {
                   ) : null
                 )}
 
-                {/* Add special event */}
-                <button
-                  onClick={() => { setAddingEvent(child); setEventForm({ title: '', event_date: dateForDay(viewDay), period: 'full_day' }); }}
-                  style={styles.addEventBtn}
-                >
-                  <Calendar size={14} /> Lägg till specialdag
-                </button>
+                {/* Add special event + delete schedule */}
+                <div style={styles.actionRow}>
+                  <button
+                    onClick={() => { setAddingEvent(child); setEventForm({ title: '', event_date: dateForDay(viewDay), period: 'full_day' }); }}
+                    style={styles.addEventBtn}
+                  >
+                    <Calendar size={14} /> Lägg till specialdag
+                  </button>
+                  {hasSchedule && (
+                    <button
+                      onClick={() => handleDeleteSchedule(child)}
+                      style={styles.deleteScheduleBtn}
+                    >
+                      <Trash2 size={14} /> Ta bort schema
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -330,6 +358,8 @@ const styles = {
   noLessons: { fontSize: F.sizes.sm, color: C.textMuted, fontFamily: F.heading, fontStyle: 'italic', padding: '8px 0' },
   setupBtn: { padding: '10px 20px', borderRadius: 12, border: `2px dashed ${C.primary}`, background: C.primaryLight, color: C.primaryDark, fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', minHeight: 44 },
   addEventBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 10, border: `1px solid ${C.borderLight}`, background: 'transparent', color: C.textMuted, fontSize: F.sizes.xs, fontFamily: F.heading, cursor: 'pointer', marginTop: 4 },
+  actionRow: { display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' },
+  deleteScheduleBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 10, border: `1px solid ${C.errorLight}`, background: 'transparent', color: C.error, fontSize: F.sizes.xs, fontFamily: F.heading, cursor: 'pointer' },
 
   // Modal
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 16 },
