@@ -1,0 +1,171 @@
+// ============================================
+// FamTastic — ChildHome (Duolingo-style home view)
+// Extracted from ChildApp
+// ============================================
+
+import React from 'react';
+import { C, F, S, formatKr, getGreeting, streakEmoji } from './data';
+import { CheckCircle, Star, Flame, Zap } from 'lucide-react';
+
+export function ChildHome({
+  member, todayChores, isCompleted, toggleChore, streak,
+  balance, todayEvents, meal, poolCount, familyGoals, onGoToChores,
+}) {
+  const doneCount = todayChores.filter(c => isCompleted(c.id)).length;
+  const allDone = todayChores.length > 0 && doneCount >= todayChores.length;
+
+  return (
+    <div style={styles.content}>
+      {/* Greeting + streak */}
+      <h1 style={styles.greeting}>{getGreeting(member.name)}</h1>
+      {streak > 0 && (
+        <div style={styles.streakPill}>
+          <Flame size={18} color={C.primary} />
+          <span style={styles.streakNum}>{streak}</span>
+          <span style={styles.streakLabel}>{streak === 1 ? 'dag' : 'dagar'} i rad {streakEmoji(streak)}</span>
+        </div>
+      )}
+
+      {/* Progress card */}
+      {todayChores.length > 0 && (
+        <div style={{
+          ...styles.progressCard,
+          background: allDone ? `linear-gradient(135deg, ${C.successLight}, #ECFDF5)` : `linear-gradient(135deg, ${C.primaryLight}, ${C.accentLight})`,
+          borderColor: allDone ? C.success : C.primary,
+        }}>
+          <span style={{ fontSize: allDone ? 32 : 28 }}>{allDone ? '🏆' : '💪'}</span>
+          <div style={styles.progressInfo}>
+            <span style={{ ...styles.progressTitle, color: allDone ? C.successDark : C.primaryDark }}>
+              {allDone ? 'Alla klara idag!' : `${doneCount} av ${todayChores.length} klara`}
+            </span>
+            <div style={styles.progressBarBg}>
+              <div style={{
+                ...styles.progressBarFill,
+                width: `${(doneCount / todayChores.length) * 100}%`,
+                background: allDone ? C.success : `linear-gradient(90deg, ${C.primary}, ${C.accent})`,
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Balance pill */}
+      <div style={styles.balancePill}>
+        <span style={{ fontSize: 20 }}>💰</span>
+        <span style={styles.balancePillLabel}>Mitt saldo</span>
+        <span style={styles.balancePillAmount}>{formatKr(balance)}</span>
+      </div>
+
+      {/* Today's chores */}
+      {todayChores.length > 0 && (
+        <div style={styles.section}>
+          <p style={S.sectionLabel}>Dagens sysslor</p>
+          {todayChores.map(chore => {
+            const done = isCompleted(chore.id);
+            return (
+              <button key={chore.id} onClick={() => toggleChore(chore.id)} style={{
+                ...styles.choreRow,
+                background: done ? C.successLight : C.bgCard,
+                borderColor: done ? C.success : C.borderLight,
+              }}>
+                <div style={{ ...styles.choreEmoji, background: done ? C.successLight : C.primaryLight }}>
+                  <span style={{ fontSize: 20 }}>{chore.icon || '📋'}</span>
+                </div>
+                <div style={styles.choreContent}>
+                  <span style={{ ...styles.choreTitle, textDecoration: done ? 'line-through' : 'none', color: done ? C.textMuted : C.text }}>
+                    {chore.title}
+                  </span>
+                  {!done && chore.chore_type === 'bonus' && chore.points > 0 && (
+                    <span style={styles.choreBonus}><Star size={10} color="#92400E" /> +{chore.points} kr</span>
+                  )}
+                </div>
+                {done ? <CheckCircle size={26} color={C.success} /> : <div style={styles.choreCheck} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pool chores teaser */}
+      {poolCount > 0 && (
+        <button onClick={onGoToChores} style={styles.poolTeaser}>
+          <span style={{ fontSize: 20 }}>🤲</span>
+          <span style={styles.poolTeaserText}>{poolCount} öppna sysslor att plocka!</span>
+          <Zap size={16} color={C.accent} />
+        </button>
+      )}
+
+      {/* Today's events */}
+      {todayEvents.length > 0 && (
+        <div style={styles.section}>
+          <p style={S.sectionLabel}>Idag</p>
+          {todayEvents.map(ev => (
+            <div key={ev.id} style={styles.eventRow}>
+              <span>📅</span>
+              <span style={styles.eventTitle}>{ev.title}</span>
+              {ev.start_time && <span style={styles.eventTime}>{ev.start_time.slice(0, 5)}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Meal */}
+      {meal && (
+        <div style={styles.section}>
+          <p style={S.sectionLabel}>Middag</p>
+          <div style={styles.mealCard}>
+            <span style={{ fontSize: 24 }}>🍽️</span>
+            <span style={styles.mealText}>{meal}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Family goal */}
+      {familyGoals.map(fg => (
+        <div key={fg.id} style={styles.section}>
+          <p style={S.sectionLabel}>Familjemål</p>
+          <div style={styles.familyGoalCard}>
+            <span style={{ fontSize: 24 }}>{fg.icon || '🎯'}</span>
+            <div style={{ flex: 1 }}>
+              <span style={styles.fgTitle}>{fg.title}</span>
+              <span style={styles.fgTarget}>{formatKr(fg.target_amount)}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const styles = {
+  content: { padding: '12px 16px' },
+  greeting: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: '0 0 8px' },
+  streakPill: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 99, background: C.primaryLight, border: `1.5px solid ${C.primary}`, marginBottom: 12 },
+  streakNum: { fontSize: F.sizes.lg, fontWeight: F.weights.extra, fontFamily: F.heading, color: C.primaryDark },
+  streakLabel: { fontSize: F.sizes.sm, fontWeight: F.weights.semi, fontFamily: F.heading, color: C.primaryDark },
+  progressCard: { display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 16, border: '1.5px solid', marginBottom: 12 },
+  progressInfo: { flex: 1 },
+  progressTitle: { display: 'block', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, marginBottom: 8 },
+  progressBarBg: { height: 6, background: 'rgba(255,255,255,0.6)', borderRadius: 99, overflow: 'hidden', marginBottom: 4 },
+  progressBarFill: { height: '100%', borderRadius: 99, background: C.primary, transition: 'width 0.4s ease' },
+  balancePill: { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: C.bgCard, borderRadius: 14, border: `1.5px solid ${C.borderLight}`, marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  balancePillLabel: { flex: 1, fontSize: F.sizes.sm, color: C.textMuted, fontFamily: F.heading },
+  balancePillAmount: { fontSize: F.sizes.xl, fontWeight: F.weights.extra, fontFamily: F.heading, color: C.text },
+  section: { marginBottom: 16 },
+  choreRow: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 14px', borderRadius: 14, border: '1.5px solid', marginBottom: 8, cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' },
+  choreEmoji: { width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  choreContent: { flex: 1, minWidth: 0 },
+  choreTitle: { display: 'block', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading },
+  choreBonus: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, color: '#92400E', background: C.accentLight, padding: '1px 8px', borderRadius: 99, marginTop: 4 },
+  choreCheck: { width: 26, height: 26, borderRadius: 13, border: `2.5px solid ${C.border}`, flexShrink: 0 },
+  poolTeaser: { display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 16px', borderRadius: 14, border: `2px dashed ${C.accent}`, background: C.accentLight, cursor: 'pointer', marginBottom: 16, textAlign: 'left' },
+  poolTeaserText: { flex: 1, fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: '#92400E' },
+  eventRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: C.bgCard, borderRadius: 12, border: `1.5px solid ${C.borderLight}`, marginBottom: 6 },
+  eventTitle: { flex: 1, fontSize: F.sizes.sm, fontWeight: F.weights.semi, fontFamily: F.heading, color: C.text },
+  eventTime: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading },
+  mealCard: { display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: C.bgCard, borderRadius: 14, border: `1.5px solid ${C.borderLight}` },
+  mealText: { fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
+  familyGoalCard: { display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: `linear-gradient(135deg, ${C.primaryLight}, ${C.accentLight})`, borderRadius: 16, border: `1.5px solid ${C.primary}` },
+  fgTitle: { display: 'block', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.primaryDark },
+  fgTarget: { display: 'block', fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading },
+};
