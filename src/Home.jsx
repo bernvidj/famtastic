@@ -1,17 +1,17 @@
 // ============================================
-// FamTastic — Home (Veckovyn)
+// FamTastic — Home (Duolingo-style veckovyn)
 // ============================================
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { C, F, S, getWeekNumber, todayStr, safeArray, formatKr } from './data';
-import { ChevronLeft, ChevronRight, CheckCircle, Circle, CalendarDays, UtensilsCrossed, ShoppingCart, Target } from 'lucide-react';
+import { C, F, S, getWeekNumber, todayStr, safeArray, formatKr, getGreeting, streakEmoji } from './data';
+import { ChevronLeft, ChevronRight, CheckCircle, Circle, UtensilsCrossed, Target, Flame, Star } from 'lucide-react';
 
 const WEEKDAYS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
 
 function getWeekDates(offset) {
   const now = new Date();
-  const day = now.getDay() || 7; // Sunday = 7
+  const day = now.getDay() || 7;
   const monday = new Date(now);
   monday.setDate(now.getDate() - day + 1 + offset * 7);
   const dates = [];
@@ -34,6 +34,7 @@ export function Home({ familyId, member, members }) {
   const [completions, setCompletions] = useState([]);
   const [mealPlan, setMealPlan] = useState([]);
   const [savingsGoals, setSavingsGoals] = useState([]);
+  const [goalProgress, setGoalProgress] = useState({});
   const [loading, setLoading] = useState(true);
 
   const weekDates = getWeekDates(weekOffset);
@@ -75,7 +76,19 @@ export function Home({ familyId, member, members }) {
     setChores(chRes.data || []);
     setCompletions(compRes.data || []);
     setMealPlan(mealRes.data || []);
-    setSavingsGoals(goalRes.data || []);
+
+    const goals = goalRes.data || [];
+    setSavingsGoals(goals);
+
+    // BUG #3 FIX: fetch family goal progress via RPC (all members' contributions)
+    const progressMap = {};
+    for (const goal of goals) {
+      const { data } = await supabase.rpc('get_family_goal_progress', {
+        p_goal_id: goal.id,
+      });
+      progressMap[goal.id] = data || 0;
+    }
+    setGoalProgress(progressMap);
     setLoading(false);
   }
 
@@ -85,13 +98,14 @@ export function Home({ familyId, member, members }) {
   }
 
   function todayChores() {
-    const dayOfWeek = new Date().getDay() || 7; // 1=Mon, 7=Sun
+    const dayOfWeek = new Date().getDay() || 7;
     return chores.filter(c => {
-      if (c.assigned_to) return true; // always show assigned
-      const rule = c.recurrence_rule;
-      if (rule && safeArray(rule.days).includes(dayOfWeek)) return true;
-      if (!c.is_recurring) return true;
-      return false;
+      if (c.is_recurring && c.recurrence_rule) {
+        const days = safeArray(c.recurrence_rule.days);
+        if (days.length > 0 && !days.includes(dayOfWeek)) return false;
+      }
+      if (!c.is_recurring && !c.assigned_to) return true;
+      return true;
     });
   }
 
@@ -101,24 +115,32 @@ export function Home({ familyId, member, members }) {
     );
   }
 
+  function myTodayChores() {
+    return todayChores().filter(c =>
+      !c.assigned_to || c.assigned_to === member.id
+    );
+  }
+
+  function myTodayDone() {
+    const mine = myTodayChores();
+    return mine.filter(c => isChoreCompleted(c.id, member.id)).length;
+  }
+
   async function toggleChore(choreId) {
     const done = isChoreCompleted(choreId, member.id);
     if (done) {
-      await supabase.from('chore_completions')
-        .delete()
-        .eq('chore_id', choreId)
-        .eq('member_id', member.id)
-        .eq('completed_date', today);
+      await supabase.rpc('uncomplete_chore', {
+        p_chore_id: choreId,
+        p_member_id: member.id,
+        p_completed_date: today,
+      });
     } else {
-      const chore = chores.find(c => c.id === choreId);
-      await supabase.from('chore_completions')
-        .insert({
-          chore_id: choreId,
-          family_id: familyId,
-          member_id: member.id,
-          completed_date: today,
-          points_earned: chore?.points || 0,
-        });
+      await supabase.rpc('complete_chore', {
+        p_chore_id: choreId,
+        p_family_id: familyId,
+        p_member_id: member.id,
+        p_completed_date: today,
+      });
     }
     loadData();
   }
@@ -127,10 +149,50 @@ export function Home({ familyId, member, members }) {
     return mealPlan.find(m => m.plan_date === today);
   }
 
+  // Streak: count consecutive days with at least 1 completion
+  function calcStreak() {
+    const dates = [...new Set(
+      completions
+        .filter(c => c.member_id === member.id)
+        .map(c => c.completed_date)
+    )].sort().reverse();
+    let streak = 0;
+    const d = new Date();
+    for (let i = 0; i < 30; i++) {
+      const ds = fmtDate(d);
+      if (dates.includes(ds)) {
+        streak++;
+      } else if (i > 0) {
+        break;
+      }
+      d.setDate(d.getDate() - 1);
+    }
+    return streak;
+  }
+
+  const streak = calcStreak();
+  const myChores = myTodayChores();
+  const myDone = myTodayDone();
+  const allDone = myChores.length > 0 && myDone >= myChores.length;
+
   // --- RENDER ---
   return (
     <div style={styles.page}>
-      {/* Week header */}
+      {/* Greeting */}
+      <div style={styles.greetingWrap}>
+        <h1 style={styles.greeting}>{getGreeting(member.name)}</h1>
+        {streak > 0 && (
+          <div style={styles.streakCard}>
+            <Flame size={20} color={C.primary} />
+            <span style={styles.streakNum}>{streak}</span>
+            <span style={styles.streakLabel}>
+              {streak === 1 ? 'dag' : 'dagar'} i rad {streakEmoji(streak)}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Week nav */}
       <div style={styles.weekHeader}>
         <button onClick={() => setWeekOffset(w => w - 1)} style={styles.weekBtn}>
           <ChevronLeft size={20} color={C.text} />
@@ -138,9 +200,7 @@ export function Home({ familyId, member, members }) {
         <div style={styles.weekTitle}>
           <span style={styles.weekLabel}>Vecka {weekNum}</span>
           {weekOffset !== 0 && (
-            <button onClick={() => setWeekOffset(0)} style={styles.todayBtn}>
-              Idag
-            </button>
+            <button onClick={() => setWeekOffset(0)} style={styles.todayBtn}>Idag</button>
           )}
         </div>
         <button onClick={() => setWeekOffset(w => w + 1)} style={styles.weekBtn}>
@@ -158,7 +218,7 @@ export function Home({ familyId, member, members }) {
             <div key={i} style={{
               ...styles.dayCol,
               background: isToday ? C.primaryLight : 'transparent',
-              borderRadius: 12,
+              border: isToday ? `2px solid ${C.primary}` : '2px solid transparent',
             }}>
               <span style={{
                 ...styles.dayName,
@@ -174,16 +234,21 @@ export function Home({ familyId, member, members }) {
               }}>
                 {d.getDate()}
               </span>
-              {dayEvents.slice(0, 2).map(ev => (
-                <div key={ev.id} style={{
-                  ...styles.dayEvent,
-                  background: ev.color || C.secondary,
-                }}>
-                  <span style={styles.dayEventText}>
-                    {ev.title.length > 6 ? ev.title.slice(0, 6) + '..' : ev.title}
-                  </span>
-                </div>
-              ))}
+              {dayEvents.slice(0, 2).map(ev => {
+                const evMember = safeArray(ev.member_ids).length === 1
+                  ? getMemberById(ev.member_ids[0])
+                  : null;
+                return (
+                  <div key={ev.id} style={{
+                    ...styles.dayEvent,
+                    background: evMember?.color || ev.color || C.secondary,
+                  }}>
+                    <span style={styles.dayEventText}>
+                      {ev.title.length > 5 ? ev.title.slice(0, 5) + '..' : ev.title}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -193,100 +258,168 @@ export function Home({ familyId, member, members }) {
         <p style={styles.loadingText}>Laddar...</p>
       ) : (
         <>
-          {/* Today's chores */}
+          {/* Today's chores — progress card */}
           <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>
-              <CheckCircle size={18} color={C.primary} /> Dagens sysslor
-            </h2>
-            {todayChores().length === 0 ? (
-              <p style={styles.emptyText}>Inga sysslor idag — njut! 🎉</p>
+            <p style={S.sectionLabel}>Dagens sysslor</p>
+            {myChores.length === 0 ? (
+              <div style={styles.emptyCard}>
+                <span style={{ fontSize: 32 }}>🎉</span>
+                <span style={styles.emptyCardText}>Inga sysslor idag!</span>
+              </div>
             ) : (
-              todayChores().map(chore => {
-                const assignee = chore.assigned_to ? getMemberById(chore.assigned_to) : null;
-                const done = isChoreCompleted(chore.id, member.id);
-                return (
-                  <button
-                    key={chore.id}
-                    onClick={() => toggleChore(chore.id)}
-                    style={{
-                      ...styles.choreRow,
-                      opacity: done ? 0.6 : 1,
-                    }}
-                  >
-                    {done ? (
-                      <CheckCircle size={22} color={C.success} />
-                    ) : (
-                      <Circle size={22} color={C.border} />
-                    )}
+              <>
+                {/* Progress summary */}
+                <div style={{
+                  ...styles.progressCard,
+                  background: allDone
+                    ? `linear-gradient(135deg, ${C.successLight}, #ECFDF5)`
+                    : `linear-gradient(135deg, ${C.primaryLight}, ${C.accentLight})`,
+                  borderColor: allDone ? C.success : C.primary,
+                }}>
+                  <div style={styles.progressTop}>
                     <span style={{
-                      ...styles.choreTitle,
-                      textDecoration: done ? 'line-through' : 'none',
+                      ...styles.progressEmoji,
+                      fontSize: allDone ? 32 : 28,
                     }}>
-                      {chore.icon} {chore.title}
+                      {allDone ? '🏆' : '💪'}
                     </span>
-                    {chore.points > 0 && (
-                      <span style={styles.chorePoints}>{chore.points} p</span>
-                    )}
-                    {assignee && (
-                      <span style={styles.choreAssignee}>{assignee.avatar}</span>
-                    )}
-                  </button>
-                );
-              })
+                    <div style={styles.progressInfo}>
+                      <span style={{
+                        ...styles.progressTitle,
+                        color: allDone ? C.successDark : C.primaryDark,
+                      }}>
+                        {allDone ? 'Alla klara!' : `${myDone} av ${myChores.length} klara`}
+                      </span>
+                      <div style={styles.progressBarBg}>
+                        <div style={{
+                          ...styles.progressBarFill,
+                          width: `${(myDone / myChores.length) * 100}%`,
+                          background: allDone
+                            ? C.success
+                            : `linear-gradient(90deg, ${C.primary}, ${C.accent})`,
+                        }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Chore list */}
+                {myChores.map(chore => {
+                  const done = isChoreCompleted(chore.id, member.id);
+                  return (
+                    <button
+                      key={chore.id}
+                      onClick={() => toggleChore(chore.id)}
+                      style={{
+                        ...styles.choreRow,
+                        background: done ? C.successLight : C.bgCard,
+                        borderColor: done ? C.success : C.borderLight,
+                        opacity: done ? 0.75 : 1,
+                      }}
+                    >
+                      <div style={{
+                        ...styles.choreEmoji,
+                        background: done ? C.successLight : C.primaryLight,
+                      }}>
+                        <span style={{ fontSize: 20 }}>{chore.icon || '📋'}</span>
+                      </div>
+                      <div style={styles.choreContent}>
+                        <span style={{
+                          ...styles.choreTitle,
+                          textDecoration: done ? 'line-through' : 'none',
+                          color: done ? C.textMuted : C.text,
+                        }}>
+                          {chore.title}
+                        </span>
+                        {!done && chore.chore_type !== 'base' && chore.points > 0 && (
+                          <span style={styles.choreBonus}>
+                            <Star size={10} color="#92400E" /> +{chore.points} kr
+                          </span>
+                        )}
+                      </div>
+                      {done ? (
+                        <CheckCircle size={26} color={C.success} />
+                      ) : (
+                        <div style={styles.choreCheck} />
+                      )}
+                    </button>
+                  );
+                })}
+              </>
             )}
           </div>
 
           {/* Today's meal */}
           <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>
-              <UtensilsCrossed size={18} color={C.primary} /> Middag idag
-            </h2>
+            <p style={S.sectionLabel}>Middag idag</p>
             {todayMeal() ? (
               <div style={styles.mealCard}>
-                <span style={styles.mealTitle}>
-                  {todayMeal().meals?.title || todayMeal().free_text || 'Ingen plan'}
-                </span>
+                <span style={{ fontSize: 28 }}>🍽️</span>
+                <div style={styles.mealInfo}>
+                  <span style={styles.mealTitle}>
+                    {todayMeal().meals?.title || todayMeal().free_text || 'Ingen plan'}
+                  </span>
+                </div>
               </div>
             ) : (
-              <p style={styles.emptyText}>Ingen middag planerad ännu</p>
+              <div style={styles.emptyCard}>
+                <span style={{ fontSize: 28 }}>🍽️</span>
+                <span style={styles.emptyCardText}>Ingen middag planerad</span>
+              </div>
             )}
           </div>
 
-          {/* Family goal */}
+          {/* Family goal — BUG #3 FIX: uses RPC progress */}
           {savingsGoals.length > 0 && (
             <div style={styles.section}>
-              <h2 style={styles.sectionTitle}>
-                <Target size={18} color={C.primary} /> Familjemål
-              </h2>
-              {savingsGoals.map(goal => (
-                <div key={goal.id} style={styles.goalCard}>
-                  <div style={styles.goalHeader}>
-                    <span>{goal.icon || '🎯'} {goal.title}</span>
-                    <span style={styles.goalAmount}>
-                      {formatKr(goal.current_amount || 0)} / {formatKr(goal.target_amount)}
-                    </span>
+              <p style={S.sectionLabel}>Familjemål</p>
+              {savingsGoals.map(goal => {
+                const saved = goalProgress[goal.id] || 0;
+                const pct = Math.min(100, (saved / goal.target_amount) * 100);
+                return (
+                  <div key={goal.id} style={styles.goalCard}>
+                    <div style={styles.goalTop}>
+                      <span style={{ fontSize: 28 }}>{goal.icon || '🎯'}</span>
+                      <div style={styles.goalInfo}>
+                        <span style={styles.goalTitle}>{goal.title}</span>
+                        <span style={styles.goalAmount}>
+                          {formatKr(saved)} av {formatKr(goal.target_amount)}
+                        </span>
+                      </div>
+                      <span style={styles.goalPct}>{Math.round(pct)}%</span>
+                    </div>
+                    <div style={styles.goalBarBg}>
+                      <div style={{
+                        ...styles.goalBarFill,
+                        width: `${pct}%`,
+                        background: pct >= 100
+                          ? C.success
+                          : `linear-gradient(90deg, ${C.primary}, ${C.accent})`,
+                      }} />
+                    </div>
+                    {/* Per-member contributions */}
+                    <div style={styles.goalMembers}>
+                      {members.filter(m => m.role === 'child').map(m => (
+                        <span key={m.id} style={styles.goalMemberChip}>
+                          {m.avatar}
+                        </span>
+                      ))}
+                      <span style={styles.goalMemberLabel}>Alla bidrar!</span>
+                    </div>
                   </div>
-                  <div style={styles.goalBarBg}>
-                    <div style={{
-                      ...styles.goalBarFill,
-                      width: `${Math.min(100, ((goal.current_amount || 0) / goal.target_amount) * 100)}%`,
-                    }} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
       )}
 
-      {/* Bottom padding for nav */}
       <div style={{ height: 80 }} />
     </div>
   );
 }
 
 // --- Styles ---
-
 const styles = {
   page: {
     minHeight: '100vh',
@@ -294,17 +427,53 @@ const styles = {
     fontFamily: F.body,
     paddingBottom: 20,
   },
+  greetingWrap: {
+    padding: '20px 16px 4px',
+  },
+  greeting: {
+    fontFamily: F.heading,
+    fontSize: F.sizes.xl,
+    fontWeight: F.weights.extra,
+    color: C.text,
+    margin: '0 0 8px',
+  },
+  streakCard: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '6px 14px',
+    borderRadius: 99,
+    background: C.primaryLight,
+    border: `1.5px solid ${C.primary}`,
+  },
+  streakNum: {
+    fontSize: F.sizes.lg,
+    fontWeight: F.weights.extra,
+    fontFamily: F.heading,
+    color: C.primaryDark,
+  },
+  streakLabel: {
+    fontSize: F.sizes.sm,
+    fontWeight: F.weights.semi,
+    fontFamily: F.heading,
+    color: C.primaryDark,
+  },
   weekHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '16px 16px 8px',
+    padding: '12px 16px 8px',
   },
   weekBtn: {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
     padding: 8,
+    minHeight: 44,
+    minWidth: 44,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   weekTitle: {
     display: 'flex',
@@ -313,13 +482,13 @@ const styles = {
   },
   weekLabel: {
     fontFamily: F.heading,
-    fontSize: F.sizes.xl,
+    fontSize: F.sizes.lg,
     fontWeight: F.weights.extra,
     color: C.text,
   },
   todayBtn: {
     padding: '4px 12px',
-    borderRadius: 8,
+    borderRadius: 99,
     border: 'none',
     background: C.primaryLight,
     color: C.primary,
@@ -341,18 +510,21 @@ const styles = {
     alignItems: 'center',
     padding: '8px 2px',
     minWidth: 44,
+    borderRadius: 12,
   },
   dayName: {
     fontSize: F.sizes.xs,
-    marginBottom: 4,
+    fontFamily: F.heading,
+    marginBottom: 2,
   },
   dayNum: {
     fontSize: F.sizes.lg,
+    fontFamily: F.heading,
     marginBottom: 4,
   },
   dayEvent: {
     width: '90%',
-    borderRadius: 4,
+    borderRadius: 6,
     padding: '2px 4px',
     marginTop: 2,
   },
@@ -360,102 +532,206 @@ const styles = {
     fontSize: 9,
     color: '#fff',
     fontWeight: F.weights.bold,
+    fontFamily: F.heading,
   },
   loadingText: {
     textAlign: 'center',
     color: C.textMuted,
     padding: 32,
+    fontFamily: F.heading,
   },
   section: {
     padding: '0 16px',
     marginBottom: 20,
   },
-  sectionTitle: {
-    fontFamily: F.heading,
-    fontSize: F.sizes.md,
-    fontWeight: F.weights.bold,
-    color: C.text,
-    margin: '0 0 10px',
+  // --- Chores ---
+  progressCard: {
+    borderRadius: 16,
+    padding: 16,
+    border: '1.5px solid',
+    marginBottom: 10,
+  },
+  progressTop: {
     display: 'flex',
     alignItems: 'center',
-    gap: 6,
+    gap: 12,
   },
-  emptyText: {
-    color: C.textMuted,
-    fontSize: F.sizes.sm,
-    margin: 0,
-    padding: '12px 0',
+  progressEmoji: {
+    flexShrink: 0,
+  },
+  progressInfo: {
+    flex: 1,
+  },
+  progressTitle: {
+    display: 'block',
+    fontSize: F.sizes.md,
+    fontWeight: F.weights.bold,
+    fontFamily: F.heading,
+    marginBottom: 8,
+  },
+  progressBarBg: {
+    height: 8,
+    background: 'rgba(255,255,255,0.6)',
+    borderRadius: 99,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 99,
+    transition: 'width 0.4s ease',
   },
   choreRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     width: '100%',
-    padding: '10px 14px',
+    padding: '12px 14px',
     background: C.bgCard,
-    borderRadius: 12,
-    border: `1px solid ${C.borderLight}`,
-    marginBottom: 6,
+    borderRadius: 14,
+    border: '1.5px solid',
+    marginBottom: 8,
     cursor: 'pointer',
     textAlign: 'left',
+    transition: 'background 0.15s',
+  },
+  choreEmoji: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  choreContent: {
+    flex: 1,
+    minWidth: 0,
   },
   choreTitle: {
-    flex: 1,
+    display: 'block',
     fontSize: F.sizes.md,
+    fontWeight: F.weights.semi,
+    fontFamily: F.heading,
     color: C.text,
   },
-  chorePoints: {
+  choreBonus: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 3,
     fontSize: F.sizes.xs,
     fontWeight: F.weights.bold,
-    color: C.accent,
+    fontFamily: F.heading,
+    color: '#92400E',
     background: C.accentLight,
-    padding: '2px 8px',
-    borderRadius: 6,
+    padding: '1px 8px',
+    borderRadius: 99,
+    marginTop: 4,
   },
-  choreAssignee: {
-    fontSize: 18,
+  choreCheck: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    border: `2.5px solid ${C.border}`,
+    flexShrink: 0,
   },
+  // --- Meal ---
   mealCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
     padding: '14px 16px',
     background: C.bgCard,
-    borderRadius: 12,
-    border: `1px solid ${C.borderLight}`,
+    borderRadius: 16,
+    border: `1.5px solid ${C.borderLight}`,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+  },
+  mealInfo: {
+    flex: 1,
   },
   mealTitle: {
     fontSize: F.sizes.md,
     color: C.text,
-    fontWeight: F.weights.semi,
+    fontWeight: F.weights.bold,
+    fontFamily: F.heading,
   },
-  goalCard: {
-    padding: '14px 16px',
-    background: C.bgCard,
-    borderRadius: 12,
-    border: `1px solid ${C.borderLight}`,
-    marginBottom: 8,
-  },
-  goalHeader: {
+  // --- Empty ---
+  emptyCard: {
     display: 'flex',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    gap: 12,
+    padding: '16px',
+    background: C.bgCard,
+    borderRadius: 16,
+    border: `1.5px dashed ${C.border}`,
+  },
+  emptyCardText: {
     fontSize: F.sizes.sm,
-    color: C.text,
-    fontWeight: F.weights.semi,
+    color: C.textMuted,
+    fontFamily: F.heading,
+  },
+  // --- Goal ---
+  goalCard: {
+    padding: 16,
+    background: `linear-gradient(135deg, ${C.primaryLight}, ${C.accentLight})`,
+    borderRadius: 16,
+    border: `1.5px solid ${C.primary}`,
+    marginBottom: 8,
+  },
+  goalTop: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 10,
+  },
+  goalInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  goalTitle: {
+    display: 'block',
+    fontSize: F.sizes.md,
+    fontWeight: F.weights.bold,
+    fontFamily: F.heading,
+    color: C.primaryDark,
   },
   goalAmount: {
+    display: 'block',
     fontSize: F.sizes.xs,
     color: C.textMuted,
+    fontFamily: F.heading,
+    marginTop: 2,
+  },
+  goalPct: {
+    fontSize: F.sizes.lg,
+    fontWeight: F.weights.extra,
+    fontFamily: F.heading,
+    color: C.primaryDark,
+    flexShrink: 0,
   },
   goalBarBg: {
-    height: 8,
-    background: C.borderLight,
-    borderRadius: 4,
+    height: 10,
+    background: 'rgba(255,255,255,0.6)',
+    borderRadius: 99,
     overflow: 'hidden',
+    marginBottom: 8,
   },
   goalBarFill: {
     height: '100%',
-    background: C.primary,
-    borderRadius: 4,
-    transition: 'width 0.3s',
+    borderRadius: 99,
+    transition: 'width 0.4s ease',
+  },
+  goalMembers: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+  },
+  goalMemberChip: {
+    fontSize: 16,
+  },
+  goalMemberLabel: {
+    fontSize: F.sizes.xs,
+    color: C.textMuted,
+    fontFamily: F.heading,
+    marginLeft: 4,
   },
 };
