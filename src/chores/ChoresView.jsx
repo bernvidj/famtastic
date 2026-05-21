@@ -85,10 +85,11 @@ export function ChoresView({ familyId, member, members }) {
     );
   }
 
-  // Regular chores (not pool) scheduled for today
+  // Regular chores + claimed pool chores scheduled for today
   function getTodayChores() {
     return chores.filter(c => {
-      if (c.pool && c.assigned_to !== (filterMember || null)) {   if (c.pool && !c.assigned_to) return false;   if (c.pool && filterMember && c.assigned_to !== filterMember) return false; } // pool chores shown separately
+      // Unclaimed pool chores only show in pool tab
+      if (c.pool && !c.assigned_to) return false;
       if (c.is_recurring && c.recurrence_rule) {
         const days = safeArray(c.recurrence_rule.days);
         if (days.length > 0 && !days.includes(todayDow)) return false;
@@ -100,9 +101,14 @@ export function ChoresView({ familyId, member, members }) {
     });
   }
 
-  // Pool chores: open (unclaimed) or recently claimed
+  // Pool chores: only unclaimed ones
   function getPoolChores() {
-    return chores.filter(c => c.pool);
+    return chores.filter(c => c.pool && !c.assigned_to);
+  }
+
+  // Recently claimed pool chores (for parent feedback)
+  function getClaimedPoolChores() {
+    return chores.filter(c => c.pool && c.assigned_to);
   }
 
   function groupByMember(choreList) {
@@ -173,7 +179,8 @@ export function ChoresView({ familyId, member, members }) {
   }
 
   const poolChores = getPoolChores();
-  const hasPool = poolChores.length > 0;
+  const claimedPoolChores = getClaimedPoolChores();
+  const hasPool = poolChores.length > 0 || claimedPoolChores.length > 0;
 
   // --- RENDER ---
   return (
@@ -208,8 +215,8 @@ export function ChoresView({ familyId, member, members }) {
             }}
           >
             <t.icon size={16} /> {t.label}
-            {t.key === 'pool' && (
-              <span style={styles.poolCount}>{poolChores.filter(c => !c.assigned_to).length}</span>
+            {t.key === 'pool' && poolChores.length > 0 && (
+              <span style={styles.poolCount}>{poolChores.length}</span>
             )}
           </button>
         ))}
@@ -294,10 +301,10 @@ export function ChoresView({ familyId, member, members }) {
         /* === POOL TAB === */
         <div style={styles.content}>
           {/* Open chores */}
-          {poolChores.filter(c => !c.assigned_to).length > 0 && (
+          {poolChores.length > 0 && (
             <div style={styles.choreGroup}>
               <p style={S.sectionLabel}>Öppna sysslor — plocka en!</p>
-              {poolChores.filter(c => !c.assigned_to).map(chore => (
+              {poolChores.map(chore => (
                 <ChorePoolCard
                   key={chore.id}
                   chore={chore}
@@ -310,12 +317,12 @@ export function ChoresView({ familyId, member, members }) {
           )}
 
           {/* Claimed chores (parent feedback) */}
-          {poolChores.filter(c => c.assigned_to).length > 0 && (
+          {claimedPoolChores.length > 0 && (
             <div style={styles.choreGroup}>
               <p style={S.sectionLabel}>
                 {isParent ? 'Plockade sysslor' : 'Redan tagna'}
               </p>
-              {poolChores.filter(c => c.assigned_to).map(chore => (
+              {claimedPoolChores.map(chore => (
                 <ChorePoolCard
                   key={chore.id}
                   chore={chore}
@@ -327,7 +334,7 @@ export function ChoresView({ familyId, member, members }) {
             </div>
           )}
 
-          {poolChores.length === 0 && (
+          {poolChores.length === 0 && claimedPoolChores.length === 0 && (
             <div style={S.emptyState}>
               <span style={{ fontSize: 48 }}>🤲</span>
               <p style={styles.emptyTitle}>Inga öppna sysslor</p>
