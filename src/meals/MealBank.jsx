@@ -1,14 +1,17 @@
 // ============================================
 // FamTastic — MealBank (recipe list + search)
+// Updated: "Lägg till från bibliotek" button
 // ============================================
 
 import React, { useState } from 'react';
 import { C, F, S, safeArray } from '../data';
-import { Search, Star, ExternalLink, Tag } from 'lucide-react';
+import { Search, Star, ExternalLink, BookOpen, Plus } from 'lucide-react';
+import { MealLibrary } from './MealLibrary';
 
-export function MealBank({ meals, onSelect, onEdit }) {
+export function MealBank({ meals, familyId, memberId, onSelect, onEdit, onAddFromTemplate }) {
   const [search, setSearch] = useState('');
   const [filterTag, setFilterTag] = useState(null);
+  const [showLibrary, setShowLibrary] = useState(false);
 
   // Collect all unique tags
   const allTags = [...new Set(meals.flatMap(m => safeArray(m.tags)))].sort();
@@ -21,8 +24,36 @@ export function MealBank({ meals, onSelect, onEdit }) {
     return matchSearch && matchTag;
   });
 
+  function handleTemplateSelect(template) {
+    setShowLibrary(false);
+    // Pass template data up — parent component saves to meals table
+    if (onAddFromTemplate) {
+      onAddFromTemplate(template);
+    }
+  }
+
   return (
     <div>
+      {/* Action buttons row */}
+      <div style={styles.actionRow}>
+        <button
+          onClick={() => setShowLibrary(true)}
+          style={styles.libraryBtn}
+        >
+          <BookOpen size={16} />
+          <span>Från bibliotek</span>
+        </button>
+        {onEdit && (
+          <button
+            onClick={() => onEdit(null)}
+            style={styles.newBtn}
+          >
+            <Plus size={16} />
+            <span>Nytt recept</span>
+          </button>
+        )}
+      </div>
+
       {/* Search */}
       <div style={styles.searchWrap}>
         <Search size={18} color={C.textMuted} style={styles.searchIcon} />
@@ -72,8 +103,20 @@ export function MealBank({ meals, onSelect, onEdit }) {
             {search || filterTag ? 'Inga träffar' : 'Inga recept ännu'}
           </p>
           <p style={styles.emptyText}>
-            {search || filterTag ? 'Prova ändra din sökning.' : 'Lägg till er första måltid!'}
+            {search || filterTag
+              ? 'Prova ändra din sökning.'
+              : 'Lägg till recept från biblioteket eller skapa egna!'
+            }
           </p>
+          {!search && !filterTag && (
+            <button
+              onClick={() => setShowLibrary(true)}
+              style={styles.emptyLibraryBtn}
+            >
+              <BookOpen size={16} />
+              <span>Öppna receptbiblioteket</span>
+            </button>
+          )}
         </div>
       ) : (
         filtered.map(meal => (
@@ -115,11 +158,57 @@ export function MealBank({ meals, onSelect, onEdit }) {
           </button>
         ))
       )}
+
+      {/* Library modal */}
+      {showLibrary && (
+        <MealLibrary
+          familyId={familyId}
+          onSelect={handleTemplateSelect}
+          onClose={() => setShowLibrary(false)}
+        />
+      )}
     </div>
   );
 }
 
 const styles = {
+  actionRow: {
+    display: 'flex',
+    gap: 8,
+    marginBottom: 12,
+  },
+  libraryBtn: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: '10px 14px',
+    borderRadius: 12,
+    border: `2px dashed ${C.primary}`,
+    background: C.primaryLight || '#FFF0E0',
+    color: C.primary,
+    fontSize: F.sizes.sm,
+    fontWeight: F.weights.bold,
+    fontFamily: F.heading,
+    cursor: 'pointer',
+  },
+  newBtn: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: '10px 14px',
+    borderRadius: 12,
+    border: `1.5px solid ${C.border}`,
+    background: C.bgCard,
+    color: C.text,
+    fontSize: F.sizes.sm,
+    fontWeight: F.weights.semi,
+    fontFamily: F.heading,
+    cursor: 'pointer',
+  },
   searchWrap: {
     position: 'relative',
     marginBottom: 10,
@@ -144,8 +233,8 @@ const styles = {
   },
   tagBtn: {
     padding: '5px 10px',
-    borderRadius: 8,
-    border: `1px solid ${C.border}`,
+    borderRadius: 99,
+    border: `1.5px solid ${C.border}`,
     fontSize: F.sizes.xs,
     fontWeight: F.weights.bold,
     fontFamily: F.heading,
@@ -157,8 +246,8 @@ const styles = {
     width: '100%',
     padding: '14px 16px',
     background: C.bgCard,
-    borderRadius: 12,
-    border: `1px solid ${C.borderLight}`,
+    borderRadius: 16,
+    border: `1.5px solid ${C.border}`,
     marginBottom: 8,
     cursor: 'pointer',
     textAlign: 'left',
@@ -197,8 +286,8 @@ const styles = {
   },
   mealTag: {
     padding: '2px 8px',
-    borderRadius: 6,
-    background: C.primaryLight,
+    borderRadius: 99,
+    background: C.primaryLight || '#FFF0E0',
     color: C.primary,
     fontSize: F.sizes.xs,
     fontWeight: F.weights.bold,
@@ -221,6 +310,20 @@ const styles = {
   emptyText: {
     fontSize: F.sizes.sm,
     color: C.textMuted,
-    margin: 0,
+    margin: '0 0 16px',
+  },
+  emptyLibraryBtn: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '10px 20px',
+    borderRadius: 12,
+    border: 'none',
+    background: C.primary,
+    color: '#fff',
+    fontSize: F.sizes.sm,
+    fontWeight: F.weights.bold,
+    fontFamily: F.heading,
+    cursor: 'pointer',
   },
 };
