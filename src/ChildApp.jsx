@@ -3,7 +3,7 @@
 // Views extracted to ChildHome, ChildChores, ChildCalendar
 // ============================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { useChildData } from './useChildData';
 import { C, F, todayStr, safeArray, formatKr } from './data';
@@ -26,6 +26,28 @@ export function ChildApp({ familyId, member, onLogout }) {
   const [celebrationType, setCelebrationType] = useState(null);
   const [celebrationActive, setCelebrationActive] = useState(false);
   const { data, loading, reload } = useChildData(familyId, member.id, true);
+
+  // School data (loaded separately — not in RPC)
+  const [schoolSchedule, setSchoolSchedule] = useState([]);
+  const [schoolSubjects, setSchoolSubjects] = useState([]);
+  const [schoolSpecialEvents, setSchoolSpecialEvents] = useState([]);
+
+  useEffect(() => {
+    if (!familyId || !member.id) return;
+    loadSchoolData();
+  }, [familyId, member.id]);
+
+  async function loadSchoolData() {
+    const [schedRes, subjRes, specRes] = await Promise.all([
+      supabase.from('school_schedule').select('*').eq('member_id', member.id),
+      supabase.from('school_subjects').select('*')
+        .or(`is_global.eq.true,family_id.eq.${familyId}`),
+      supabase.from('school_special_events').select('*').eq('member_id', member.id),
+    ]);
+    setSchoolSchedule(schedRes.data || []);
+    setSchoolSubjects(subjRes.data || []);
+    setSchoolSpecialEvents(specRes.data || []);
+  }
 
   const today = todayStr();
   const todayDow = new Date().getDay() || 7;
@@ -62,15 +84,12 @@ export function ChildApp({ familyId, member, onLogout }) {
   function getPoolChores() {
     return chores.filter(c => {
       if (!c.pool || c.assigned_to) return false;
-      // One-off dated: only show on that date
       if (c.scheduled_date) return c.scheduled_date === today;
-      // Recurring with days: only show on scheduled days
       if (c.is_recurring && c.recurrence_rule) {
         if (c.recurrence_rule.until && today > c.recurrence_rule.until) return false;
         const days = safeArray(c.recurrence_rule.days);
         if (days.length > 0 && !days.includes(todayDow)) return false;
       }
-      // No schedule = show always (gör när du vill)
       return true;
     });
   }
@@ -246,6 +265,9 @@ export function ChildApp({ familyId, member, onLogout }) {
           getMyEvents={getMyEvents}
           getChoresForDate={getChoresForDate}
           isCompletedOnDate={isCompletedOnDate}
+          schoolSchedule={schoolSchedule}
+          schoolSubjects={schoolSubjects}
+          schoolSpecialEvents={schoolSpecialEvents}
         />
       )}
 
