@@ -140,8 +140,10 @@ export function ChildApp({ familyId, member, onLogout }) {
         if (c.recurrence_rule.until && dateStr > c.recurrence_rule.until) return false;
         const days = safeArray(c.recurrence_rule.days);
         if (days.length > 0 && !days.includes(dow)) return false;
+        return true;
       }
-      return true;
+      // Non-recurring without scheduled_date: only show on today
+      return dateStr === today;
     });
   }
 
