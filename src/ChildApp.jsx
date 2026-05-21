@@ -38,7 +38,7 @@ export function ChildApp({ familyId, member, onLogout }) {
   // --- Chore helpers ---
   function getTodayChores() {
     return chores.filter(c => {
-      if (c.pool) return false; // pool chores handled separately
+      if (c.pool && c.assigned_to !== member.id) return false; // show claimed pool chores
       if (c.assigned_to && c.assigned_to !== member.id) return false;
       if (c.is_recurring && c.recurrence_rule) {
         const days = safeArray(c.recurrence_rule.days);
