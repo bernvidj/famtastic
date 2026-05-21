@@ -12,7 +12,7 @@ import { ChoresView } from './chores/ChoresView';
 import { MoneyView } from './money/MoneyView';
 import { MealPlan } from './meals/MealPlan';
 import { ShoppingView } from './shopping/ShoppingView';
-import { CalendarView } from './calendar/CalendarView';
+import { ScheduleView } from './ScheduleView';
 import { SettingsView } from './settings/SettingsView';
 import { ChildApp } from './ChildApp';
 import { C } from './data';
@@ -161,8 +161,8 @@ export function App() {
     switch (page) {
       case 'home':
         return <Home familyId={familyId} member={memberData} members={allMembers} />;
-      case 'calendar':
-        return <CalendarView familyId={familyId} member={memberData} members={allMembers} />;
+      case 'schedule':
+        return <ScheduleView familyId={familyId} member={memberData} members={allMembers} />;
       case 'chores':
         return <ChoresView familyId={familyId} member={memberData} members={allMembers} />;
       case 'money':
