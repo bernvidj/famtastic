@@ -1,5 +1,6 @@
 // ============================================
 // FamTastic — Constants, colors, helpers
+// Duolingo-vibe design tokens
 // ============================================
 
 // Color tokens
@@ -10,8 +11,11 @@ export const C = {
   primaryDark: '#EA580C',   // Hover/active
   secondary: '#14B8A6',     // Teal/mint
   secondaryLight: '#F0FDFA',
+  secondaryDark: '#0D9488',
   accent: '#FBBF24',        // Sunny yellow
   accentLight: '#FFFBEB',
+  purple: '#8B5CF6',        // Fun purple
+  purpleLight: '#F5F3FF',
 
   // Backgrounds
   bg: '#FFFBF5',            // Warm off-white
@@ -28,32 +32,27 @@ export const C = {
   borderLight: '#F5F5F4',
   success: '#22C55E',
   successLight: '#F0FDF4',
+  successDark: '#16A34A',
   error: '#EF4444',
   errorLight: '#FEF2F2',
   warning: '#F59E0B',
 
   // Member colors (assigned to family members)
   memberColors: [
-    '#F97316', // orange
-    '#14B8A6', // teal
-    '#8B5CF6', // purple
-    '#EC4899', // pink
-    '#3B82F6', // blue
-    '#22C55E', // green
-    '#F59E0B', // amber
-    '#EF4444', // red
+    '#F97316', '#14B8A6', '#8B5CF6', '#EC4899',
+    '#3B82F6', '#22C55E', '#F59E0B', '#EF4444',
   ],
 };
 
-// Font tokens
+// Font tokens — Duolingo-vibe: bigger, bolder
 export const F = {
   heading: "'Nunito', system-ui, sans-serif",
-  body: "system-ui, -apple-system, sans-serif",
+  body: "'Nunito', system-ui, -apple-system, sans-serif",
   sizes: {
     xs: 12,
     sm: 14,
     md: 16,
-    lg: 20,
+    lg: 18,      // was 20, tightened
     xl: 24,
     xxl: 32,
     hero: 40,
@@ -66,14 +65,17 @@ export const F = {
   },
 };
 
-// Common styles (reusable)
+// Common styles (reusable) — Duolingo-inspired
 export const S = {
   card: {
     background: C.bgCard,
     borderRadius: 16,
-    padding: 20,
-    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-    border: `1px solid ${C.borderLight}`,
+    padding: 16,
+    border: `1.5px solid ${C.borderLight}`,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+  },
+  cardHover: {
+    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
   },
   button: {
     display: 'inline-flex',
@@ -88,6 +90,7 @@ export const S = {
     fontFamily: F.heading,
     cursor: 'pointer',
     transition: 'background 0.15s, transform 0.1s',
+    minHeight: 48,
   },
   buttonPrimary: {
     background: C.primary,
@@ -96,6 +99,10 @@ export const S = {
   buttonSecondary: {
     background: C.primaryLight,
     color: C.primary,
+  },
+  buttonSuccess: {
+    background: C.success,
+    color: '#fff',
   },
   input: {
     width: '100%',
@@ -107,19 +114,43 @@ export const S = {
     outline: 'none',
     boxSizing: 'border-box',
     transition: 'border-color 0.15s',
+    minHeight: 48,
   },
   container: {
     maxWidth: 480,
     margin: '0 auto',
     padding: '24px 16px',
   },
+  sectionLabel: {
+    fontSize: F.sizes.xs,
+    fontWeight: F.weights.bold,
+    fontFamily: F.heading,
+    color: C.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    margin: '0 0 8px',
+  },
+  badge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '3px 10px',
+    borderRadius: 99,
+    fontSize: F.sizes.xs,
+    fontWeight: F.weights.bold,
+    fontFamily: F.heading,
+  },
+  emptyState: {
+    textAlign: 'center',
+    padding: '32px 20px',
+  },
 };
 
 // Difficulty labels (Swedish)
 export const DIFFICULTY = {
-  easy: { label: 'Lätt', color: C.success, bg: C.successLight },
-  medium: { label: 'Medel', color: C.accent, bg: C.accentLight },
-  hard: { label: 'Svårt', color: C.error, bg: C.errorLight },
+  easy: { label: 'Lätt', color: C.success, bg: C.successLight, emoji: '🟢' },
+  medium: { label: 'Medel', color: C.accent, bg: C.accentLight, emoji: '🟡' },
+  hard: { label: 'Svårt', color: C.error, bg: C.errorLight, emoji: '🔴' },
 };
 
 // Chore category icons
@@ -132,15 +163,8 @@ export const CATEGORY_ICONS = {
 
 // Shopping categories (Swedish)
 export const SHOPPING_CATEGORIES = [
-  'Mejeri',
-  'Frukt & grönt',
-  'Kött & fisk',
-  'Frys',
-  'Bröd',
-  'Skafferi',
-  'Dryck',
-  'Hygien',
-  'Övrigt',
+  'Mejeri', 'Frukt & grönt', 'Kött & fisk', 'Frys',
+  'Bröd', 'Skafferi', 'Dryck', 'Hygien', 'Övrigt',
 ];
 
 // Helper: format öre to kr string
@@ -168,4 +192,20 @@ export function getWeekNumber(date) {
 // Helper: safe array from JSONB (handles {} instead of [])
 export function safeArray(val) {
   return Array.isArray(val) ? val : [];
+}
+
+// Helper: greeting based on time of day
+export function getGreeting(name) {
+  const h = new Date().getHours();
+  if (h < 10) return `God morgon, ${name}! ☀️`;
+  if (h < 17) return `Hej ${name}! 👋`;
+  return `God kväll, ${name}! 🌙`;
+}
+
+// Helper: streak emoji based on count
+export function streakEmoji(count) {
+  if (count >= 14) return '💎';
+  if (count >= 7) return '🔥';
+  if (count >= 3) return '⚡';
+  return '✨';
 }
