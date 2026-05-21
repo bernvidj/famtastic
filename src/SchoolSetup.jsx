@@ -299,9 +299,6 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
 
     setSaving(false);
     if (onDone) onDone();
-
-    setSaving(false);
-    if (onDone) onDone();
   }
 
   // --- Subject helpers ---
