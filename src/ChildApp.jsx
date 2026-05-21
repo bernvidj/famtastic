@@ -7,12 +7,15 @@ import { supabase } from './supabaseClient';
 import { useChildData } from './useChildData';
 import { C, F, S, todayStr, safeArray, formatKr, getGreeting, streakEmoji } from './data';
 import { ChildMoneyView } from './money/ChildMoneyView';
+import { Celebration } from './Celebrations';
 import { Home, Calendar, CheckSquare, PiggyBank, LogOut, CheckCircle, Circle, Star, Flame, Target, Zap } from 'lucide-react';
 
 const WEEKDAYS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
 
 export function ChildApp({ familyId, member, onLogout }) {
   const [page, setPage] = useState('home');
+  const [celebrationType, setCelebrationType] = useState(null);
+  const [celebrationActive, setCelebrationActive] = useState(false);
   const { data, loading, reload } = useChildData(familyId, member.id, true);
 
   const today = todayStr();
@@ -65,6 +68,11 @@ export function ChildApp({ familyId, member, onLogout }) {
     return days.length > 0 ? days.length : 1;
   }
 
+  function triggerCelebration(type) {
+    setCelebrationType(type);
+    setCelebrationActive(true);
+  }
+
   async function toggleChore(choreId) {
     const done = isCompleted(choreId);
     if (done) {
@@ -72,15 +80,27 @@ export function ChildApp({ familyId, member, onLogout }) {
         p_chore_id: choreId, p_member_id: member.id, p_completed_date: today,
       });
     } else {
-      await supabase.rpc('complete_chore', {
+      const chore = chores.find(c => c.id === choreId);
+      const { data: result } = await supabase.rpc('complete_chore', {
         p_chore_id: choreId, p_family_id: familyId, p_member_id: member.id, p_completed_date: today,
       });
+      // Check if all today's chores are now done
+      const todayList = getTodayChores();
+      const nowDone = todayList.filter(c => c.id === choreId || isCompleted(c.id)).length;
+      if (nowDone >= todayList.length) {
+        triggerCelebration('fireworks');
+      } else if (result?.points_earned > 0) {
+        triggerCelebration('sparkle');
+      } else {
+        triggerCelebration('confetti');
+      }
     }
     reload();
   }
 
   async function claimPoolChore(choreId) {
     await supabase.from('chores').update({ assigned_to: member.id }).eq('id', choreId);
+    triggerCelebration('sparkle');
     reload();
   }
 
@@ -426,6 +446,13 @@ export function ChildApp({ familyId, member, onLogout }) {
         />
       )}
       {page === 'calendar' && renderCalendar()}
+
+      {/* Celebrations overlay */}
+      <Celebration
+        type={celebrationType}
+        active={celebrationActive}
+        onDone={() => setCelebrationActive(false)}
+      />
 
       {/* Bottom nav */}
       <nav style={styles.nav}>
