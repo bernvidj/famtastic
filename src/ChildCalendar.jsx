@@ -1,14 +1,22 @@
 // ============================================
-// FamTastic — ChildCalendar (week view with events + chores)
-// Extracted from ChildApp
+// FamTastic — ChildCalendar (week view with lessons + events + chores)
+// Shows school schedule per day above events and chores
 // ============================================
 
 import React from 'react';
-import { C, F } from './data';
+import { C, F, safeArray } from './data';
 
 const WEEKDAYS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
 
-export function ChildCalendar({ today, getMyEvents, getChoresForDate, isCompletedOnDate }) {
+function fmtTime(t) {
+  if (!t) return '';
+  return t.slice(0, 5);
+}
+
+export function ChildCalendar({
+  today, getMyEvents, getChoresForDate, isCompletedOnDate,
+  schoolSchedule, schoolSubjects, schoolSpecialEvents,
+}) {
   const now = new Date();
   const day = now.getDay() || 7;
   const monday = new Date(now);
@@ -20,8 +28,58 @@ export function ChildCalendar({ today, getMyEvents, getChoresForDate, isComplete
     weekDates.push(d);
   }
 
+  const schedule = safeArray(schoolSchedule);
+  const subjects = safeArray(schoolSubjects);
+  const specials = safeArray(schoolSpecialEvents);
+
+  const subjectMap = {};
+  subjects.forEach(s => { subjectMap[s.id] = s; });
+
   function fmtD(d) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function getLessons(dateStr, dow) {
+    // dow 1-7 (Mon-Sun), school only 1-5
+    if (dow > 5) return [];
+
+    // Check for special events on this date
+    const daySpecials = specials.filter(se => se.event_date === dateStr);
+    const fullDay = daySpecials.find(se => se.period === 'full_day');
+    if (fullDay) return [{ special: true, title: fullDay.title, icon: fullDay.icon || '🎉', period: 'full_day' }];
+
+    const morningSpecial = daySpecials.find(se => se.period === 'morning');
+    const afternoonSpecial = daySpecials.find(se => se.period === 'afternoon');
+
+    // Get normal lessons for this day of week
+    const dayLessons = schedule
+      .filter(sl => sl.day_of_week === dow)
+      .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+
+    // Replace morning/afternoon if specials exist
+    return dayLessons.map(sl => {
+      const startHour = parseInt((sl.start_time || '08:00').split(':')[0], 10);
+      if (morningSpecial && startHour < 12) {
+        return { special: true, title: morningSpecial.title, icon: morningSpecial.icon || '🎉', period: 'morning', time: sl.start_time };
+      }
+      if (afternoonSpecial && startHour >= 12) {
+        return { special: true, title: afternoonSpecial.title, icon: afternoonSpecial.icon || '🎉', period: 'afternoon', time: sl.start_time };
+      }
+      const subj = subjectMap[sl.subject_id];
+      return {
+        special: false,
+        title: subj?.title || 'Lektion',
+        shortName: subj?.short_name || '',
+        icon: subj?.icon || '📚',
+        color: subj?.color || C.secondary,
+        startTime: sl.start_time,
+        endTime: sl.end_time,
+      };
+    }).filter((lesson, i, arr) => {
+      // Deduplicate morning/afternoon specials (they replace multiple lessons)
+      if (!lesson.special) return true;
+      return i === arr.findIndex(l => l.special && l.period === lesson.period);
+    });
   }
 
   return (
@@ -30,9 +88,13 @@ export function ChildCalendar({ today, getMyEvents, getChoresForDate, isComplete
       {weekDates.map((d, i) => {
         const dateStr = fmtD(d);
         const isToday = dateStr === today;
+        const dow = i + 1; // 1=Mon .. 7=Sun
         const dayEvents = getMyEvents(dateStr);
         const dayChores = getChoresForDate(dateStr);
-        if (dayEvents.length === 0 && dayChores.length === 0) return null;
+        const dayLessons = getLessons(dateStr, dow);
+
+        if (dayEvents.length === 0 && dayChores.length === 0 && dayLessons.length === 0) return null;
+
         return (
           <div key={i} style={{
             ...styles.calDay,
@@ -42,11 +104,39 @@ export function ChildCalendar({ today, getMyEvents, getChoresForDate, isComplete
             <span style={{ ...styles.calDayName, color: isToday ? C.primary : C.text }}>
               {WEEKDAYS[i]} {d.getDate()}/{d.getMonth() + 1}
             </span>
+
+            {/* Lessons first */}
+            {dayLessons.length > 0 && (
+              <div style={styles.lessonBlock}>
+                {dayLessons.map((lesson, li) => (
+                  <div key={li} style={{
+                    ...styles.lessonRow,
+                    borderLeftColor: lesson.special ? C.accent : lesson.color,
+                  }}>
+                    <span style={{ fontSize: 14 }}>{lesson.icon}</span>
+                    {lesson.special ? (
+                      <span style={styles.lessonTitle}>{lesson.title}</span>
+                    ) : (
+                      <>
+                        <span style={styles.lessonTime}>
+                          {fmtTime(lesson.startTime)}–{fmtTime(lesson.endTime)}
+                        </span>
+                        <span style={styles.lessonTitle}>{lesson.title}</span>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Events */}
             {dayEvents.map(ev => (
               <div key={ev.id} style={styles.calEvent}>
                 📅 {ev.start_time ? ev.start_time.slice(0, 5) + ' ' : ''}{ev.title}
               </div>
             ))}
+
+            {/* Chores */}
             {dayChores.map(ch => {
               const done = isCompletedOnDate(ch.id, dateStr);
               return (
@@ -74,6 +164,21 @@ const styles = {
   pageTitle: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: '0 0 4px' },
   calDay: { padding: '12px 14px', borderRadius: 14, border: '1.5px solid', marginBottom: 8 },
   calDayName: { display: 'block', fontFamily: F.heading, fontSize: F.sizes.sm, fontWeight: F.weights.bold, marginBottom: 4 },
+  lessonBlock: { marginBottom: 4 },
+  lessonRow: {
+    display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px',
+    borderLeft: '3px solid', borderLeftColor: C.secondary,
+    borderRadius: '0 8px 8px 0', marginBottom: 2,
+    background: 'rgba(0,0,0,0.02)',
+  },
+  lessonTime: {
+    fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading,
+    fontWeight: F.weights.semi, minWidth: 72, flexShrink: 0,
+  },
+  lessonTitle: {
+    fontSize: F.sizes.sm, color: C.text, fontFamily: F.heading,
+    fontWeight: F.weights.semi,
+  },
   calEvent: { fontSize: F.sizes.sm, color: C.text, fontFamily: F.heading, padding: '2px 0' },
   calChore: {
     display: 'flex', alignItems: 'center', gap: 6, fontSize: F.sizes.sm,
