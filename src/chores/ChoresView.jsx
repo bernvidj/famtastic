@@ -1,13 +1,15 @@
 // ============================================
 // FamTastic — ChoresView (Duolingo-style)
+// with pool chores + parent feedback
 // ============================================
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { C, F, S, todayStr, safeArray, streakEmoji } from '../data';
+import { C, F, S, todayStr, safeArray } from '../data';
 import { ChoreCard } from './ChoreCard';
+import { ChorePoolCard } from './ChorePoolCard';
 import { ChoreEditor } from './ChoreEditor';
-import { Plus, List, CalendarDays, Filter, Trophy } from 'lucide-react';
+import { Plus, List, CalendarDays, Trophy, HandMetal } from 'lucide-react';
 
 export function ChoresView({ familyId, member, members }) {
   const [tab, setTab] = useState('today');
@@ -33,23 +35,15 @@ export function ChoresView({ familyId, member, members }) {
   const weekStart = fmtDate(monday);
   const weekEnd = fmtDate(sunday);
 
-  useEffect(() => {
-    loadData();
-  }, [familyId]);
+  useEffect(() => { loadData(); }, [familyId]);
 
   async function loadData() {
     setLoading(true);
     const [chRes, compRes, famRes] = await Promise.all([
-      supabase.from('chores').select('*')
-        .eq('family_id', familyId)
-        .order('created_at'),
-      supabase.from('chore_completions').select('*')
-        .eq('family_id', familyId)
-        .gte('completed_date', weekStart)
-        .lte('completed_date', weekEnd),
-      supabase.from('families').select('settings')
-        .eq('id', familyId)
-        .single(),
+      supabase.from('chores').select('*').eq('family_id', familyId).order('created_at'),
+      supabase.from('chore_completions').select('*').eq('family_id', familyId)
+        .gte('completed_date', weekStart).lte('completed_date', weekEnd),
+      supabase.from('families').select('settings').eq('id', familyId).single(),
     ]);
     setChores(chRes.data || []);
     setCompletions(compRes.data || []);
@@ -68,9 +62,7 @@ export function ChoresView({ familyId, member, members }) {
   }
 
   function weekDone(choreId, memberId) {
-    return completions.filter(
-      c => c.chore_id === choreId && c.member_id === memberId
-    ).length;
+    return completions.filter(c => c.chore_id === choreId && c.member_id === memberId).length;
   }
 
   function weekEarned(chore, memberId) {
@@ -93,66 +85,62 @@ export function ChoresView({ familyId, member, members }) {
     );
   }
 
-  // BUG #1 FIX: filter works correctly for assigned + unassigned chores
+  // Regular chores (not pool) scheduled for today
   function getTodayChores() {
     return chores.filter(c => {
-      // Check recurring schedule
+      if (c.pool) return false; // pool chores shown separately
       if (c.is_recurring && c.recurrence_rule) {
         const days = safeArray(c.recurrence_rule.days);
         if (days.length > 0 && !days.includes(todayDow)) return false;
       }
-      // Member filter: show chore if assigned to selected member OR unassigned
       if (filterMember) {
         if (c.assigned_to && c.assigned_to !== filterMember) return false;
-        // unassigned (assigned_to=null) always passes — shown for everyone
       }
       return true;
     });
   }
 
-  // BUG #1 FIX: groupByMember now respects filterMember
+  // Pool chores: open (unclaimed) or recently claimed
+  function getPoolChores() {
+    return chores.filter(c => c.pool);
+  }
+
   function groupByMember(choreList) {
     const children = members.filter(m => m.role === 'child');
-    const filtered = filterMember
-      ? children.filter(c => c.id === filterMember)
-      : children;
-
+    const filtered = filterMember ? children.filter(c => c.id === filterMember) : children;
     return filtered.map(child => ({
       member: child,
-      chores: choreList.filter(c =>
-        !c.assigned_to || c.assigned_to === child.id
-      ),
+      chores: choreList.filter(c => !c.assigned_to || c.assigned_to === child.id),
     })).filter(g => g.chores.length > 0);
   }
 
-  // --- Toggle via RPC ---
+  // --- Actions ---
   async function toggleChore(choreId, memberId) {
     const mid = memberId || member.id;
     const done = isCompletedToday(choreId, mid);
-
     if (done) {
       const { error } = await supabase.rpc('uncomplete_chore', {
-        p_chore_id: choreId,
-        p_member_id: mid,
-        p_completed_date: today,
+        p_chore_id: choreId, p_member_id: mid, p_completed_date: today,
       });
       if (error) showToast('Kunde inte ångra: ' + error.message);
     } else {
       const chore = chores.find(c => c.id === choreId);
       const { data, error } = await supabase.rpc('complete_chore', {
-        p_chore_id: choreId,
-        p_family_id: familyId,
-        p_member_id: mid,
-        p_completed_date: today,
+        p_chore_id: choreId, p_family_id: familyId, p_member_id: mid, p_completed_date: today,
       });
-      if (error) {
-        showToast('Kunde inte bocka av: ' + error.message);
-      } else if (data?.points_earned > 0) {
-        showToast(`🎉 +${data.points_earned} kr för ${chore?.title}!`);
-      } else {
-        showToast(`✅ ${chore?.title} klart!`);
-      }
+      if (error) showToast('Kunde inte bocka av: ' + error.message);
+      else if (data?.points_earned > 0) showToast(`🎉 +${data.points_earned} kr för ${chore?.title}!`);
+      else showToast(`✅ ${chore?.title} klart!`);
     }
+    loadData();
+  }
+
+  async function claimChore(choreId) {
+    const { error } = await supabase.from('chores')
+      .update({ assigned_to: member.id })
+      .eq('id', choreId);
+    if (error) showToast('Kunde inte plocka sysslan');
+    else showToast('🙌 Du tog sysslan!');
     loadData();
   }
 
@@ -178,60 +166,54 @@ export function ChoresView({ familyId, member, members }) {
   }
 
   function weekSummary(childId) {
-    const childCompletions = completions.filter(c => c.member_id === childId);
-    const bonusEarned = childCompletions.reduce((sum, c) => sum + (c.points_earned || 0), 0);
-    const totalDone = childCompletions.length;
-    return { totalDone, bonusEarned };
+    const cc = completions.filter(c => c.member_id === childId);
+    return { totalDone: cc.length, bonusEarned: cc.reduce((s, c) => s + (c.points_earned || 0), 0) };
   }
+
+  const poolChores = getPoolChores();
+  const hasPool = poolChores.length > 0;
 
   // --- RENDER ---
   return (
     <div style={styles.page}>
-      {/* Toast */}
-      {toastMsg && (
-        <div style={styles.toast}>{toastMsg}</div>
-      )}
+      {toastMsg && <div style={styles.toast}>{toastMsg}</div>}
 
       {/* Header */}
       <div style={styles.header}>
         <h1 style={styles.pageTitle}>Sysslor</h1>
         {isParent && (
-          <button
-            onClick={() => setEditing('new')}
-            style={styles.addBtn}
-          >
+          <button onClick={() => setEditing('new')} style={styles.addBtn}>
             <Plus size={20} /> Ny
           </button>
         )}
       </div>
 
-      {/* Tabs — Duolingo pill style */}
+      {/* Tabs */}
       <div style={styles.tabRow}>
-        <button
-          onClick={() => setTab('today')}
-          style={{
-            ...styles.tabBtn,
-            background: tab === 'today' ? C.primary : C.bgCard,
-            color: tab === 'today' ? '#fff' : C.textMuted,
-            borderColor: tab === 'today' ? C.primary : C.border,
-          }}
-        >
-          <CalendarDays size={16} /> Idag
-        </button>
-        <button
-          onClick={() => setTab('all')}
-          style={{
-            ...styles.tabBtn,
-            background: tab === 'all' ? C.primary : C.bgCard,
-            color: tab === 'all' ? '#fff' : C.textMuted,
-            borderColor: tab === 'all' ? C.primary : C.border,
-          }}
-        >
-          <List size={16} /> Alla
-        </button>
+        {[
+          { key: 'today', label: 'Idag', icon: CalendarDays },
+          ...(hasPool ? [{ key: 'pool', label: 'Plocka', icon: HandMetal }] : []),
+          { key: 'all', label: 'Alla', icon: List },
+        ].map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            style={{
+              ...styles.tabBtn,
+              background: tab === t.key ? C.primary : C.bgCard,
+              color: tab === t.key ? '#fff' : C.textMuted,
+              borderColor: tab === t.key ? C.primary : C.border,
+            }}
+          >
+            <t.icon size={16} /> {t.label}
+            {t.key === 'pool' && (
+              <span style={styles.poolCount}>{poolChores.filter(c => !c.assigned_to).length}</span>
+            )}
+          </button>
+        ))}
       </div>
 
-      {/* Member filter pills */}
+      {/* Member filter (today tab only) */}
       {tab === 'today' && members.filter(m => m.role === 'child').length > 1 && (
         <div style={styles.filterRow}>
           <button
@@ -242,22 +224,14 @@ export function ChoresView({ familyId, member, members }) {
               color: !filterMember ? '#fff' : C.text,
               borderColor: !filterMember ? C.text : C.border,
             }}
-          >
-            Alla
-          </button>
+          >Alla</button>
           {members.filter(m => m.role === 'child').map(m => (
-            <button
-              key={m.id}
-              onClick={() => setFilterMember(m.id)}
-              style={{
-                ...styles.filterPill,
-                background: filterMember === m.id ? (m.color || C.primary) : C.bgCard,
-                color: filterMember === m.id ? '#fff' : C.text,
-                borderColor: filterMember === m.id ? (m.color || C.primary) : C.border,
-              }}
-            >
-              {m.avatar} {m.name}
-            </button>
+            <button key={m.id} onClick={() => setFilterMember(m.id)} style={{
+              ...styles.filterPill,
+              background: filterMember === m.id ? (m.color || C.primary) : C.bgCard,
+              color: filterMember === m.id ? '#fff' : C.text,
+              borderColor: filterMember === m.id ? (m.color || C.primary) : C.border,
+            }}>{m.avatar} {m.name}</button>
           ))}
         </div>
       )}
@@ -265,6 +239,7 @@ export function ChoresView({ familyId, member, members }) {
       {loading ? (
         <p style={styles.loadingText}>Laddar sysslor...</p>
       ) : tab === 'today' ? (
+        /* === TODAY TAB === */
         <div style={styles.content}>
           {getTodayChores().length === 0 ? (
             <div style={S.emptyState}>
@@ -277,12 +252,8 @@ export function ChoresView({ familyId, member, members }) {
               const summary = weekSummary(group.member.id);
               return (
                 <div key={group.member.id} style={styles.memberGroup}>
-                  {/* Member header with stats */}
                   <div style={styles.memberHeader}>
-                    <div style={{
-                      ...styles.memberAvatarWrap,
-                      background: group.member.color || C.primary,
-                    }}>
+                    <div style={{ ...styles.memberAvatarWrap, background: group.member.color || C.primary }}>
                       <span style={styles.memberAvatar}>{group.member.avatar}</span>
                     </div>
                     <div style={styles.memberInfo}>
@@ -299,35 +270,75 @@ export function ChoresView({ familyId, member, members }) {
                       </div>
                     )}
                   </div>
-
-                  {/* Chore cards */}
-                  {group.chores.map(chore => {
-                    const total = weekTotal(chore);
-                    const done = weekDone(chore.id, group.member.id);
-                    const earned = weekEarned(chore, group.member.id);
-                    return (
-                      <ChoreCard
-                        key={chore.id}
-                        chore={chore}
-                        completed={isCompletedToday(chore.id, group.member.id)}
-                        pending={isPending(chore.id, group.member.id)}
-                        requireApproval={requireApproval}
-                        onToggle={() => toggleChore(chore.id, group.member.id)}
-                        canToggle={member.id === group.member.id || isParent}
-                        memberAvatar={null}
-                        memberName={null}
-                        weekProgress={{ done, total }}
-                        weekEarned={earned}
-                      />
-                    );
-                  })}
+                  {group.chores.map(chore => (
+                    <ChoreCard
+                      key={chore.id}
+                      chore={chore}
+                      completed={isCompletedToday(chore.id, group.member.id)}
+                      pending={isPending(chore.id, group.member.id)}
+                      requireApproval={requireApproval}
+                      onToggle={() => toggleChore(chore.id, group.member.id)}
+                      canToggle={member.id === group.member.id || isParent}
+                      weekProgress={{ done: weekDone(chore.id, group.member.id), total: weekTotal(chore) }}
+                      weekEarned={weekEarned(chore, group.member.id)}
+                    />
+                  ))}
                 </div>
               );
             })
           )}
         </div>
+      ) : tab === 'pool' ? (
+        /* === POOL TAB === */
+        <div style={styles.content}>
+          {/* Open chores */}
+          {poolChores.filter(c => !c.assigned_to).length > 0 && (
+            <div style={styles.choreGroup}>
+              <p style={S.sectionLabel}>Öppna sysslor — plocka en!</p>
+              {poolChores.filter(c => !c.assigned_to).map(chore => (
+                <ChorePoolCard
+                  key={chore.id}
+                  chore={chore}
+                  onClaim={() => claimChore(chore.id)}
+                  claimedBy={null}
+                  members={members}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Claimed chores (parent feedback) */}
+          {poolChores.filter(c => c.assigned_to).length > 0 && (
+            <div style={styles.choreGroup}>
+              <p style={S.sectionLabel}>
+                {isParent ? 'Plockade sysslor' : 'Redan tagna'}
+              </p>
+              {poolChores.filter(c => c.assigned_to).map(chore => (
+                <ChorePoolCard
+                  key={chore.id}
+                  chore={chore}
+                  onClaim={() => {}}
+                  claimedBy={chore.assigned_to}
+                  members={members}
+                />
+              ))}
+            </div>
+          )}
+
+          {poolChores.length === 0 && (
+            <div style={S.emptyState}>
+              <span style={{ fontSize: 48 }}>🤲</span>
+              <p style={styles.emptyTitle}>Inga öppna sysslor</p>
+              <p style={styles.emptyText}>
+                {isParent
+                  ? 'Skapa en syssla och markera den som "Öppen pool".'
+                  : 'Fråga en förälder om det finns något att göra!'}
+              </p>
+            </div>
+          )}
+        </div>
       ) : (
-        /* ALL CHORES tab */
+        /* === ALL CHORES TAB === */
         <div style={styles.content}>
           {chores.length === 0 ? (
             <div style={S.emptyState}>
@@ -337,53 +348,44 @@ export function ChoresView({ familyId, member, members }) {
             </div>
           ) : (
             <>
-              {chores.filter(c => c.chore_type === 'base').length > 0 && (
+              {chores.filter(c => c.chore_type === 'base' && !c.pool).length > 0 && (
                 <div style={styles.choreGroup}>
-                  <p style={S.sectionLabel}>Grundsysslor (ingår i veckopeng)</p>
-                  {chores.filter(c => c.chore_type === 'base').map(chore => {
-                    const assignee = chore.assigned_to
-                      ? members.find(m => m.id === chore.assigned_to)
-                      : null;
+                  <p style={S.sectionLabel}>Grundsysslor</p>
+                  {chores.filter(c => c.chore_type === 'base' && !c.pool).map(chore => {
+                    const a = chore.assigned_to ? members.find(m => m.id === chore.assigned_to) : null;
                     return (
-                      <ChoreCard
-                        key={chore.id}
-                        chore={chore}
-                        completed={false}
-                        pending={false}
-                        requireApproval={requireApproval}
-                        onToggle={() => isParent && setEditing(chore)}
-                        canToggle={isParent}
-                        memberAvatar={assignee?.avatar}
-                        memberName={assignee?.name}
-                        weekProgress={null}
-                        weekEarned={0}
-                      />
+                      <ChoreCard key={chore.id} chore={chore} completed={false} pending={false}
+                        requireApproval={requireApproval} onToggle={() => isParent && setEditing(chore)}
+                        canToggle={isParent} memberAvatar={a?.avatar} memberName={a?.name}
+                        weekProgress={null} weekEarned={0} />
                     );
                   })}
                 </div>
               )}
-
-              {chores.filter(c => c.chore_type !== 'base').length > 0 && (
+              {chores.filter(c => c.chore_type !== 'base' && !c.pool).length > 0 && (
                 <div style={styles.choreGroup}>
-                  <p style={S.sectionLabel}>Bonussysslor (extra pengar)</p>
-                  {chores.filter(c => c.chore_type !== 'base').map(chore => {
-                    const assignee = chore.assigned_to
-                      ? members.find(m => m.id === chore.assigned_to)
-                      : null;
+                  <p style={S.sectionLabel}>Bonussysslor</p>
+                  {chores.filter(c => c.chore_type !== 'base' && !c.pool).map(chore => {
+                    const a = chore.assigned_to ? members.find(m => m.id === chore.assigned_to) : null;
                     return (
-                      <ChoreCard
-                        key={chore.id}
-                        chore={chore}
-                        completed={false}
-                        pending={false}
-                        requireApproval={requireApproval}
-                        onToggle={() => isParent && setEditing(chore)}
-                        canToggle={isParent}
-                        memberAvatar={assignee?.avatar}
-                        memberName={assignee?.name}
-                        weekProgress={null}
-                        weekEarned={0}
-                      />
+                      <ChoreCard key={chore.id} chore={chore} completed={false} pending={false}
+                        requireApproval={requireApproval} onToggle={() => isParent && setEditing(chore)}
+                        canToggle={isParent} memberAvatar={a?.avatar} memberName={a?.name}
+                        weekProgress={null} weekEarned={0} />
+                    );
+                  })}
+                </div>
+              )}
+              {chores.filter(c => c.pool).length > 0 && (
+                <div style={styles.choreGroup}>
+                  <p style={S.sectionLabel}>Öppna pool-sysslor</p>
+                  {chores.filter(c => c.pool).map(chore => {
+                    const a = chore.assigned_to ? members.find(m => m.id === chore.assigned_to) : null;
+                    return (
+                      <ChoreCard key={chore.id} chore={chore} completed={false} pending={false}
+                        requireApproval={requireApproval} onToggle={() => isParent && setEditing(chore)}
+                        canToggle={isParent} memberAvatar={a?.avatar} memberName={a?.name || 'Öppen'}
+                        weekProgress={null} weekEarned={0} />
                     );
                   })}
                 </div>
@@ -411,169 +413,47 @@ export function ChoresView({ familyId, member, members }) {
 }
 
 const styles = {
-  page: {
-    minHeight: '100vh',
-    background: C.bg,
-    fontFamily: F.body,
-  },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body },
   toast: {
-    position: 'fixed',
-    top: 16,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    background: C.text,
-    color: '#fff',
-    padding: '12px 24px',
-    borderRadius: 99,
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-    zIndex: 300,
-    boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+    position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
+    background: C.text, color: '#fff', padding: '12px 24px', borderRadius: 99,
+    fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading,
+    zIndex: 300, boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
   },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px 16px 8px',
-  },
-  pageTitle: {
-    fontFamily: F.heading,
-    fontSize: F.sizes.xl,
-    fontWeight: F.weights.extra,
-    color: C.text,
-    margin: 0,
-  },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 16px 8px' },
+  pageTitle: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: 0 },
   addBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '10px 18px',
-    borderRadius: 12,
-    border: 'none',
-    background: C.primary,
-    color: '#fff',
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-    cursor: 'pointer',
-    minHeight: 44,
+    display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 18px',
+    borderRadius: 12, border: 'none', background: C.primary, color: '#fff',
+    fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', minHeight: 44,
   },
-  tabRow: {
-    display: 'flex',
-    gap: 8,
-    padding: '8px 16px 4px',
-  },
+  tabRow: { display: 'flex', gap: 8, padding: '8px 16px 4px' },
   tabBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '10px 20px',
-    borderRadius: 99,
-    border: '1.5px solid',
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-    cursor: 'pointer',
-    minHeight: 44,
-    transition: 'background 0.15s, color 0.15s',
+    display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px',
+    borderRadius: 99, border: '1.5px solid', fontSize: F.sizes.sm, fontWeight: F.weights.bold,
+    fontFamily: F.heading, cursor: 'pointer', minHeight: 44, transition: 'background 0.15s, color 0.15s',
   },
-  filterRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '8px 16px',
-    overflowX: 'auto',
+  poolCount: {
+    background: 'rgba(255,255,255,0.3)', padding: '1px 7px', borderRadius: 99,
+    fontSize: F.sizes.xs, fontWeight: F.weights.extra, marginLeft: 2,
   },
+  filterRow: { display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', overflowX: 'auto' },
   filterPill: {
-    padding: '8px 16px',
-    borderRadius: 99,
-    border: '1.5px solid',
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    minHeight: 40,
-    transition: 'background 0.15s, color 0.15s',
+    padding: '8px 16px', borderRadius: 99, border: '1.5px solid', fontSize: F.sizes.sm,
+    fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', whiteSpace: 'nowrap', minHeight: 40,
   },
-  content: {
-    padding: '8px 16px',
-  },
-  loadingText: {
-    textAlign: 'center',
-    color: C.textMuted,
-    padding: 32,
-    fontFamily: F.heading,
-  },
-  emptyTitle: {
-    fontFamily: F.heading,
-    fontSize: F.sizes.lg,
-    fontWeight: F.weights.bold,
-    color: C.text,
-    margin: '12px 0 4px',
-  },
-  emptyText: {
-    fontSize: F.sizes.sm,
-    color: C.textMuted,
-    margin: 0,
-    fontFamily: F.heading,
-  },
-  memberGroup: {
-    marginBottom: 24,
-  },
-  memberHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 12,
-    padding: '4px 0',
-  },
-  memberAvatarWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  memberAvatar: {
-    fontSize: 22,
-  },
-  memberInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  memberName: {
-    display: 'block',
-    fontFamily: F.heading,
-    fontSize: F.sizes.md,
-    fontWeight: F.weights.bold,
-    color: C.text,
-  },
-  memberStats: {
-    display: 'block',
-    fontSize: F.sizes.xs,
-    color: C.textMuted,
-    fontFamily: F.heading,
-  },
-  streakBadge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-    padding: '4px 10px',
-    borderRadius: 99,
-    background: C.accentLight,
-    flexShrink: 0,
-  },
-  streakText: {
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.extra,
-    fontFamily: F.heading,
-    color: '#92400E',
-  },
-  choreGroup: {
-    marginBottom: 24,
-  },
+  content: { padding: '8px 16px' },
+  loadingText: { textAlign: 'center', color: C.textMuted, padding: 32, fontFamily: F.heading },
+  emptyTitle: { fontFamily: F.heading, fontSize: F.sizes.lg, fontWeight: F.weights.bold, color: C.text, margin: '12px 0 4px' },
+  emptyText: { fontSize: F.sizes.sm, color: C.textMuted, margin: 0, fontFamily: F.heading },
+  memberGroup: { marginBottom: 24 },
+  memberHeader: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '4px 0' },
+  memberAvatarWrap: { width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  memberAvatar: { fontSize: 22 },
+  memberInfo: { flex: 1, minWidth: 0 },
+  memberName: { display: 'block', fontFamily: F.heading, fontSize: F.sizes.md, fontWeight: F.weights.bold, color: C.text },
+  memberStats: { display: 'block', fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading },
+  streakBadge: { display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 99, background: C.accentLight, flexShrink: 0 },
+  streakText: { fontSize: F.sizes.sm, fontWeight: F.weights.extra, fontFamily: F.heading, color: '#92400E' },
+  choreGroup: { marginBottom: 24 },
 };
