@@ -223,14 +223,13 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
       end_time: s.end_time,
     }));
 
-    // Delete existing schedule for this child, then insert new
     await supabase.from('school_schedule').delete().eq('member_id', memberId);
     if (scheduleRows.length > 0) {
       await supabase.from('school_schedule').insert(scheduleRows);
     }
 
-    // 2. Save active rules
-    const activeRules = rules.filter(r => r.is_active).map(r => ({
+    // 2. Save rules (all, including inactive for future toggling)
+    const ruleRows = rules.map(r => ({
       family_id: familyId,
       member_id: memberId,
       subject_id: r.subject_id,
@@ -239,13 +238,67 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
       icon: r.icon,
       days_before: r.days_before,
       time_of_day: r.time_of_day,
-      is_active: true,
+      is_active: r.is_active,
     }));
 
     await supabase.from('school_rules').delete().eq('member_id', memberId);
-    if (activeRules.length > 0) {
-      await supabase.from('school_rules').insert(activeRules);
+    let savedRules = [];
+    if (ruleRows.length > 0) {
+      const { data } = await supabase.from('school_rules').insert(ruleRows).select();
+      savedRules = data || [];
     }
+
+    // 3. Delete old auto-generated chores for this child (by reference_id linking to old rules)
+    // We find all chores with a reference_id that belong to this child
+    await supabase.from('chores')
+      .delete()
+      .eq('family_id', familyId)
+      .eq('assigned_to', memberId)
+      .not('reference_id', 'is', null);
+
+    // 4. Generate new chores from active rules
+    const activeRules = savedRules.filter(r => r.is_active);
+    const newChores = [];
+
+    for (const rule of activeRules) {
+      // Find which days this subject has lessons
+      const subjectSlots = schedule.filter(s => s.subject_id === rule.subject_id);
+      // For each lesson day, calculate the reminder day
+      const reminderDays = new Set();
+      for (const slot of subjectSlots) {
+        let reminderDay = slot.day_of_week - rule.days_before;
+        // Wrap around: if reminder day < 1, wrap to previous week (5=Fri, 4=Thu, etc.)
+        if (reminderDay < 1) reminderDay += 7;
+        // Only include weekdays 1-7
+        reminderDays.add(reminderDay);
+      }
+
+      if (reminderDays.size > 0) {
+        newChores.push({
+          family_id: familyId,
+          title: rule.title,
+          description: `Auto: ${allSubjects.find(s => s.id === rule.subject_id)?.short_name || ''}`,
+          icon: rule.icon,
+          chore_type: 'base',
+          points: 0,
+          difficulty: 'easy',
+          is_recurring: true,
+          recurrence_rule: { frequency: 'weekly', days: [...reminderDays].sort((a, b) => a - b) },
+          assigned_to: memberId,
+          pool: false,
+          scheduled_date: null,
+          reference_id: rule.id,
+          created_by: memberId,
+        });
+      }
+    }
+
+    if (newChores.length > 0) {
+      await supabase.from('chores').insert(newChores);
+    }
+
+    setSaving(false);
+    if (onDone) onDone();
 
     setSaving(false);
     if (onDone) onDone();
