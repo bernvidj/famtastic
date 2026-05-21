@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F, S, formatKr } from '../data';
 import { Celebration } from '../Celebrations';
-import { Wallet, PiggyBank, Target, ArrowRight, Check, ArrowLeft } from 'lucide-react';
+import { Wallet, PiggyBank, Target, ArrowRight, Check, ArrowLeft, ArrowUpCircle, Plus } from 'lucide-react';
 
 export function ChildMoneyView({ familyId, memberId, transactions, goals, familyGoals, members, onReload }) {
   const [mode, setMode] = useState('jars');     // jars | move | confirm | done
@@ -46,15 +46,15 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
     setMoveTo(to);
     setAmount(0);
     setSelectedGoal(null);
-    if (to === 'family_goal' && familyGoals.length === 1) {
+    if (to === 'withdrawal') {
+      setMode('move');
+    } else if (to === 'family_goal' && familyGoals.length === 1) {
       setSelectedGoal(familyGoals[0]);
       setMode('move');
     } else if (to === 'saving' && goals.length === 1) {
       setSelectedGoal(goals[0]);
       setMode('move');
-    } else if (to === 'saving' && goals.length > 1) {
-      setMode('pick_goal');
-    } else if (to === 'family_goal' && familyGoals.length > 1) {
+    } else if (to === 'saving' || to === 'family_goal') {
       setMode('pick_goal');
     } else {
       setMode('move');
@@ -64,6 +64,38 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
   function pickGoal(goal) {
     setSelectedGoal(goal);
     setMode('move');
+  }
+
+  // --- Create new savings goal ---
+  const [showNewGoal, setShowNewGoal] = useState(false);
+  const [newGoalTitle, setNewGoalTitle] = useState('');
+  const [newGoalTarget, setNewGoalTarget] = useState('');
+  const [newGoalIcon, setNewGoalIcon] = useState('🎯');
+  const GOAL_ICONS = ['🎯','🎮','⚽','🎸','👟','📱','🚲','🎨','✈️','🎁','💻','🏀'];
+
+  async function handleCreateGoal() {
+    if (!newGoalTitle.trim() || !newGoalTarget) return;
+    setSaving(true);
+    const { data: newGoal, error } = await supabase
+      .from('savings_goals')
+      .insert({
+        family_id: familyId,
+        member_id: memberId,
+        title: newGoalTitle.trim(),
+        target_amount: Math.round(Number(newGoalTarget) * 100),
+        icon: newGoalIcon,
+        is_family_goal: false,
+      })
+      .select()
+      .single();
+    setSaving(false);
+    if (!error && newGoal) {
+      setSelectedGoal(newGoal);
+      setShowNewGoal(false);
+      setNewGoalTitle('');
+      setNewGoalTarget('');
+      setMode('move');
+    }
   }
 
   async function handleConfirm() {
@@ -76,9 +108,11 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
       amount: -amountOre,
       type: moveTo,
       savings_goal_id: selectedGoal?.id || null,
-      description: moveTo === 'family_goal'
-        ? `Bidrag till ${selectedGoal?.title || 'familjemålet'}`
-        : `Sparande till ${selectedGoal?.title || 'sparmål'}`,
+      description: moveTo === 'withdrawal'
+        ? `Uttag ${formatKr(amountOre)}`
+        : moveTo === 'family_goal'
+          ? `Bidrag till ${selectedGoal?.title || 'familjemålet'}`
+          : `Sparande till ${selectedGoal?.title || 'sparmål'}`,
     });
     setSaving(false);
     if (!error) {
@@ -125,6 +159,38 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
               </button>
             );
           })}
+
+          {/* Create new goal (only for personal savings) */}
+          {moveTo === 'saving' && !showNewGoal && (
+            <button onClick={() => setShowNewGoal(true)} style={styles.newGoalBtn}>
+              <Plus size={16} color={C.primary} /> Skapa nytt sparmål
+            </button>
+          )}
+
+          {showNewGoal && (
+            <div style={styles.newGoalForm}>
+              <div style={styles.iconPickerRow}>
+                {GOAL_ICONS.map(ic => (
+                  <button key={ic} onClick={() => setNewGoalIcon(ic)} style={{
+                    ...styles.iconPickerBtn,
+                    background: newGoalIcon === ic ? C.primaryLight : 'transparent',
+                    border: newGoalIcon === ic ? `2px solid ${C.primary}` : '2px solid transparent',
+                  }}>{ic}</button>
+                ))}
+              </div>
+              <input type="text" placeholder="Vad sparar du till?" value={newGoalTitle}
+                onChange={e => setNewGoalTitle(e.target.value)}
+                style={{ ...styles.formInput, marginBottom: 8 }} autoFocus />
+              <input type="number" placeholder="Målbelopp (kr)" value={newGoalTarget}
+                onChange={e => setNewGoalTarget(e.target.value)}
+                style={styles.formInput} min="1" />
+              <button onClick={handleCreateGoal}
+                disabled={saving || !newGoalTitle.trim() || !newGoalTarget}
+                style={{ ...styles.confirmBtn, marginTop: 10, opacity: saving || !newGoalTitle.trim() || !newGoalTarget ? 0.5 : 1 }}>
+                {saving ? 'Skapar...' : 'Skapa sparmål'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -132,9 +198,11 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
 
   // --- Move amount view ---
   if (mode === 'move') {
-    const label = moveTo === 'family_goal'
-      ? `Till ${selectedGoal?.icon || '🎯'} ${selectedGoal?.title || 'Familjemål'}`
-      : `Till ${selectedGoal?.icon || '🐷'} ${selectedGoal?.title || 'Sparmål'}`;
+    const label = moveTo === 'withdrawal'
+      ? 'Begär uttag'
+      : moveTo === 'family_goal'
+        ? `Till ${selectedGoal?.icon || '🎯'} ${selectedGoal?.title || 'Familjemål'}`
+        : `Till ${selectedGoal?.icon || '🐷'} ${selectedGoal?.title || 'Sparmål'}`;
 
     return (
       <div style={styles.page}>
@@ -142,7 +210,7 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
           <button onClick={() => setMode('jars')} style={styles.backBtn}>
             <ArrowLeft size={20} color={C.text} />
           </button>
-          <h1 style={styles.title}>Flytta pengar</h1>
+          <h1 style={styles.title}>{moveTo === 'withdrawal' ? 'Begär uttag' : 'Flytta pengar'}</h1>
         </div>
 
         <div style={styles.moveCard}>
@@ -154,12 +222,16 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
           </div>
           <ArrowRight size={20} color={C.textMuted} />
           <div style={styles.moveTo}>
-            <div style={{ ...styles.jarIconSmall, background: moveTo === 'family_goal' ? C.accentLight : C.secondaryLight }}>
-              {moveTo === 'family_goal'
-                ? <Target size={20} color={C.accent} />
-                : <PiggyBank size={20} color={C.secondary} />}
+            <div style={{ ...styles.jarIconSmall, background: moveTo === 'withdrawal' ? C.errorLight : moveTo === 'family_goal' ? C.accentLight : C.secondaryLight }}>
+              {moveTo === 'withdrawal'
+                ? <ArrowUpCircle size={20} color={C.error} />
+                : moveTo === 'family_goal'
+                  ? <Target size={20} color={C.accent} />
+                  : <PiggyBank size={20} color={C.secondary} />}
             </div>
-            <span style={styles.moveLabel}>{selectedGoal?.title || 'Mål'}</span>
+            <span style={styles.moveLabel}>
+              {moveTo === 'withdrawal' ? 'Uttag' : selectedGoal?.title || 'Mål'}
+            </span>
           </div>
         </div>
 
@@ -198,7 +270,7 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
             opacity: saving || amount <= 0 ? 0.5 : 1,
           }}
         >
-          {saving ? 'Sparar...' : `Flytta ${amount} kr`}
+          {saving ? 'Sparar...' : moveTo === 'withdrawal' ? `Begär uttag ${amount} kr` : `Flytta ${amount} kr`}
         </button>
       </div>
     );
@@ -206,16 +278,17 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
 
   // --- Done view ---
   if (mode === 'done') {
-    const emoji = moveTo === 'family_goal' ? '🎯' : '🐷';
+    const emoji = moveTo === 'withdrawal' ? '💸' : moveTo === 'family_goal' ? '🎯' : '🐷';
+    const doneMsg = moveTo === 'withdrawal'
+      ? `Du har begärt ${amount} kr i uttag. Be en förälder att betala ut!`
+      : `${amount} kr flyttat till ${selectedGoal?.title || 'målet'}!`;
     return (
       <div style={styles.page}>
-        <Celebration type="sparkle" active={showCelebration} onDone={() => setShowCelebration(false)} />
+        <Celebration type={moveTo === 'withdrawal' ? 'confetti' : 'sparkle'} active={showCelebration} onDone={() => setShowCelebration(false)} />
         <div style={styles.doneWrap}>
           <span style={{ fontSize: 56 }}>{emoji}</span>
           <h2 style={styles.doneTitle}>Klart!</h2>
-          <p style={styles.doneText}>
-            {amount} kr flyttat till {selectedGoal?.title || 'målet'}!
-          </p>
+          <p style={styles.doneText}>{doneMsg}</p>
           <button onClick={reset} style={styles.confirmBtn}>
             <Check size={18} /> Tillbaka
           </button>
@@ -229,7 +302,7 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
     <div style={styles.page}>
       <h1 style={styles.title}>Mina pengar</h1>
 
-      {/* The three jars */}
+      {/* The jars */}
       <div style={styles.jarsGrid}>
         {/* Wallet jar */}
         <div style={{ ...styles.jar, borderColor: C.primary }}>
@@ -243,6 +316,20 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
           <span style={styles.jarSub}>Fria pengar</span>
         </div>
 
+        {/* Withdrawal jar */}
+        {walletBalance > 0 && (
+          <button onClick={() => startMove('withdrawal')} style={{ ...styles.jar, borderColor: C.error, cursor: 'pointer' }}>
+            <div style={{ ...styles.jarIcon, background: C.errorLight }}>
+              <ArrowUpCircle size={28} color={C.error} />
+            </div>
+            <span style={styles.jarLabel}>Ta ut</span>
+            <span style={{ ...styles.jarAmount, color: C.error }}>
+              Få pengar
+            </span>
+            <span style={styles.jarAction}>Begär uttag →</span>
+          </button>
+        )}
+
         {/* Piggy bank jar */}
         <button onClick={() => startMove('saving')} style={{ ...styles.jar, borderColor: C.secondary, cursor: 'pointer' }}>
           <div style={{ ...styles.jarIcon, background: C.secondaryLight }}>
@@ -250,7 +337,7 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
           </div>
           <span style={styles.jarLabel}>Spargris</span>
           <span style={{ ...styles.jarAmount, color: C.secondaryDark }}>
-            {goals.length} mål
+            {goals.length > 0 ? `${goals.length} mål` : 'Skapa mål'}
           </span>
           <span style={styles.jarAction}>Spara →</span>
         </button>
@@ -398,6 +485,11 @@ const styles = {
   goalPickInfo: { flex: 1, minWidth: 0 },
   goalPickTitle: { display: 'block', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text, marginBottom: 6 },
   goalPickPct: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading },
+  newGoalBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '12px', borderRadius: 14, border: `2px dashed ${C.primary}`, background: C.primaryLight, cursor: 'pointer', fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.primaryDark, marginTop: 4 },
+  newGoalForm: { padding: 14, background: C.bgCard, borderRadius: 14, border: `1.5px solid ${C.borderLight}`, marginTop: 8 },
+  iconPickerRow: { display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 },
+  iconPickerBtn: { width: 38, height: 38, borderRadius: 10, fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  formInput: { width: '100%', padding: '12px 14px', borderRadius: 12, border: `2px solid ${C.border}`, fontSize: F.sizes.md, fontFamily: F.body, outline: 'none', boxSizing: 'border-box', minHeight: 48 },
 
   // --- Transactions ---
   txRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid ${C.borderLight}` },
