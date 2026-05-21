@@ -3,12 +3,12 @@
 // ============================================
 
 import React from 'react';
-import { Home, Calendar, CheckSquare, PiggyBank, UtensilsCrossed, ShoppingCart, Settings } from 'lucide-react';
+import { Home, GraduationCap, CheckSquare, PiggyBank, UtensilsCrossed, ShoppingCart, Settings } from 'lucide-react';
 import { C, F } from './data';
 
 const NAV_ITEMS = [
   { id: 'home',     label: 'Hem',      icon: Home },
-  { id: 'calendar', label: 'Kalender', icon: Calendar },
+  { id: 'schedule', label: 'Schema',   icon: GraduationCap },
   { id: 'chores',   label: 'Sysslor',  icon: CheckSquare },
   { id: 'money',    label: 'Pengar',   icon: PiggyBank },
   { id: 'meals',    label: 'Mat',      icon: UtensilsCrossed },
