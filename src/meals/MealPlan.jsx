@@ -165,7 +165,7 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
     loadData();
   }
 
-  // --- Generate shopping list ---
+  // --- Generate shopping list (merges duplicates) ---
   async function handleGenerateShopping() {
     const weekMeals = mealPlan
       .filter(p => p.meal_id && p.meals)
@@ -173,22 +173,75 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
 
     if (weekMeals.length === 0) return;
 
-    // Collect all ingredients
-    const items = [];
+    // Collect all raw ingredients
+    const raw = [];
     weekMeals.forEach(meal => {
       safeArray(meal.ingredients).forEach(ing => {
         if (ing.name && ing.name.trim()) {
-          items.push({
+          raw.push({
             name: ing.name.trim(),
-            quantity: [ing.amount, ing.unit].filter(Boolean).join(' ') || null,
-            from_meal_plan: true,
+            amount: ing.amount ? parseFloat(ing.amount) : null,
+            unit: (ing.unit || '').trim().toLowerCase(),
+            mealTitle: meal.title,
             source_meal_id: meal.id,
           });
         }
       });
     });
 
-    if (items.length === 0) return;
+    if (raw.length === 0) return;
+
+    // Merge duplicates: same name (case-insensitive) + same unit → sum amounts
+    // Different units or unparseable amounts → keep separate
+    const mergeMap = new Map();
+    const unmerged = [];
+
+    raw.forEach(item => {
+      const key = `${item.name.toLowerCase()}::${item.unit}`;
+      const canMerge = item.amount !== null && !isNaN(item.amount);
+
+      if (canMerge) {
+        if (mergeMap.has(key)) {
+          const existing = mergeMap.get(key);
+          existing.amount += item.amount;
+          existing.meals.push(item.mealTitle);
+          // Keep first source_meal_id for the DB field
+        } else {
+          mergeMap.set(key, {
+            name: item.name,
+            amount: item.amount,
+            unit: item.unit,
+            meals: [item.mealTitle],
+            source_meal_id: item.source_meal_id,
+          });
+        }
+      } else {
+        // No parseable amount — keep as-is
+        unmerged.push(item);
+      }
+    });
+
+    // Build final items list
+    const items = [];
+
+    mergeMap.forEach(m => {
+      const amountStr = m.amount % 1 === 0 ? String(m.amount) : m.amount.toFixed(1);
+      const qty = [amountStr, m.unit].filter(Boolean).join(' ');
+      const suffix = m.meals.length > 1 ? ` (${m.meals.join(' + ')})` : '';
+      items.push({
+        name: m.name + suffix,
+        quantity: qty || null,
+        source_meal_id: m.source_meal_id,
+      });
+    });
+
+    unmerged.forEach(u => {
+      items.push({
+        name: u.name,
+        quantity: null,
+        source_meal_id: u.source_meal_id,
+      });
+    });
 
     // Find or create default shopping list
     let { data: lists } = await supabase
@@ -216,7 +269,7 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
       .eq('list_id', listId)
       .eq('from_meal_plan', true);
 
-    // Insert new items
+    // Insert merged items
     const rows = items.map(item => ({
       list_id: listId,
       family_id: familyId,
