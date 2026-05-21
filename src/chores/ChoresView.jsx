@@ -136,10 +136,12 @@ export function ChoresView({ familyId, member, members }) {
   }
 
   async function claimChore(choreId) {
-    const { error } = await supabase.from('chores')
-      .update({ assigned_to: member.id })
-      .eq('id', choreId);
-    if (error) showToast('Kunde inte plocka sysslan');
+    const { data, error } = await supabase.rpc('child_claim_pool_chore', {
+      p_family_id: familyId,
+      p_member_id: member.id,
+      p_chore_id: choreId,
+    });
+    if (error || !data?.success) showToast('Kunde inte plocka sysslan');
     else showToast('🙌 Du tog sysslan!');
     loadData();
   }
