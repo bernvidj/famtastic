@@ -18,7 +18,7 @@ export const C = {
   purpleLight: '#F5F3FF',
 
   // Backgrounds
-  bg: '#FFFBF5',            // Warm off-white
+  bg: 'linear-gradient(135deg, #F5F3FF 0%, #FFF7ED 50%, #FFECD2 100%)', // Lila → persika
   bgCard: '#FFFFFF',
   bgDark: '#1C1917',
 
