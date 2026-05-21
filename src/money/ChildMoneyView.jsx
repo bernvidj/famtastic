@@ -1,6 +1,7 @@
 // ============================================
 // FamTastic — ChildMoneyView (burk-system)
 // Plånbok / Spargris / Mål-låda
+// Uses RPCs for all writes (child has no JWT)
 // ============================================
 
 import React, { useState } from 'react';
@@ -66,7 +67,7 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
     setMode('move');
   }
 
-  // --- Create new savings goal ---
+  // --- Create new savings goal (via RPC) ---
   const [showNewGoal, setShowNewGoal] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState('');
   const [newGoalTarget, setNewGoalTarget] = useState('');
@@ -76,21 +77,19 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
   async function handleCreateGoal() {
     if (!newGoalTitle.trim() || !newGoalTarget) return;
     setSaving(true);
-    const { data: newGoal, error } = await supabase
-      .from('savings_goals')
-      .insert({
-        family_id: familyId,
-        member_id: memberId,
-        title: newGoalTitle.trim(),
-        target_amount: Math.round(Number(newGoalTarget) * 100),
-        icon: newGoalIcon,
-        is_family_goal: false,
-      })
-      .select()
-      .single();
+
+    const { data, error } = await supabase.rpc('child_create_savings_goal', {
+      p_family_id: familyId,
+      p_member_id: memberId,
+      p_title: newGoalTitle.trim(),
+      p_target_amount: Math.round(Number(newGoalTarget) * 100),
+      p_icon: newGoalIcon,
+    });
+
     setSaving(false);
-    if (!error && newGoal) {
-      setSelectedGoal(newGoal);
+
+    if (!error && data?.success && data?.goal) {
+      setSelectedGoal(data.goal);
       setShowNewGoal(false);
       setNewGoalTitle('');
       setNewGoalTarget('');
@@ -98,24 +97,30 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
     }
   }
 
+  // --- Confirm move (via RPC) ---
   async function handleConfirm() {
     if (amount <= 0 || amount > walletKr) return;
     setSaving(true);
     const amountOre = Math.round(amount * 100);
-    const { error } = await supabase.from('money_transactions').insert({
-      family_id: familyId,
-      member_id: memberId,
-      amount: -amountOre,
-      type: moveTo,
-      savings_goal_id: selectedGoal?.id || null,
-      description: moveTo === 'withdrawal'
-        ? `Uttag ${formatKr(amountOre)}`
-        : moveTo === 'family_goal'
-          ? `Bidrag till ${selectedGoal?.title || 'familjemålet'}`
-          : `Sparande till ${selectedGoal?.title || 'sparmål'}`,
+
+    const description = moveTo === 'withdrawal'
+      ? `Uttag ${formatKr(amountOre)}`
+      : moveTo === 'family_goal'
+        ? `Bidrag till ${selectedGoal?.title || 'familjemålet'}`
+        : `Sparande till ${selectedGoal?.title || 'sparmål'}`;
+
+    const { data, error } = await supabase.rpc('child_move_money', {
+      p_family_id: familyId,
+      p_member_id: memberId,
+      p_amount_ore: amountOre,
+      p_type: moveTo,
+      p_savings_goal_id: selectedGoal?.id || null,
+      p_description: description,
     });
+
     setSaving(false);
-    if (!error) {
+
+    if (!error && data?.success) {
       setShowCelebration(true);
       setMode('done');
     }
