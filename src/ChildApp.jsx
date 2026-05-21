@@ -99,7 +99,11 @@ export function ChildApp({ familyId, member, onLogout }) {
   }
 
   async function claimPoolChore(choreId) {
-    await supabase.from('chores').update({ assigned_to: member.id }).eq('id', choreId);
+    await supabase.rpc('child_claim_pool_chore', {
+      p_family_id: familyId,
+      p_member_id: member.id,
+      p_chore_id: choreId,
+    });
     triggerCelebration('sparkle');
     reload();
   }
