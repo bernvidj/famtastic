@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { C, F, S, getWeekNumber, todayStr, safeArray, formatKr } from './data';
 import { ParentActionItems } from './ParentActionItems';
-import { ChevronLeft, ChevronRight, Flame, TrendingUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Flame, TrendingUp, GraduationCap } from 'lucide-react';
 
 const WEEKDAYS_SHORT = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
 
@@ -36,6 +36,9 @@ export function Home({ familyId, member, members }) {
   const [events, setEvents] = useState([]);
   const [savingsGoals, setSavingsGoals] = useState([]);
   const [goalProgress, setGoalProgress] = useState({});
+  const [schoolSchedule, setSchoolSchedule] = useState([]);
+  const [schoolSubjects, setSchoolSubjects] = useState([]);
+  const [schoolSpecialEvents, setSchoolSpecialEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const weekDates = getWeekDates(weekOffset);
@@ -54,7 +57,8 @@ export function Home({ familyId, member, members }) {
 
   async function loadData() {
     setLoading(true);
-    const [chRes, compRes, txRes, monthTxRes, mealRes, evRes, goalRes] = await Promise.all([
+    const childIds = children.map(c => c.id);
+    const [chRes, compRes, txRes, monthTxRes, mealRes, evRes, goalRes, schedRes, subjRes, specRes] = await Promise.all([
       supabase.from('chores').select('*').eq('family_id', familyId),
       supabase.from('chore_completions').select('*').eq('family_id', familyId)
         .gte('completed_date', startDate).lte('completed_date', endDate),
@@ -68,6 +72,15 @@ export function Home({ familyId, member, members }) {
         .gte('event_date', startDate).lte('event_date', endDate).order('event_date'),
       supabase.from('savings_goals').select('*').eq('family_id', familyId)
         .eq('is_family_goal', true).is('achieved_at', null),
+      // School data
+      childIds.length > 0
+        ? supabase.from('school_schedule').select('*').in('member_id', childIds)
+        : Promise.resolve({ data: [] }),
+      supabase.from('school_subjects').select('*')
+        .or(`is_global.eq.true,family_id.eq.${familyId}`),
+      childIds.length > 0
+        ? supabase.from('school_special_events').select('*').in('member_id', childIds)
+        : Promise.resolve({ data: [] }),
     ]);
     setChores(chRes.data || []);
     setCompletions(compRes.data || []);
@@ -75,6 +88,9 @@ export function Home({ familyId, member, members }) {
     setMonthTx(monthTxRes.data || []);
     setMealPlan(mealRes.data || []);
     setEvents(evRes.data || []);
+    setSchoolSchedule(schedRes.data || []);
+    setSchoolSubjects(subjRes.data || []);
+    setSchoolSpecialEvents(specRes.data || []);
     const goals = goalRes.data || [];
     setSavingsGoals(goals);
     const pMap = {};
@@ -91,9 +107,7 @@ export function Home({ familyId, member, members }) {
     return chores.filter(c => {
       if (c.pool && !c.assigned_to) return false;
       if (c.assigned_to && c.assigned_to !== childId) return false;
-      // One-off dated chore
       if (c.scheduled_date) return c.scheduled_date === today;
-      // Recurring: check day + until
       if (c.is_recurring && c.recurrence_rule) {
         if (c.recurrence_rule.until && today > c.recurrence_rule.until) return false;
         const days = safeArray(c.recurrence_rule.days);
@@ -133,13 +147,11 @@ export function Home({ familyId, member, members }) {
     let count = 0;
     for (const c of chores) {
       if (c.pool) continue;
-      // One-off dated chore: only count on that exact date
       if (c.scheduled_date) {
         if (c.scheduled_date !== dateStr) continue;
         count += c.assigned_to ? 1 : children.length;
         continue;
       }
-      // Recurring: check day-of-week + until
       if (c.is_recurring && c.recurrence_rule) {
         if (c.recurrence_rule.until && dateStr > c.recurrence_rule.until) continue;
         const days = safeArray(c.recurrence_rule.days);
@@ -158,7 +170,6 @@ export function Home({ familyId, member, members }) {
     return allWeekTx.filter(tx => tx.member_id === childId && tx.type === 'chore_bonus').reduce((s, tx) => s + tx.amount, 0);
   }
 
-  // --- 30-day money overview per child ---
   function childMonthSummary(childId) {
     const txs = monthTx.filter(tx => tx.member_id === childId);
     return {
@@ -177,15 +188,51 @@ export function Home({ familyId, member, members }) {
 
   function todayEvents() { return events.filter(e => e.event_date === today); }
 
+  // --- School helpers ---
+  const subjectMap = {};
+  schoolSubjects.forEach(s => { subjectMap[s.id] = s; });
+
+  function childTodayLessons(childId) {
+    if (todayDow > 5) return { lessons: [], special: null };
+    const daySpecials = schoolSpecialEvents.filter(
+      se => se.member_id === childId && se.event_date === today
+    );
+    const fullDay = daySpecials.find(se => se.period === 'full_day');
+    if (fullDay) return { lessons: [], special: fullDay };
+
+    const lessons = schoolSchedule
+      .filter(sl => sl.member_id === childId && sl.day_of_week === todayDow)
+      .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+      .map(sl => {
+        const startHour = parseInt((sl.start_time || '08:00').split(':')[0], 10);
+        const morningSpec = daySpecials.find(se => se.period === 'morning');
+        const afternoonSpec = daySpecials.find(se => se.period === 'afternoon');
+        if (morningSpec && startHour < 12) return null; // replaced by special
+        if (afternoonSpec && startHour >= 12) return null;
+        const subj = subjectMap[sl.subject_id];
+        return {
+          title: subj?.title || 'Lektion',
+          icon: subj?.icon || '📚',
+          color: subj?.color || C.secondary,
+          time: sl.start_time ? sl.start_time.slice(0, 5) : '',
+          endTime: sl.end_time ? sl.end_time.slice(0, 5) : '',
+        };
+      })
+      .filter(Boolean);
+    const morningSpec = daySpecials.find(se => se.period === 'morning');
+    const afternoonSpec = daySpecials.find(se => se.period === 'afternoon');
+    return { lessons, morningSpecial: morningSpec, afternoonSpecial: afternoonSpec };
+  }
+
+  // Check if any child has school today
+  const childrenWithSchool = children.filter(child => {
+    const { lessons, special, morningSpecial, afternoonSpecial } = childTodayLessons(child.id);
+    return lessons.length > 0 || special || morningSpecial || afternoonSpecial;
+  });
+
   const totalTodayChores = children.reduce((s, c) => s + todayChoresForChild(c.id).length, 0);
   const totalTodayDone = children.reduce((s, c) => s + todayChoresForChild(c.id).filter(ch => isCompletedToday(ch.id, c.id)).length, 0);
   const claims = poolClaims();
-
-  // Check if there are any 30-day transactions to show
-  const hasMonthData = children.some(childId => {
-    const s = childMonthSummary(childId);
-    return s.allowance > 0 || s.bonus > 0 || s.savings > 0 || s.withdrawals > 0 || s.familyGoal > 0;
-  });
 
   return (
     <div style={styles.page}>
@@ -256,6 +303,55 @@ export function Home({ familyId, member, members }) {
               );
             })}
           </div>
+
+          {/* 3b. School today */}
+          {childrenWithSchool.length > 0 && (
+            <div style={styles.section}>
+              <p style={S.sectionLabel}><GraduationCap size={12} color={C.textMuted} /> Skola idag</p>
+              {childrenWithSchool.map(child => {
+                const { lessons, special, morningSpecial, afternoonSpecial } = childTodayLessons(child.id);
+                return (
+                  <div key={child.id} style={styles.schoolCard}>
+                    <div style={styles.schoolHeader}>
+                      <div style={{ ...styles.schoolAvatar, background: child.color || C.primary }}>
+                        <span style={{ fontSize: 16 }}>{child.avatar}</span>
+                      </div>
+                      <span style={styles.schoolName}>{child.name}</span>
+                    </div>
+                    {special && (
+                      <div style={styles.schoolSpecialBanner}>
+                        <span style={{ fontSize: 14 }}>{special.icon || '🎉'}</span>
+                        <span style={styles.schoolSpecialText}>{special.title}</span>
+                      </div>
+                    )}
+                    {morningSpecial && (
+                      <div style={styles.schoolSpecialBanner}>
+                        <span style={{ fontSize: 14 }}>{morningSpecial.icon || '🎉'}</span>
+                        <span style={styles.schoolSpecialText}>{morningSpecial.title} (fm)</span>
+                      </div>
+                    )}
+                    {afternoonSpecial && (
+                      <div style={styles.schoolSpecialBanner}>
+                        <span style={{ fontSize: 14 }}>{afternoonSpecial.icon || '🎉'}</span>
+                        <span style={styles.schoolSpecialText}>{afternoonSpecial.title} (em)</span>
+                      </div>
+                    )}
+                    {lessons.length > 0 && (
+                      <div style={styles.schoolLessons}>
+                        {lessons.map((l, li) => (
+                          <div key={li} style={{ ...styles.schoolLesson, borderLeftColor: l.color }}>
+                            <span style={{ fontSize: 13 }}>{l.icon}</span>
+                            <span style={styles.schoolLessonTime}>{l.time}{l.endTime ? `–${l.endTime}` : ''}</span>
+                            <span style={styles.schoolLessonTitle}>{l.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* 4. Pool claims */}
           {claims.length > 0 && (
@@ -430,6 +526,18 @@ const styles = {
   streakInline: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.primaryDark },
   childBarBg: { height: 6, background: C.borderLight, borderRadius: 99, overflow: 'hidden' },
   childBarFill: { height: '100%', borderRadius: 99, transition: 'width 0.4s ease' },
+  // School section
+  schoolCard: { padding: 12, background: C.bgCard, borderRadius: 14, border: `1.5px solid ${C.borderLight}`, marginBottom: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  schoolHeader: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 },
+  schoolAvatar: { width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  schoolName: { fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
+  schoolSpecialBanner: { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: C.accentLight, borderRadius: 10, border: `1px solid ${C.accent}`, marginBottom: 4 },
+  schoolSpecialText: { fontSize: F.sizes.sm, fontWeight: F.weights.semi, fontFamily: F.heading, color: '#92400E' },
+  schoolLessons: { display: 'flex', flexDirection: 'column', gap: 2 },
+  schoolLesson: { display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderLeft: '3px solid', borderRadius: '0 8px 8px 0', background: 'rgba(0,0,0,0.02)' },
+  schoolLessonTime: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading, fontWeight: F.weights.semi, minWidth: 68, flexShrink: 0 },
+  schoolLessonTitle: { fontSize: F.sizes.sm, color: C.text, fontFamily: F.heading, fontWeight: F.weights.semi },
+  // Existing
   poolAlert: { padding: '10px 14px', background: C.accentLight, borderRadius: 14, border: `1.5px solid ${C.accent}`, fontSize: F.sizes.sm, fontFamily: F.heading, color: '#92400E', lineHeight: 1.5 },
   chartWrap: { display: 'flex', gap: 4, padding: '8px 4px', background: C.bgCard, borderRadius: 16, border: `1.5px solid ${C.borderLight}`, height: 110, alignItems: 'flex-end' },
   chartCol: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' },
@@ -443,7 +551,6 @@ const styles = {
   goalPct: { fontSize: F.sizes.lg, fontWeight: F.weights.extra, fontFamily: F.heading, color: C.primaryDark, flexShrink: 0 },
   goalBarBg: { height: 8, background: 'rgba(255,255,255,0.6)', borderRadius: 99, overflow: 'hidden' },
   goalBarFill: { height: '100%', borderRadius: 99, transition: 'width 0.4s ease' },
-  // --- Money overview ---
   overviewCard: { padding: 14, background: C.bgCard, borderRadius: 16, border: `1.5px solid ${C.borderLight}`, marginBottom: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
   overviewHeader: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 },
   overviewAvatar: { width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
