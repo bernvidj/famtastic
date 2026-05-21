@@ -689,7 +689,7 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
 // Styles
 // ============================================
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, display: 'flex', flexDirection: 'column' },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, display: 'flex', flexDirection: 'column', paddingBottom: 70 },
   header: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: C.bgCard, borderBottom: `1px solid ${C.borderLight}` },
   title: { flex: 1, fontFamily: F.heading, fontSize: F.sizes.lg, fontWeight: F.weights.bold, color: C.text, margin: 0 },
   stepLabel: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading, fontWeight: F.weights.semi },
@@ -697,7 +697,7 @@ const styles = {
   body: { flex: 1, padding: '16px', overflowY: 'auto' },
   subtitle: { fontSize: F.sizes.sm, color: C.textMuted, fontFamily: F.heading, margin: '0 0 16px' },
   hint: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading, margin: '-4px 0 8px' },
-  footer: { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))', borderTop: `1px solid ${C.borderLight}`, background: C.bgCard },
+  footer: { position: 'fixed', bottom: 60, left: 0, right: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderTop: `1px solid ${C.borderLight}`, background: C.bgCard, zIndex: 50 },
 
   // Subject grid
   subjectGrid: { display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
