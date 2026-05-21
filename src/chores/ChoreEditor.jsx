@@ -30,6 +30,7 @@ const EMPTY = {
   is_recurring: false,
   recurrence_rule: { frequency: 'weekly', days: [] },
   assigned_to: null,
+  pool: false,
 };
 
 export function ChoreEditor({ chore, members, familyId, memberId, onSave, onDelete, onClose }) {
@@ -49,6 +50,7 @@ export function ChoreEditor({ chore, members, familyId, memberId, onSave, onDele
         is_recurring: chore.is_recurring || false,
         recurrence_rule: chore.recurrence_rule || { frequency: 'weekly', days: [] },
         assigned_to: chore.assigned_to || null,
+        pool: chore.pool || false,
       });
     } else {
       setForm(EMPTY);
@@ -118,7 +120,8 @@ export function ChoreEditor({ chore, members, familyId, memberId, onSave, onDele
       difficulty: form.difficulty,
       is_recurring: form.is_recurring,
       recurrence_rule: form.is_recurring ? form.recurrence_rule : null,
-      assigned_to: form.assigned_to || null,
+      assigned_to: form.pool ? null : (form.assigned_to || null),
+      pool: form.pool || false,
       created_by: memberId,
     };
     onSave(data);
@@ -272,33 +275,63 @@ export function ChoreEditor({ chore, members, familyId, memberId, onSave, onDele
               ))}
             </div>
 
-            {/* Assigned to */}
-            <label style={styles.label14}>Tilldelad</label>
-            <div style={styles.assignRow}>
-              <button
-                onClick={() => set('assigned_to', null)}
-                style={{
-                  ...styles.assignBtn,
-                  background: !form.assigned_to ? C.primaryLight : C.bgCard,
-                  borderColor: !form.assigned_to ? C.primary : C.border,
-                }}
-              >
-                Alla
-              </button>
-              {children.map(m => (
-                <button
-                  key={m.id}
-                  onClick={() => set('assigned_to', m.id)}
-                  style={{
-                    ...styles.assignBtn,
-                    background: form.assigned_to === m.id ? C.primaryLight : C.bgCard,
-                    borderColor: form.assigned_to === m.id ? C.primary : C.border,
-                  }}
-                >
-                  {m.avatar} {m.name}
-                </button>
-              ))}
-            </div>
+            {/* Pool toggle — open for kids to claim */}
+            <label style={styles.label14}>Öppen pool</label>
+            <button
+              onClick={() => set('pool', !form.pool)}
+              style={{
+                ...styles.poolToggle,
+                background: form.pool ? C.accentLight : C.bgCard,
+                borderColor: form.pool ? C.accent : C.border,
+              }}
+            >
+              <span style={{ fontSize: 20 }}>{form.pool ? '🤲' : '👤'}</span>
+              <div style={styles.poolToggleText}>
+                <span style={{
+                  ...styles.poolToggleTitle,
+                  color: form.pool ? '#92400E' : C.text,
+                }}>
+                  {form.pool ? 'Öppen — barnen kan plocka' : 'Tilldelad direkt'}
+                </span>
+                <span style={styles.poolToggleSub}>
+                  {form.pool
+                    ? 'Sysslan visas i "Plocka"-fliken för alla barn'
+                    : 'Sysslan tilldelas direkt till valt barn'}
+                </span>
+              </div>
+            </button>
+
+            {/* Assigned to — only if NOT pool */}
+            {!form.pool && (
+              <>
+                <label style={styles.label14}>Tilldelad</label>
+                <div style={styles.assignRow}>
+                  <button
+                    onClick={() => set('assigned_to', null)}
+                    style={{
+                      ...styles.assignBtn,
+                      background: !form.assigned_to ? C.primaryLight : C.bgCard,
+                      borderColor: !form.assigned_to ? C.primary : C.border,
+                    }}
+                  >
+                    Alla
+                  </button>
+                  {children.map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => set('assigned_to', m.id)}
+                      style={{
+                        ...styles.assignBtn,
+                        background: form.assigned_to === m.id ? C.primaryLight : C.bgCard,
+                        borderColor: form.assigned_to === m.id ? C.primary : C.border,
+                      }}
+                    >
+                      {m.avatar} {m.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             {/* Recurring */}
             <label style={styles.label14}>Återkommande</label>
@@ -646,5 +679,33 @@ const styles = {
     fontFamily: F.heading,
     cursor: 'pointer',
     minHeight: 48,
+  },
+  poolToggle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+    padding: '12px 14px',
+    borderRadius: 14,
+    border: '2px solid',
+    cursor: 'pointer',
+    textAlign: 'left',
+    marginBottom: 4,
+  },
+  poolToggleText: {
+    flex: 1,
+  },
+  poolToggleTitle: {
+    display: 'block',
+    fontSize: F.sizes.sm,
+    fontWeight: F.weights.bold,
+    fontFamily: F.heading,
+  },
+  poolToggleSub: {
+    display: 'block',
+    fontSize: F.sizes.xs,
+    color: C.textMuted,
+    fontFamily: F.heading,
+    marginTop: 2,
   },
 };
