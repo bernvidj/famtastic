@@ -112,8 +112,15 @@ export function ChoresView({ familyId, member, members }) {
   function getPoolChores() {
     return chores.filter(c => {
       if (!c.pool || c.assigned_to) return false;
-      if (c.scheduled_date && c.scheduled_date !== today) return false;
-      if (c.is_recurring && c.recurrence_rule?.until && today > c.recurrence_rule.until) return false;
+      // One-off dated: only show on that date
+      if (c.scheduled_date) return c.scheduled_date !== today ? false : true;
+      // Recurring with days: only show on scheduled days
+      if (c.is_recurring && c.recurrence_rule) {
+        if (c.recurrence_rule.until && today > c.recurrence_rule.until) return false;
+        const days = safeArray(c.recurrence_rule.days);
+        if (days.length > 0 && !days.includes(todayDow)) return false;
+      }
+      // No schedule = show always
       return true;
     });
   }
