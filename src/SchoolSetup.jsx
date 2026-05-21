@@ -42,14 +42,49 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
   const [saving, setSaving] = useState(false);
   const [customSubject, setCustomSubject] = useState('');
 
-  useEffect(() => { loadSubjects(); }, []);
+  useEffect(() => { loadAll(); }, []);
 
-  async function loadSubjects() {
-    const { data } = await supabase.from('school_subjects')
+  async function loadAll() {
+    // Load all available subjects
+    const { data: subjectData } = await supabase.from('school_subjects')
       .select('*')
       .or(`is_global.eq.true,family_id.eq.${familyId}`)
       .order('category, title');
-    setAllSubjects(data || []);
+    setAllSubjects(subjectData || []);
+
+    // Load existing schedule for this child
+    const { data: schedData } = await supabase.from('school_schedule')
+      .select('*')
+      .eq('member_id', memberId);
+    if (schedData && schedData.length > 0) {
+      setSchedule(schedData.map(s => ({
+        subject_id: s.subject_id,
+        day_of_week: s.day_of_week,
+        start_time: s.start_time,
+        end_time: s.end_time,
+      })));
+      // Pre-select subjects that are in the schedule
+      const usedSubjects = [...new Set(schedData.map(s => s.subject_id))];
+      setSelectedSubjects(usedSubjects);
+    }
+
+    // Load existing rules for this child
+    const { data: rulesData } = await supabase.from('school_rules')
+      .select('*')
+      .eq('member_id', memberId);
+    if (rulesData && rulesData.length > 0) {
+      setRules(rulesData.map(r => ({
+        subject_id: r.subject_id,
+        subject_name: (subjectData || []).find(s => s.id === r.subject_id)?.short_name || '?',
+        subject_icon: (subjectData || []).find(s => s.id === r.subject_id)?.icon || '📚',
+        title: r.title,
+        icon: r.icon,
+        days_before: r.days_before,
+        time_of_day: r.time_of_day,
+        is_active: r.is_active,
+        rule_type: r.rule_type,
+      })));
+    }
   }
 
   function toggleSubject(id) {
@@ -84,12 +119,15 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
 
   // Move to step 3 — generate rule suggestions
   function goToRules() {
-    const suggestions = [];
+    // If rules already loaded from DB, keep them and only add suggestions for new subjects
+    const existingSubjectIds = rules.map(r => r.subject_id);
+    const suggestions = [...rules];
+
     selectedSubjects.forEach(sid => {
+      if (existingSubjectIds.includes(sid)) return; // already has rules
       const subj = allSubjects.find(s => s.id === sid);
       if (!subj) return;
 
-      // Check for specific suggestions
       const suggestion = RULE_SUGGESTIONS[subj.title];
       if (suggestion) {
         suggestions.push({
@@ -102,7 +140,6 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
         });
       }
 
-      // Homework suggestion for academic subjects
       if (HOMEWORK_SUBJECTS.includes(subj.title)) {
         suggestions.push({
           subject_id: sid,
@@ -112,12 +149,15 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
           icon: '📝',
           days_before: 2,
           time_of_day: 'evening',
-          is_active: false, // off by default, user toggles on
+          is_active: false,
           rule_type: 'homework',
         });
       }
     });
-    setRules(suggestions);
+
+    // Remove rules for deselected subjects
+    const filtered = suggestions.filter(r => selectedSubjects.includes(r.subject_id));
+    setRules(filtered);
     setStep(3);
   }
 
