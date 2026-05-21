@@ -39,6 +39,7 @@ export function Home({ familyId, member, members }) {
   const [schoolSchedule, setSchoolSchedule] = useState([]);
   const [schoolSubjects, setSchoolSubjects] = useState([]);
   const [schoolSpecialEvents, setSchoolSpecialEvents] = useState([]);
+  const [schoolExams, setSchoolExams] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const weekDates = getWeekDates(weekOffset);
@@ -58,7 +59,7 @@ export function Home({ familyId, member, members }) {
   async function loadData() {
     setLoading(true);
     const childIds = children.map(c => c.id);
-    const [chRes, compRes, txRes, monthTxRes, mealRes, evRes, goalRes, schedRes, subjRes, specRes] = await Promise.all([
+    const [chRes, compRes, txRes, monthTxRes, mealRes, evRes, goalRes, schedRes, subjRes, specRes, examRes] = await Promise.all([
       supabase.from('chores').select('*').eq('family_id', familyId),
       supabase.from('chore_completions').select('*').eq('family_id', familyId)
         .gte('completed_date', startDate).lte('completed_date', endDate),
@@ -81,6 +82,10 @@ export function Home({ familyId, member, members }) {
       childIds.length > 0
         ? supabase.from('school_special_events').select('*').in('member_id', childIds)
         : Promise.resolve({ data: [] }),
+      // Exams
+      childIds.length > 0
+        ? supabase.from('school_exams').select('*').eq('family_id', familyId).gte('exam_date', today).order('exam_date')
+        : Promise.resolve({ data: [] }),
     ]);
     setChores(chRes.data || []);
     setCompletions(compRes.data || []);
@@ -91,6 +96,7 @@ export function Home({ familyId, member, members }) {
     setSchoolSchedule(schedRes.data || []);
     setSchoolSubjects(subjRes.data || []);
     setSchoolSpecialEvents(specRes.data || []);
+    setSchoolExams(examRes.data || []);
     const goals = goalRes.data || [];
     setSavingsGoals(goals);
     const pMap = {};
@@ -224,10 +230,20 @@ export function Home({ familyId, member, members }) {
     return { lessons, morningSpecial: morningSpec, afternoonSpecial: afternoonSpec };
   }
 
+  function childUpcomingExams(childId) {
+    return schoolExams.filter(e => e.member_id === childId).slice(0, 3);
+  }
+
+  function daysUntilExam(dateStr) {
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    const target = new Date(dateStr + 'T12:00:00'); target.setHours(0, 0, 0, 0);
+    return Math.round((target - t) / 86400000);
+  }
+
   // Check if any child has school today
   const childrenWithSchool = children.filter(child => {
     const { lessons, special, morningSpecial, afternoonSpecial } = childTodayLessons(child.id);
-    return lessons.length > 0 || special || morningSpecial || afternoonSpecial;
+    return lessons.length > 0 || special || morningSpecial || afternoonSpecial || childUpcomingExams(child.id).length > 0;
   });
 
   const totalTodayChores = children.reduce((s, c) => s + todayChoresForChild(c.id).length, 0);
@@ -345,6 +361,27 @@ export function Home({ familyId, member, members }) {
                             <span style={styles.schoolLessonTitle}>{l.title}</span>
                           </div>
                         ))}
+                      </div>
+                    )}
+                    {childUpcomingExams(child.id).length > 0 && (
+                      <div style={{ marginTop: lessons.length > 0 ? 6 : 0 }}>
+                        {childUpcomingExams(child.id).map(exam => {
+                          const days = daysUntilExam(exam.exam_date);
+                          const urgent = days <= 2;
+                          return (
+                            <div key={exam.id} style={{
+                              ...styles.schoolExamRow,
+                              background: urgent ? C.primaryLight : 'rgba(0,0,0,0.02)',
+                              borderColor: urgent ? C.primary : C.borderLight,
+                            }}>
+                              <span style={{ fontSize: 13 }}>{exam.icon || '📝'}</span>
+                              <span style={styles.schoolExamTitle}>{exam.title}</span>
+                              <span style={{ ...styles.schoolExamDays, color: urgent ? C.primary : C.textMuted }}>
+                                {days === 0 ? 'Idag!' : days === 1 ? 'Imorgon' : `${days}d`}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -537,6 +574,9 @@ const styles = {
   schoolLesson: { display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderLeft: '3px solid', borderRadius: '0 8px 8px 0', background: 'rgba(0,0,0,0.02)' },
   schoolLessonTime: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading, fontWeight: F.weights.semi, minWidth: 68, flexShrink: 0 },
   schoolLessonTitle: { fontSize: F.sizes.sm, color: C.text, fontFamily: F.heading, fontWeight: F.weights.semi },
+  schoolExamRow: { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, border: '1px solid', marginBottom: 3 },
+  schoolExamTitle: { flex: 1, fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
+  schoolExamDays: { fontSize: F.sizes.xs, fontWeight: F.weights.extra, fontFamily: F.heading, flexShrink: 0 },
   // Existing
   poolAlert: { padding: '10px 14px', background: C.accentLight, borderRadius: 14, border: `1.5px solid ${C.accent}`, fontSize: F.sizes.sm, fontFamily: F.heading, color: '#92400E', lineHeight: 1.5 },
   chartWrap: { display: 'flex', gap: 4, padding: '8px 4px', background: C.bgCard, borderRadius: 16, border: `1.5px solid ${C.borderLight}`, height: 110, alignItems: 'flex-end' },
