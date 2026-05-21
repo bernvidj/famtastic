@@ -1,5 +1,6 @@
 // ============================================
 // FamTastic — MealPlan (weekly meal grid)
+// Updated: passes library props to MealBank
 // ============================================
 
 import React, { useState, useEffect } from 'react';
@@ -145,6 +146,22 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
   async function handleDeleteMeal(mealId) {
     await supabase.from('meals').delete().eq('id', mealId);
     setEditingMeal(null);
+    loadData();
+  }
+
+  // --- Add meal from template library ---
+  async function handleAddFromTemplate(template) {
+    await supabase.from('meals').insert({
+      family_id: familyId,
+      title: template.title,
+      description: template.description || '',
+      tags: Array.isArray(template.tags) ? template.tags : [],
+      ingredients: Array.isArray(template.ingredients) ? template.ingredients : [],
+      recipe_url: template.recipe_url || '',
+      recipe_notes: '',
+      rating: 0,
+      created_by: member.id,
+    });
     loadData();
   }
 
@@ -338,8 +355,11 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
         <div style={styles.content}>
           <MealBank
             meals={meals}
+            familyId={familyId}
+            memberId={member.id}
             onSelect={null}
             onEdit={meal => setEditingMeal(meal)}
+            onAddFromTemplate={handleAddFromTemplate}
           />
         </div>
       )}
@@ -380,8 +400,11 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
 
             <MealBank
               meals={meals}
+              familyId={familyId}
+              memberId={member.id}
               onSelect={meal => assignMeal(pickingDay, meal)}
               onEdit={null}
+              onAddFromTemplate={handleAddFromTemplate}
             />
           </div>
         </div>
