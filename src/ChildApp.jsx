@@ -38,9 +38,13 @@ export function ChildApp({ familyId, member, onLogout }) {
   // --- Chore helpers ---
   function getTodayChores() {
     return chores.filter(c => {
-      if (c.pool && c.assigned_to !== member.id) return false; // show claimed pool chores
+      if (c.pool && c.assigned_to !== member.id) return false;
       if (c.assigned_to && c.assigned_to !== member.id) return false;
+      // One-off dated chore: only show on that exact date
+      if (c.scheduled_date) return c.scheduled_date === today;
+      // Recurring: check day-of-week + optional until
       if (c.is_recurring && c.recurrence_rule) {
+        if (c.recurrence_rule.until && today > c.recurrence_rule.until) return false;
         const days = safeArray(c.recurrence_rule.days);
         if (days.length > 0 && !days.includes(todayDow)) return false;
       }
@@ -63,6 +67,7 @@ export function ChildApp({ familyId, member, onLogout }) {
   }
 
   function weekTotal(chore) {
+    if (chore.scheduled_date) return 1;
     if (!chore.is_recurring || !chore.recurrence_rule) return 1;
     const days = safeArray(chore.recurrence_rule.days);
     return days.length > 0 ? days.length : 1;
