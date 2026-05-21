@@ -88,7 +88,7 @@ export function ChoresView({ familyId, member, members }) {
   // Regular chores (not pool) scheduled for today
   function getTodayChores() {
     return chores.filter(c => {
-      if (c.pool) return false; // pool chores shown separately
+      if (c.pool && c.assigned_to !== (filterMember || null)) {   if (c.pool && !c.assigned_to) return false;   if (c.pool && filterMember && c.assigned_to !== filterMember) return false; } // pool chores shown separately
       if (c.is_recurring && c.recurrence_rule) {
         const days = safeArray(c.recurrence_rule.days);
         if (days.length > 0 && !days.includes(todayDow)) return false;
