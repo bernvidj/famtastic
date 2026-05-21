@@ -307,20 +307,23 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
     <div style={styles.page}>
       <h1 style={styles.title}>Mina pengar</h1>
 
-      {/* The jars */}
-      <div style={styles.jarsGrid}>
-        {/* Wallet jar */}
-        <div style={{ ...styles.jar, borderColor: C.primary }}>
-          <div style={{ ...styles.jarIcon, background: C.primaryLight }}>
-            <Wallet size={28} color={C.primary} />
+      {/* Balance card */}
+      <div style={styles.balanceCard}>
+        <div style={styles.balanceLeft}>
+          <div style={styles.balanceIconWrap}>
+            <Wallet size={24} color="#fff" />
           </div>
-          <span style={styles.jarLabel}>Plånbok</span>
-          <span style={{ ...styles.jarAmount, color: C.primaryDark }}>
-            {formatKr(walletBalance)}
-          </span>
-          <span style={styles.jarSub}>Fria pengar</span>
+          <div>
+            <span style={styles.balanceLabel}>Min plånbok</span>
+            <span style={styles.balanceSub}>Fria pengar att fördela ↓</span>
+          </div>
         </div>
+        <span style={styles.balanceAmount}>{formatKr(walletBalance)}</span>
+      </div>
 
+      {/* Action jars */}
+      <p style={styles.jarsHeading}>Vad vill du göra?</p>
+      <div style={styles.jarsGrid}>
         {/* Withdrawal jar */}
         {walletBalance > 0 && (
           <button onClick={() => startMove('withdrawal')} style={{ ...styles.jar, borderColor: C.error, cursor: 'pointer' }}>
@@ -429,13 +432,32 @@ const styles = {
   backBtn: { background: 'none', border: 'none', cursor: 'pointer', padding: 8, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: 0 },
 
+  // --- Balance card ---
+  balanceCard: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '18px 20px', borderRadius: 20,
+    background: `linear-gradient(135deg, ${C.primary}, #E85D04)`,
+    marginBottom: 16, boxShadow: '0 4px 16px rgba(249,115,22,0.3)',
+    boxSizing: 'border-box', width: '100%',
+  },
+  balanceLeft: { display: 'flex', alignItems: 'center', gap: 12 },
+  balanceIconWrap: {
+    width: 48, height: 48, borderRadius: 14,
+    background: 'rgba(255,255,255,0.25)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  balanceLabel: { display: 'block', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, color: '#fff' },
+  balanceSub: { display: 'block', fontSize: F.sizes.xs, color: 'rgba(255,255,255,0.8)', fontFamily: F.heading, marginTop: 2 },
+  balanceAmount: { fontSize: F.sizes.xxl, fontWeight: F.weights.extra, fontFamily: F.heading, color: '#fff', flexShrink: 0 },
+  jarsHeading: { fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.textMuted, margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: 0.5 },
+
   // --- Jars ---
   jarsGrid: { display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 },
   jar: {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
     padding: '20px 16px', borderRadius: 20, border: '2.5px solid',
     background: C.bgCard, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-    width: '100%', textAlign: 'center',
+    width: '100%', textAlign: 'center', boxSizing: 'border-box',
   },
   jarIcon: { width: 56, height: 56, borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   jarLabel: { fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
