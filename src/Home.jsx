@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { C, F, S, getWeekNumber, todayStr, safeArray, formatKr } from './data';
 import { ParentActionItems } from './ParentActionItems';
-import { ChevronLeft, ChevronRight, Flame, CreditCard } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Flame, TrendingUp } from 'lucide-react';
 
 const WEEKDAYS_SHORT = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
 
@@ -31,6 +31,7 @@ export function Home({ familyId, member, members }) {
   const [chores, setChores] = useState([]);
   const [completions, setCompletions] = useState([]);
   const [allWeekTx, setAllWeekTx] = useState([]);
+  const [monthTx, setMonthTx] = useState([]);
   const [mealPlan, setMealPlan] = useState([]);
   const [events, setEvents] = useState([]);
   const [savingsGoals, setSavingsGoals] = useState([]);
@@ -45,16 +46,22 @@ export function Home({ familyId, member, members }) {
   const startDate = fmtDate(weekDates[0]);
   const endDate = fmtDate(weekDates[6]);
 
+  // 30 days ago for money overview
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
   useEffect(() => { loadData(); }, [weekOffset, familyId]);
 
   async function loadData() {
     setLoading(true);
-    const [chRes, compRes, txRes, mealRes, evRes, goalRes] = await Promise.all([
+    const [chRes, compRes, txRes, monthTxRes, mealRes, evRes, goalRes] = await Promise.all([
       supabase.from('chores').select('*').eq('family_id', familyId),
       supabase.from('chore_completions').select('*').eq('family_id', familyId)
         .gte('completed_date', startDate).lte('completed_date', endDate),
       supabase.from('money_transactions').select('*').eq('family_id', familyId)
         .gte('created_at', weekDates[0].toISOString()).order('created_at', { ascending: false }),
+      supabase.from('money_transactions').select('*').eq('family_id', familyId)
+        .gte('created_at', thirtyDaysAgo.toISOString()).order('created_at', { ascending: false }),
       supabase.from('meal_plan').select('*, meals(*)').eq('family_id', familyId)
         .gte('plan_date', startDate).lte('plan_date', endDate),
       supabase.from('calendar_events').select('*').eq('family_id', familyId)
@@ -65,6 +72,7 @@ export function Home({ familyId, member, members }) {
     setChores(chRes.data || []);
     setCompletions(compRes.data || []);
     setAllWeekTx(txRes.data || []);
+    setMonthTx(monthTxRes.data || []);
     setMealPlan(mealRes.data || []);
     setEvents(evRes.data || []);
     const goals = goalRes.data || [];
@@ -81,7 +89,7 @@ export function Home({ familyId, member, members }) {
   // --- Helpers ---
   function todayChoresForChild(childId) {
     return chores.filter(c => {
-      if (c.pool) return false;
+      if (c.pool && !c.assigned_to) return false;
       if (c.assigned_to && c.assigned_to !== childId) return false;
       if (c.is_recurring && c.recurrence_rule) {
         const days = safeArray(c.recurrence_rule.days);
@@ -138,9 +146,16 @@ export function Home({ familyId, member, members }) {
     return allWeekTx.filter(tx => tx.member_id === childId && tx.type === 'chore_bonus').reduce((s, tx) => s + tx.amount, 0);
   }
 
-  function childPayoutTotal(childId) {
-    const base = allWeekTx.filter(tx => tx.member_id === childId && tx.type === 'base_allowance').reduce((s, tx) => s + tx.amount, 0);
-    return base + childWeekBonus(childId);
+  // --- 30-day money overview per child ---
+  function childMonthSummary(childId) {
+    const txs = monthTx.filter(tx => tx.member_id === childId);
+    return {
+      allowance: txs.filter(tx => tx.type === 'base_allowance').reduce((s, tx) => s + tx.amount, 0),
+      bonus: txs.filter(tx => tx.type === 'chore_bonus').reduce((s, tx) => s + tx.amount, 0),
+      savings: txs.filter(tx => tx.type === 'saving').reduce((s, tx) => s + Math.abs(tx.amount), 0),
+      withdrawals: txs.filter(tx => tx.type === 'withdrawal').reduce((s, tx) => s + Math.abs(tx.amount), 0),
+      familyGoal: txs.filter(tx => tx.type === 'family_goal').reduce((s, tx) => s + Math.abs(tx.amount), 0),
+    };
   }
 
   function todayMeal() {
@@ -153,6 +168,12 @@ export function Home({ familyId, member, members }) {
   const totalTodayChores = children.reduce((s, c) => s + todayChoresForChild(c.id).length, 0);
   const totalTodayDone = children.reduce((s, c) => s + todayChoresForChild(c.id).filter(ch => isCompletedToday(ch.id, c.id)).length, 0);
   const claims = poolClaims();
+
+  // Check if there are any 30-day transactions to show
+  const hasMonthData = children.some(childId => {
+    const s = childMonthSummary(childId);
+    return s.allowance > 0 || s.bonus > 0 || s.savings > 0 || s.withdrawals > 0 || s.familyGoal > 0;
+  });
 
   return (
     <div style={styles.page}>
@@ -288,18 +309,61 @@ export function Home({ familyId, member, members }) {
             </div>
           )}
 
-          {/* 7. Payout summary */}
-          {children.some(c => childPayoutTotal(c.id) > 0) && (
+          {/* 7. Money overview (30 days) */}
+          {children.some(c => {
+            const s = childMonthSummary(c.id);
+            return s.allowance > 0 || s.bonus > 0 || s.savings > 0 || s.withdrawals > 0 || s.familyGoal > 0;
+          }) && (
             <div style={styles.section}>
-              <p style={S.sectionLabel}><CreditCard size={12} color={C.textMuted} /> Att betala ut</p>
+              <p style={S.sectionLabel}><TrendingUp size={12} color={C.textMuted} /> Pengaöversikt — 30 dagar</p>
               {children.map(child => {
-                const total = childPayoutTotal(child.id);
-                if (total <= 0) return null;
+                const s = childMonthSummary(child.id);
+                if (s.allowance === 0 && s.bonus === 0 && s.savings === 0 && s.withdrawals === 0 && s.familyGoal === 0) return null;
                 return (
-                  <div key={child.id} style={styles.payoutRow}>
-                    <span style={{ fontSize: 20 }}>{child.avatar}</span>
-                    <span style={styles.payoutName}>{child.name}</span>
-                    <span style={styles.payoutAmount}>{formatKr(total)}</span>
+                  <div key={child.id} style={styles.overviewCard}>
+                    <div style={styles.overviewHeader}>
+                      <div style={{ ...styles.overviewAvatar, background: child.color || C.primary }}>
+                        <span style={{ fontSize: 18 }}>{child.avatar}</span>
+                      </div>
+                      <span style={styles.overviewName}>{child.name}</span>
+                    </div>
+                    <div style={styles.overviewGrid}>
+                      {s.allowance > 0 && (
+                        <div style={styles.overviewItem}>
+                          <span style={styles.overviewEmoji}>💰</span>
+                          <span style={styles.overviewItemLabel}>Veckopeng</span>
+                          <span style={{ ...styles.overviewItemVal, color: C.success }}>+{formatKr(s.allowance)}</span>
+                        </div>
+                      )}
+                      {s.bonus > 0 && (
+                        <div style={styles.overviewItem}>
+                          <span style={styles.overviewEmoji}>⭐</span>
+                          <span style={styles.overviewItemLabel}>Bonus</span>
+                          <span style={{ ...styles.overviewItemVal, color: C.success }}>+{formatKr(s.bonus)}</span>
+                        </div>
+                      )}
+                      {s.savings > 0 && (
+                        <div style={styles.overviewItem}>
+                          <span style={styles.overviewEmoji}>🐷</span>
+                          <span style={styles.overviewItemLabel}>Sparat</span>
+                          <span style={{ ...styles.overviewItemVal, color: C.secondary }}>{formatKr(s.savings)}</span>
+                        </div>
+                      )}
+                      {s.withdrawals > 0 && (
+                        <div style={styles.overviewItem}>
+                          <span style={styles.overviewEmoji}>💸</span>
+                          <span style={styles.overviewItemLabel}>Utbetalt</span>
+                          <span style={{ ...styles.overviewItemVal, color: C.primary }}>{formatKr(s.withdrawals)}</span>
+                        </div>
+                      )}
+                      {s.familyGoal > 0 && (
+                        <div style={styles.overviewItem}>
+                          <span style={styles.overviewEmoji}>🎯</span>
+                          <span style={styles.overviewItemLabel}>Familjemål</span>
+                          <span style={{ ...styles.overviewItemVal, color: C.accent }}>{formatKr(s.familyGoal)}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -367,9 +431,16 @@ const styles = {
   goalPct: { fontSize: F.sizes.lg, fontWeight: F.weights.extra, fontFamily: F.heading, color: C.primaryDark, flexShrink: 0 },
   goalBarBg: { height: 8, background: 'rgba(255,255,255,0.6)', borderRadius: 99, overflow: 'hidden' },
   goalBarFill: { height: '100%', borderRadius: 99, transition: 'width 0.4s ease' },
-  payoutRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: C.bgCard, borderRadius: 14, border: `1.5px solid ${C.borderLight}`, marginBottom: 6 },
-  payoutName: { flex: 1, fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
-  payoutAmount: { fontSize: F.sizes.lg, fontWeight: F.weights.extra, fontFamily: F.heading, color: C.primaryDark },
+  // --- Money overview ---
+  overviewCard: { padding: 14, background: C.bgCard, borderRadius: 16, border: `1.5px solid ${C.borderLight}`, marginBottom: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  overviewHeader: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 },
+  overviewAvatar: { width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  overviewName: { fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
+  overviewGrid: { display: 'flex', flexWrap: 'wrap', gap: 6 },
+  overviewItem: { display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', background: C.bg, borderRadius: 10 },
+  overviewEmoji: { fontSize: 14, flexShrink: 0 },
+  overviewItemLabel: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading },
+  overviewItemVal: { fontSize: F.sizes.sm, fontWeight: F.weights.extra, fontFamily: F.heading, marginLeft: 2 },
   infoRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: C.bgCard, borderRadius: 14, border: `1.5px solid ${C.borderLight}`, marginBottom: 6 },
   infoText: { flex: 1, fontSize: F.sizes.sm, fontWeight: F.weights.semi, fontFamily: F.heading, color: C.text },
 };
