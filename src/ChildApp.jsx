@@ -60,7 +60,19 @@ export function ChildApp({ familyId, member, onLogout }) {
   }
 
   function getPoolChores() {
-    return chores.filter(c => c.pool && !c.assigned_to);
+    return chores.filter(c => {
+      if (!c.pool || c.assigned_to) return false;
+      // One-off dated: only show on that date
+      if (c.scheduled_date) return c.scheduled_date === today;
+      // Recurring with days: only show on scheduled days
+      if (c.is_recurring && c.recurrence_rule) {
+        if (c.recurrence_rule.until && today > c.recurrence_rule.until) return false;
+        const days = safeArray(c.recurrence_rule.days);
+        if (days.length > 0 && !days.includes(todayDow)) return false;
+      }
+      // No schedule = show always (gör när du vill)
+      return true;
+    });
   }
 
   function isCompleted(choreId) {
