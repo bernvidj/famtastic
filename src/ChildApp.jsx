@@ -31,6 +31,7 @@ export function ChildApp({ familyId, member, onLogout }) {
   const [schoolSchedule, setSchoolSchedule] = useState([]);
   const [schoolSubjects, setSchoolSubjects] = useState([]);
   const [schoolSpecialEvents, setSchoolSpecialEvents] = useState([]);
+  const [exams, setExams] = useState([]);
 
   useEffect(() => {
     if (!familyId || !member.id) return;
@@ -38,15 +39,17 @@ export function ChildApp({ familyId, member, onLogout }) {
   }, [familyId, member.id]);
 
   async function loadSchoolData() {
-    const [schedRes, subjRes, specRes] = await Promise.all([
+    const [schedRes, subjRes, specRes, examRes] = await Promise.all([
       supabase.from('school_schedule').select('*').eq('member_id', member.id),
       supabase.from('school_subjects').select('*')
         .or(`is_global.eq.true,family_id.eq.${familyId}`),
       supabase.from('school_special_events').select('*').eq('member_id', member.id),
+      supabase.rpc('get_child_exams', { p_family_id: familyId, p_member_id: member.id }),
     ]);
     setSchoolSchedule(schedRes.data || []);
     setSchoolSubjects(subjRes.data || []);
     setSchoolSpecialEvents(specRes.data || []);
+    setExams(safeArray(examRes.data));
   }
 
   const today = todayStr();
@@ -65,6 +68,42 @@ export function ChildApp({ familyId, member, onLogout }) {
   const balance = transactions.reduce((sum, tx) => sum + tx.amount, 0);
   const personalGoals = goals.filter(g => !g.is_family_goal);
   const familyGoals = goals.filter(g => g.is_family_goal);
+
+  // --- School lesson helpers ---
+  const subjectMap = {};
+  safeArray(schoolSubjects).forEach(s => { subjectMap[s.id] = s; });
+
+  function getTodaySchool() {
+    if (todayDow > 5) return { lessons: [], special: null, morningSpecial: null, afternoonSpecial: null };
+    const specials = safeArray(schoolSpecialEvents).filter(se => se.event_date === today);
+    const fullDay = specials.find(se => se.period === 'full_day');
+    if (fullDay) return { lessons: [], special: fullDay, morningSpecial: null, afternoonSpecial: null };
+
+    const morningSpec = specials.find(se => se.period === 'morning');
+    const afternoonSpec = specials.find(se => se.period === 'afternoon');
+
+    const lessons = safeArray(schoolSchedule)
+      .filter(sl => sl.day_of_week === todayDow)
+      .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
+      .map(sl => {
+        const startHour = parseInt((sl.start_time || '08:00').split(':')[0], 10);
+        if (morningSpec && startHour < 12) return null;
+        if (afternoonSpec && startHour >= 12) return null;
+        const subj = subjectMap[sl.subject_id];
+        return {
+          title: subj?.title || 'Lektion',
+          icon: subj?.icon || '📚',
+          color: subj?.color || C.secondary,
+          startTime: sl.start_time,
+          endTime: sl.end_time,
+        };
+      })
+      .filter(Boolean);
+
+    return { lessons, special: null, morningSpecial: morningSpec, afternoonSpecial: afternoonSpec };
+  }
+
+  const todaySchool = getTodaySchool();
 
   // --- Chore helpers ---
   function getTodayChores() {
@@ -178,7 +217,6 @@ export function ChildApp({ familyId, member, onLogout }) {
         p_chore_id: choreId, p_member_id: member.id, p_completed_date: today,
       });
     } else {
-      const chore = chores.find(c => c.id === choreId);
       const { data: result } = await supabase.rpc('complete_chore', {
         p_chore_id: choreId, p_family_id: familyId, p_member_id: member.id, p_completed_date: today,
       });
@@ -197,9 +235,7 @@ export function ChildApp({ familyId, member, onLogout }) {
 
   async function claimPoolChore(choreId) {
     await supabase.rpc('child_claim_pool_chore', {
-      p_family_id: familyId,
-      p_member_id: member.id,
-      p_chore_id: choreId,
+      p_family_id: familyId, p_member_id: member.id, p_chore_id: choreId,
     });
     triggerCelebration('sparkle');
     reload();
@@ -208,7 +244,6 @@ export function ChildApp({ familyId, member, onLogout }) {
   // --- Render ---
   return (
     <div style={styles.appPage}>
-      {/* Top bar */}
       <div style={styles.topBar}>
         <span style={{ fontSize: 28 }}>{member.avatar}</span>
         <span style={styles.topName}>{member.name}</span>
@@ -230,6 +265,11 @@ export function ChildApp({ familyId, member, onLogout }) {
           poolCount={getPoolChores().length}
           familyGoals={familyGoals}
           onGoToChores={() => setPage('chores')}
+          todayLessons={todaySchool.lessons}
+          schoolSpecial={todaySchool.special}
+          morningSpecial={todaySchool.morningSpecial}
+          afternoonSpecial={todaySchool.afternoonSpecial}
+          exams={exams}
         />
       )}
 
@@ -249,44 +289,30 @@ export function ChildApp({ familyId, member, onLogout }) {
 
       {page === 'money' && (
         <ChildMoneyView
-          familyId={familyId}
-          memberId={member.id}
-          transactions={transactions}
-          goals={personalGoals}
-          familyGoals={familyGoals}
-          members={members}
-          onReload={reload}
+          familyId={familyId} memberId={member.id}
+          transactions={transactions} goals={personalGoals}
+          familyGoals={familyGoals} members={members} onReload={reload}
         />
       )}
 
       {page === 'calendar' && (
         <ChildCalendar
-          today={today}
-          getMyEvents={getMyEvents}
-          getChoresForDate={getChoresForDate}
-          isCompletedOnDate={isCompletedOnDate}
-          schoolSchedule={schoolSchedule}
-          schoolSubjects={schoolSubjects}
-          schoolSpecialEvents={schoolSpecialEvents}
+          today={today} getMyEvents={getMyEvents}
+          getChoresForDate={getChoresForDate} isCompletedOnDate={isCompletedOnDate}
+          schoolSchedule={schoolSchedule} schoolSubjects={schoolSubjects}
+          schoolSpecialEvents={schoolSpecialEvents} exams={exams}
         />
       )}
 
-      {/* Celebrations overlay */}
-      <Celebration
-        type={celebrationType}
-        active={celebrationActive}
-        onDone={() => setCelebrationActive(false)}
-      />
+      <Celebration type={celebrationType} active={celebrationActive} onDone={() => setCelebrationActive(false)} />
 
-      {/* Bottom nav */}
       <nav style={styles.nav}>
         {NAV.map(item => {
           const Icon = item.icon;
           const active = page === item.id;
           return (
             <button key={item.id} onClick={() => setPage(item.id)} style={{
-              ...styles.navBtn,
-              color: active ? C.primary : C.textMuted,
+              ...styles.navBtn, color: active ? C.primary : C.textMuted,
             }}>
               <Icon size={22} strokeWidth={active ? 2.5 : 2} />
               <span style={{ ...styles.navLabel, fontWeight: active ? F.weights.bold : F.weights.normal }}>
