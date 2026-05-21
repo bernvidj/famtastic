@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F, S, formatKr } from '../data';
+import { Celebration } from '../Celebrations';
 import { Wallet, PiggyBank, Target, ArrowRight, Check, ArrowLeft } from 'lucide-react';
 
 export function ChildMoneyView({ familyId, memberId, transactions, goals, familyGoals, members, onReload }) {
@@ -15,6 +16,7 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [amount, setAmount] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   // Calculate balances
   const totalBalance = transactions.reduce((sum, tx) => sum + tx.amount, 0);
@@ -80,6 +82,7 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
     });
     setSaving(false);
     if (!error) {
+      setShowCelebration(true);
       setMode('done');
     }
   }
@@ -90,6 +93,7 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
     setMoveTo(null);
     setSelectedGoal(null);
     setAmount(0);
+    setShowCelebration(false);
     onReload();
   }
 
@@ -205,6 +209,7 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
     const emoji = moveTo === 'family_goal' ? '🎯' : '🐷';
     return (
       <div style={styles.page}>
+        <Celebration type="sparkle" active={showCelebration} onDone={() => setShowCelebration(false)} />
         <div style={styles.doneWrap}>
           <span style={{ fontSize: 56 }}>{emoji}</span>
           <h2 style={styles.doneTitle}>Klart!</h2>
