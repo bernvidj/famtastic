@@ -91,7 +91,11 @@ export function Home({ familyId, member, members }) {
     return chores.filter(c => {
       if (c.pool && !c.assigned_to) return false;
       if (c.assigned_to && c.assigned_to !== childId) return false;
+      // One-off dated chore
+      if (c.scheduled_date) return c.scheduled_date === today;
+      // Recurring: check day + until
       if (c.is_recurring && c.recurrence_rule) {
+        if (c.recurrence_rule.until && today > c.recurrence_rule.until) return false;
         const days = safeArray(c.recurrence_rule.days);
         if (days.length > 0 && !days.includes(todayDow)) return false;
       }
@@ -129,7 +133,15 @@ export function Home({ familyId, member, members }) {
     let count = 0;
     for (const c of chores) {
       if (c.pool) continue;
+      // One-off dated chore: only count on that exact date
+      if (c.scheduled_date) {
+        if (c.scheduled_date !== dateStr) continue;
+        count += c.assigned_to ? 1 : children.length;
+        continue;
+      }
+      // Recurring: check day-of-week + until
       if (c.is_recurring && c.recurrence_rule) {
+        if (c.recurrence_rule.until && dateStr > c.recurrence_rule.until) continue;
         const days = safeArray(c.recurrence_rule.days);
         if (days.length > 0 && !days.includes(dow)) continue;
       }
