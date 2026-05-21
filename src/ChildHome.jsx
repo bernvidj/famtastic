@@ -1,18 +1,32 @@
 // ============================================
 // FamTastic — ChildHome (Duolingo-style home view)
-// Extracted from ChildApp
+// Now includes school schedule + upcoming exams
 // ============================================
 
 import React from 'react';
-import { C, F, S, formatKr, getGreeting, streakEmoji } from './data';
+import { C, F, S, formatKr, getGreeting, streakEmoji, safeArray } from './data';
 import { CheckCircle, Star, Flame, Zap } from 'lucide-react';
+
+function fmtTime(t) { return t ? t.slice(0, 5) : ''; }
+
+function daysUntil(dateStr) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr + 'T12:00:00');
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target - today) / 86400000);
+}
 
 export function ChildHome({
   member, todayChores, isCompleted, toggleChore, streak,
   balance, todayEvents, meal, poolCount, familyGoals, onGoToChores,
+  todayLessons, schoolSpecial, morningSpecial, afternoonSpecial, exams,
 }) {
   const doneCount = todayChores.filter(c => isCompleted(c.id)).length;
   const allDone = todayChores.length > 0 && doneCount >= todayChores.length;
+  const lessons = safeArray(todayLessons);
+  const upcomingExams = safeArray(exams).filter(e => daysUntil(e.exam_date) >= 0).slice(0, 3);
+  const hasSchool = lessons.length > 0 || schoolSpecial || morningSpecial || afternoonSpecial;
 
   return (
     <div style={styles.content}>
@@ -55,6 +69,69 @@ export function ChildHome({
         <span style={styles.balancePillLabel}>Mitt saldo</span>
         <span style={styles.balancePillAmount}>{formatKr(balance)}</span>
       </div>
+
+      {/* School today */}
+      {hasSchool && (
+        <div style={styles.section}>
+          <p style={S.sectionLabel}>🎒 Skola idag</p>
+          {schoolSpecial && (
+            <div style={styles.specialBanner}>
+              <span style={{ fontSize: 16 }}>{schoolSpecial.icon || '🎉'}</span>
+              <span style={styles.specialText}>{schoolSpecial.title}</span>
+            </div>
+          )}
+          {morningSpecial && (
+            <div style={styles.specialBanner}>
+              <span style={{ fontSize: 16 }}>{morningSpecial.icon || '🎉'}</span>
+              <span style={styles.specialText}>{morningSpecial.title} (fm)</span>
+            </div>
+          )}
+          {afternoonSpecial && (
+            <div style={styles.specialBanner}>
+              <span style={{ fontSize: 16 }}>{afternoonSpecial.icon || '🎉'}</span>
+              <span style={styles.specialText}>{afternoonSpecial.title} (em)</span>
+            </div>
+          )}
+          {lessons.length > 0 && (
+            <div style={styles.lessonList}>
+              {lessons.map((l, i) => (
+                <div key={i} style={{ ...styles.lessonRow, borderLeftColor: l.color || C.secondary }}>
+                  <span style={{ fontSize: 14 }}>{l.icon}</span>
+                  <span style={styles.lessonTime}>{fmtTime(l.startTime)}{l.endTime ? `–${fmtTime(l.endTime)}` : ''}</span>
+                  <span style={styles.lessonTitle}>{l.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Upcoming exams */}
+      {upcomingExams.length > 0 && (
+        <div style={styles.section}>
+          <p style={S.sectionLabel}>📝 Kommande prov</p>
+          {upcomingExams.map(exam => {
+            const days = daysUntil(exam.exam_date);
+            const urgent = days <= 2;
+            return (
+              <div key={exam.id} style={{
+                ...styles.examCard,
+                borderColor: urgent ? C.primary : C.borderLight,
+                background: urgent ? C.primaryLight : C.bgCard,
+              }}>
+                <span style={{ fontSize: 20 }}>{exam.icon || '📝'}</span>
+                <div style={{ flex: 1 }}>
+                  <span style={styles.examTitle}>{exam.title}</span>
+                  <span style={styles.examDate}>
+                    {days === 0 ? 'Idag!' : days === 1 ? 'Imorgon' : `Om ${days} dagar`}
+                  </span>
+                </div>
+                {urgent && <span style={{ fontSize: 16 }}>⚠️</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Today's chores */}
       {todayChores.length > 0 && (
@@ -152,6 +229,18 @@ const styles = {
   balancePillLabel: { flex: 1, fontSize: F.sizes.sm, color: C.textMuted, fontFamily: F.heading },
   balancePillAmount: { fontSize: F.sizes.xl, fontWeight: F.weights.extra, fontFamily: F.heading, color: C.text },
   section: { marginBottom: 16 },
+  // School
+  specialBanner: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: C.accentLight, borderRadius: 12, border: `1px solid ${C.accent}`, marginBottom: 4 },
+  specialText: { fontSize: F.sizes.sm, fontWeight: F.weights.semi, fontFamily: F.heading, color: '#92400E' },
+  lessonList: { display: 'flex', flexDirection: 'column', gap: 2 },
+  lessonRow: { display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderLeft: '3px solid', borderRadius: '0 8px 8px 0', background: 'rgba(0,0,0,0.02)' },
+  lessonTime: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading, fontWeight: F.weights.semi, minWidth: 72, flexShrink: 0 },
+  lessonTitle: { fontSize: F.sizes.sm, color: C.text, fontFamily: F.heading, fontWeight: F.weights.semi },
+  // Exams
+  examCard: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, border: '1.5px solid', marginBottom: 6, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
+  examTitle: { display: 'block', fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
+  examDate: { display: 'block', fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading, marginTop: 2 },
+  // Chores
   choreRow: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 14px', borderRadius: 14, border: '1.5px solid', marginBottom: 8, cursor: 'pointer', textAlign: 'left', transition: 'background 0.15s' },
   choreEmoji: { width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   choreContent: { flex: 1, minWidth: 0 },
