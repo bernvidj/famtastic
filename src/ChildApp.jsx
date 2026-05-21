@@ -129,6 +129,28 @@ export function ChildApp({ familyId, member, onLogout }) {
     return streak;
   }
 
+  // Chores for any given date (used by calendar)
+  function getChoresForDate(dateStr) {
+    const dow = (() => { const d = new Date(dateStr + 'T12:00:00'); return d.getDay() || 7; })();
+    return chores.filter(c => {
+      if (c.pool && c.assigned_to !== member.id) return false;
+      if (c.assigned_to && c.assigned_to !== member.id) return false;
+      if (c.scheduled_date) return c.scheduled_date === dateStr;
+      if (c.is_recurring && c.recurrence_rule) {
+        if (c.recurrence_rule.until && dateStr > c.recurrence_rule.until) return false;
+        const days = safeArray(c.recurrence_rule.days);
+        if (days.length > 0 && !days.includes(dow)) return false;
+      }
+      return true;
+    });
+  }
+
+  function isCompletedOnDate(choreId, dateStr) {
+    return completions.some(
+      c => c.chore_id === choreId && c.member_id === member.id && c.completed_date === dateStr
+    );
+  }
+
   // --- Event helpers ---
   function getMyEvents(dateStr) {
     const dow = (() => { const d = new Date(dateStr + 'T12:00:00'); return d.getDay() || 7; })();
@@ -408,7 +430,8 @@ export function ChildApp({ familyId, member, onLogout }) {
           const dateStr = fmtD(d);
           const isToday = dateStr === today;
           const dayEvents = getMyEvents(dateStr);
-          if (dayEvents.length === 0) return null;
+          const dayChores = getChoresForDate(dateStr);
+          if (dayEvents.length === 0 && dayChores.length === 0) return null;
           return (
             <div key={i} style={{
               ...styles.calDay,
@@ -423,6 +446,21 @@ export function ChildApp({ familyId, member, onLogout }) {
                   📅 {ev.start_time ? ev.start_time.slice(0, 5) + ' ' : ''}{ev.title}
                 </div>
               ))}
+              {dayChores.map(ch => {
+                const done = isCompletedOnDate(ch.id, dateStr);
+                return (
+                  <div key={ch.id} style={{
+                    ...styles.calChore,
+                    opacity: done ? 0.6 : 1,
+                  }}>
+                    <span>{done ? '✅' : '⬜'}</span>
+                    <span>{ch.icon} {ch.title}</span>
+                    {ch.chore_type === 'bonus' && ch.points > 0 && (
+                      <span style={styles.calChorePoints}>+{ch.points} kr</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -549,6 +587,14 @@ const styles = {
   calDay: { padding: '12px 14px', borderRadius: 14, border: '1.5px solid', marginBottom: 8 },
   calDayName: { display: 'block', fontFamily: F.heading, fontSize: F.sizes.sm, fontWeight: F.weights.bold, marginBottom: 4 },
   calEvent: { fontSize: F.sizes.sm, color: C.text, fontFamily: F.heading, padding: '2px 0' },
+  calChore: {
+    display: 'flex', alignItems: 'center', gap: 6, fontSize: F.sizes.sm,
+    color: C.text, fontFamily: F.heading, padding: '2px 0',
+  },
+  calChorePoints: {
+    fontSize: F.sizes.xs, color: C.primary, fontWeight: F.weights.bold,
+    fontFamily: F.heading, marginLeft: 'auto',
+  },
 
   // --- Empty ---
   emptyTitle: { fontFamily: F.heading, fontSize: F.sizes.lg, fontWeight: F.weights.bold, color: C.text, margin: '12px 0 4px' },
