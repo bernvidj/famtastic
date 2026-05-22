@@ -1,7 +1,7 @@
 // ============================================
 // FamTastic — SchoolSetup (wizard: schedule+subjects → rules)
 // Step 1: subjects + schedule combined
-// Step 2: linked reminders
+// Step 2: linked reminders (homework with due_day picker)
 // ============================================
 
 import React, { useState, useEffect } from 'react';
@@ -70,6 +70,7 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
         subject_icon: (subjectData || []).find(s => s.id === r.subject_id)?.icon || '📚',
         title: r.title, icon: r.icon, days_before: r.days_before,
         time_of_day: r.time_of_day, is_active: r.is_active, rule_type: r.rule_type,
+        due_day: r.due_day || null,
       })));
     }
   }
@@ -126,6 +127,20 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
     setRules(prev => prev.map((r, i) => i === idx ? { ...r, is_active: !r.is_active } : r));
   }
 
+  function setRuleDueDay(idx, day) {
+    setRules(prev => prev.map((r, i) => {
+      if (i !== idx) return r;
+      const newDay = r.due_day === day ? null : day;
+      const subj = allSubjects.find(s => s.id === r.subject_id);
+      const name = subj?.short_name || '?';
+      return {
+        ...r,
+        due_day: newDay,
+        title: newDay ? `Läxinlämning ${name}` : `${name}-läxa`,
+      };
+    }));
+  }
+
   function goToRules() {
     const existingSubjectIds = rules.map(r => r.subject_id);
     const suggestions = [...rules];
@@ -138,7 +153,15 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
         suggestions.push({ subject_id: sid, subject_name: subj.short_name, subject_icon: subj.icon, ...suggestion, is_active: true, rule_type: 'bring_item' });
       }
       if (HOMEWORK_SUBJECTS.includes(subj.title)) {
-        suggestions.push({ subject_id: sid, subject_name: subj.short_name, subject_icon: subj.icon, title: `${subj.short_name}-läxa`, icon: '📝', days_before: 2, time_of_day: 'evening', is_active: false, rule_type: 'homework' });
+        // Auto-suggest due_day = last lesson day for this subject
+        const subjectDays = schedule.filter(s => s.subject_id === sid).map(s => s.day_of_week).sort((a, b) => a - b);
+        const suggestedDueDay = subjectDays.length > 0 ? subjectDays[subjectDays.length - 1] : null;
+        const title = suggestedDueDay ? `Läxinlämning ${subj.short_name}` : `${subj.short_name}-läxa`;
+        suggestions.push({
+          subject_id: sid, subject_name: subj.short_name, subject_icon: subj.icon,
+          title, icon: '📝', days_before: 1, time_of_day: 'evening',
+          is_active: false, rule_type: 'homework', due_day: suggestedDueDay,
+        });
       }
     });
     setRules(suggestions.filter(r => selectedSubjects.includes(r.subject_id)));
@@ -151,7 +174,12 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
     await supabase.from('school_schedule').delete().eq('member_id', memberId);
     if (scheduleRows.length > 0) await supabase.from('school_schedule').insert(scheduleRows);
 
-    const ruleRows = rules.map(r => ({ family_id: familyId, member_id: memberId, subject_id: r.subject_id, rule_type: r.rule_type, title: r.title, icon: r.icon, days_before: r.days_before, time_of_day: r.time_of_day, is_active: r.is_active }));
+    const ruleRows = rules.map(r => ({
+      family_id: familyId, member_id: memberId, subject_id: r.subject_id,
+      rule_type: r.rule_type, title: r.title, icon: r.icon,
+      days_before: r.days_before, time_of_day: r.time_of_day, is_active: r.is_active,
+      due_day: r.due_day || null,
+    }));
     await supabase.from('school_rules').delete().eq('member_id', memberId);
     let savedRules = [];
     if (ruleRows.length > 0) { const { data } = await supabase.from('school_rules').insert(ruleRows).select(); savedRules = data || []; }
@@ -160,21 +188,35 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
 
     const newChores = [];
     for (const rule of savedRules.filter(r => r.is_active)) {
-      const subjectSlots = schedule.filter(s => s.subject_id === rule.subject_id);
-      const reminderDays = new Set();
-      for (const slot of subjectSlots) {
-        let rd = slot.day_of_week - rule.days_before;
-        if (rd < 1) rd += 7;
-        reminderDays.add(rd);
-      }
-      if (reminderDays.size > 0) {
+      if (rule.rule_type === 'homework' && rule.due_day) {
+        // Homework with due_day: ONE reminder the day before submission
+        let reminderDay = rule.due_day - 1;
+        if (reminderDay < 1) reminderDay = 5; // Friday if due Monday
         newChores.push({
           family_id: familyId, title: rule.title,
           description: `Auto: ${allSubjects.find(s => s.id === rule.subject_id)?.short_name || ''}`,
           icon: rule.icon, chore_type: 'base', points: 0, difficulty: 'easy',
-          is_recurring: true, recurrence_rule: { frequency: 'weekly', days: [...reminderDays].sort((a, b) => a - b) },
+          is_recurring: true, recurrence_rule: { frequency: 'weekly', days: [reminderDay] },
           assigned_to: memberId, pool: false, scheduled_date: null, reference_id: rule.id, created_by: memberId,
         });
+      } else {
+        // bring_item or homework without due_day: reminder before each lesson (original logic)
+        const subjectSlots = schedule.filter(s => s.subject_id === rule.subject_id);
+        const reminderDays = new Set();
+        for (const slot of subjectSlots) {
+          let rd = slot.day_of_week - rule.days_before;
+          if (rd < 1) rd += 7;
+          reminderDays.add(rd);
+        }
+        if (reminderDays.size > 0) {
+          newChores.push({
+            family_id: familyId, title: rule.title,
+            description: `Auto: ${allSubjects.find(s => s.id === rule.subject_id)?.short_name || ''}`,
+            icon: rule.icon, chore_type: 'base', points: 0, difficulty: 'easy',
+            is_recurring: true, recurrence_rule: { frequency: 'weekly', days: [...reminderDays].sort((a, b) => a - b) },
+            assigned_to: memberId, pool: false, scheduled_date: null, reference_id: rule.id, created_by: memberId,
+          });
+        }
       }
     }
     if (newChores.length > 0) await supabase.from('chores').insert(newChores);
@@ -218,7 +260,6 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
         </div>
 
         <div style={styles.body}>
-          {/* Subject picker — collapsible */}
           <button onClick={() => setShowSubjects(!showSubjects)} style={styles.subjectToggle}>
             <span style={styles.subjectToggleText}>
               {selectedSubjects.length === 0 ? '📚 Välj ämnen...' : `📚 ${selectedSubjects.length} ämnen valda`}
@@ -242,7 +283,6 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
             </div>
           )}
 
-          {/* Schedule grid */}
           <p style={{ ...S.sectionLabel, marginTop: 12 }}>Veckoschema</p>
           <p style={styles.hint}>Tryck "+ Lägg till" för att lägga till en lektion.</p>
 
@@ -275,7 +315,6 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
           })}
         </div>
 
-        {/* Slot editor modal */}
         <SchoolSlotModal
           editingSlot={editingSlot}
           slotForm={slotForm}
@@ -338,23 +377,46 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
 
           {hwRules.length > 0 && (
             <>
-              <p style={{ ...S.sectionLabel, marginTop: 20 }}>📝 Läxpåminnelser</p>
-              <p style={styles.hint}>Skapas automatiskt inför varje lektion</p>
+              <p style={{ ...S.sectionLabel, marginTop: 20 }}>📝 Läxor</p>
+              <p style={styles.hint}>Välj inlämningsdag — påminnelse skapas dagen innan</p>
               {hwRules.map((rule, idx) => {
                 const globalIdx = rules.indexOf(rule);
                 return (
-                  <button key={idx} onClick={() => toggleRule(globalIdx)} style={{
-                    ...styles.ruleCard, background: rule.is_active ? C.successLight : C.bgCard, borderColor: rule.is_active ? C.success : C.borderLight,
-                  }}>
-                    <span style={styles.ruleIcon}>{rule.icon}</span>
-                    <div style={styles.ruleInfo}>
-                      <span style={styles.ruleTitle}>{rule.title}</span>
-                      <span style={styles.ruleSub}>{rule.subject_icon} {rule.subject_name} · {rule.days_before} dagar innan</span>
-                    </div>
-                    <div style={{ ...styles.ruleToggle, background: rule.is_active ? C.success : C.border }}>
-                      <div style={{ ...styles.ruleToggleKnob, transform: rule.is_active ? 'translateX(20px)' : 'translateX(0)' }} />
-                    </div>
-                  </button>
+                  <div key={idx} style={{ marginBottom: 12 }}>
+                    <button onClick={() => toggleRule(globalIdx)} style={{
+                      ...styles.ruleCard, marginBottom: 0,
+                      background: rule.is_active ? C.successLight : C.bgCard,
+                      borderColor: rule.is_active ? C.success : C.borderLight,
+                      borderRadius: rule.is_active ? '14px 14px 0 0' : 14,
+                    }}>
+                      <span style={styles.ruleIcon}>{rule.icon}</span>
+                      <div style={styles.ruleInfo}>
+                        <span style={styles.ruleTitle}>{rule.title}</span>
+                        <span style={styles.ruleSub}>
+                          {rule.subject_icon} {rule.subject_name}
+                          {rule.due_day ? ` · Inlämning ${DAYS.find(d => d.value === rule.due_day)?.label}` : ' · Välj inlämningsdag'}
+                        </span>
+                      </div>
+                      <div style={{ ...styles.ruleToggle, background: rule.is_active ? C.success : C.border }}>
+                        <div style={{ ...styles.ruleToggleKnob, transform: rule.is_active ? 'translateX(20px)' : 'translateX(0)' }} />
+                      </div>
+                    </button>
+                    {rule.is_active && (
+                      <div style={styles.dueDayRow}>
+                        <span style={styles.dueDayLabel}>Inlämning:</span>
+                        {DAYS.map(d => (
+                          <button key={d.value} onClick={() => setRuleDueDay(globalIdx, d.value)} style={{
+                            ...styles.dueDayBtn,
+                            background: rule.due_day === d.value ? C.primary : C.bgCard,
+                            color: rule.due_day === d.value ? '#fff' : C.text,
+                            borderColor: rule.due_day === d.value ? C.primary : C.borderLight,
+                          }}>
+                            {d.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </>
@@ -419,6 +481,10 @@ const styles = {
   ruleSub: { display: 'block', fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading, marginTop: 2 },
   ruleToggle: { width: 44, height: 24, borderRadius: 12, padding: 2, transition: 'background 0.2s', flexShrink: 0 },
   ruleToggleKnob: { width: 20, height: 20, borderRadius: 10, background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.2)', transition: 'transform 0.2s' },
+  // Due day picker
+  dueDayRow: { display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', background: C.successLight, borderRadius: '0 0 14px 14px', border: `1.5px solid ${C.success}`, borderTop: 'none' },
+  dueDayLabel: { fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text, marginRight: 4 },
+  dueDayBtn: { padding: '6px 10px', borderRadius: 8, border: '1.5px solid', fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', minHeight: 32 },
   emptyTitle: { fontFamily: F.heading, fontSize: F.sizes.lg, fontWeight: F.weights.bold, color: C.text, margin: '12px 0 4px' },
   emptyText: { fontSize: F.sizes.sm, color: C.textMuted, margin: 0, fontFamily: F.heading },
   nextBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '12px 24px', borderRadius: 12, border: 'none', background: C.primary, color: '#fff', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', minHeight: 48 },
