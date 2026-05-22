@@ -136,7 +136,7 @@ export function App() {
   async function loadAllMembers(fid) {
     const { data } = await supabase
       .from('family_members')
-      .select('id, name, role, avatar, color')
+      .select('id, name, role, avatar, color, auth_user_id, pin_hash')
       .eq('family_id', fid)
       .order('created_at');
     setAllMembers(data || []);
