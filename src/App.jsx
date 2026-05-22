@@ -20,15 +20,26 @@ import { Home as HomeIcon } from 'lucide-react';
 
 // ── Lösenordsåterställning (visas när användaren klickar reset-länk i mail) ──
 function PasswordReset({ onDone }) {
+  const [ready,   setReady]   = useState(false);  // väntar på Supabase recovery-session
   const [pw,      setPw]      = useState('');
   const [pw2,     setPw2]     = useState('');
   const [saving,  setSaving]  = useState(false);
   const [err,     setErr]     = useState('');
   const [success, setSuccess] = useState(false);
 
+  useEffect(() => {
+    // Vänta på att Supabase etablerar recovery-sessionen via hash-token
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setReady(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   async function handleSave() {
-    if (pw.length < 6)    { setErr('Minst 6 tecken'); return; }
-    if (pw !== pw2)       { setErr('Lösenorden matchar inte'); return; }
+    if (pw.length < 6) { setErr('Minst 6 tecken'); return; }
+    if (pw !== pw2)    { setErr('Lösenorden matchar inte'); return; }
     setSaving(true); setErr('');
     const { error } = await supabase.auth.updateUser({ password: pw });
     if (error) { setErr(error.message); setSaving(false); return; }
@@ -45,12 +56,15 @@ function PasswordReset({ onDone }) {
         </h2>
         {success ? (
           <p style={{ textAlign: 'center', color: '#10B981', fontWeight: 700, fontSize: 16 }}>✅ Lösenord sparat! Loggar in...</p>
+        ) : !ready ? (
+          <p style={{ textAlign: 'center', color: '#6B7280', fontSize: 15 }}>Verifierar länk...</p>
         ) : (
           <>
             <input
               type="password" placeholder="Nytt lösenord (minst 6 tecken)"
               value={pw} onChange={e => setPw(e.target.value)}
               style={{ width: '100%', padding: '14px 16px', borderRadius: 12, border: '2px solid #E5E7EB', fontSize: 16, boxSizing: 'border-box', marginBottom: 12, fontFamily: 'inherit' }}
+              autoFocus
             />
             <input
               type="password" placeholder="Bekräfta lösenord"
