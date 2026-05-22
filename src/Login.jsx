@@ -1,407 +1,336 @@
-// ============================================
-// FamTastic — Login (parent magic link + child PIN)
-// ============================================
+import { useState, useEffect } from 'react'
+import { supabase } from './supabaseClient'
 
-import React, { useState, useEffect } from 'react';
-import { Home, Mail, ArrowRight, CheckCircle, AlertCircle, ArrowLeft, KeyRound } from 'lucide-react';
-import { supabase } from './supabaseClient';
-import { C, F, S } from './data';
-
-export function Login({ onChildLogin }) {
-  const [mode, setMode] = useState('choose'); // choose | parent | child-family | child-pick | child-pin
-  const [email, setEmail] = useState('');
-  const [status, setStatus] = useState('idle');
-  const [errorMsg, setErrorMsg] = useState('');
-
-  // Child login state
-  const [families, setFamilies] = useState([]);
-  const [selectedFamily, setSelectedFamily] = useState(null);
-  const [children, setChildren] = useState([]);
-  const [selectedChild, setSelectedChild] = useState(null);
-  const [pin, setPin] = useState('');
-  const [pinError, setPinError] = useState('');
-  const [verifying, setVerifying] = useState(false);
-
-  // Load families for child login
-  async function loadFamilies() {
-    const { data } = await supabase.rpc('get_families_public');
-    setFamilies(data || []);
-  }
-
-  async function loadChildren(familyId) {
-    const { data } = await supabase.rpc('get_family_children', { p_family_id: familyId });
-    setChildren(data || []);
-  }
-
-  function selectFamily(family) {
-    setSelectedFamily(family);
-    loadChildren(family.id);
-    setMode('child-pick');
-  }
-
-  function selectChild(child) {
-    setSelectedChild(child);
-    setPin('');
-    setPinError('');
-    setMode('child-pin');
-  }
-
-  async function verifyPin() {
-    if (pin.length !== 4) return;
-    setVerifying(true);
-    setPinError('');
-
-    try {
-      const { data, error } = await supabase.rpc('verify_child_pin', {
-        p_family_id: selectedFamily.id,
-        p_member_id: selectedChild.id,
-        p_pin: pin,
-      });
-
-      if (error) throw error;
-      onChildLogin(data);
-    } catch (err) {
-      setPinError(err.message === 'Wrong PIN' ? 'Fel PIN — försök igen' : 'Något gick fel');
-      setPin('');
-    }
-    setVerifying(false);
-  }
-
-  // Parent magic link
-  async function handleParentSubmit(e) {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setStatus('loading');
-    setErrorMsg('');
-
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: window.location.origin },
-    });
-
-    if (error) {
-      setStatus('error');
-      setErrorMsg(error.message);
-    } else {
-      setStatus('sent');
-    }
-  }
-
-  // --- CHOOSE MODE ---
-  if (mode === 'choose') {
-    return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <div style={styles.logoWrap}>
-            <div style={styles.logoIcon}><Home size={36} color="#fff" /></div>
-            <h1 style={styles.logoText}>FamTastic</h1>
-            <p style={styles.tagline}>Familjens samlingsplats</p>
-          </div>
-
-          <div style={styles.card}>
-            <h2 style={styles.cardTitle}>Vem loggar in?</h2>
-
-            <button onClick={() => setMode('parent')} style={styles.choiceBtn}>
-              <div style={{ ...styles.choiceIcon, background: C.primaryLight }}>
-                <Mail size={24} color={C.primary} />
-              </div>
-              <div style={styles.choiceContent}>
-                <span style={styles.choiceTitle}>Förälder</span>
-                <span style={styles.choiceDesc}>Logga in med e-post</span>
-              </div>
-              <ArrowRight size={18} color={C.textMuted} />
-            </button>
-
-            <button onClick={() => { setMode('child-family'); loadFamilies(); }} style={styles.choiceBtn}>
-              <div style={{ ...styles.choiceIcon, background: C.accentLight }}>
-                <KeyRound size={24} color={C.warning} />
-              </div>
-              <div style={styles.choiceContent}>
-                <span style={styles.choiceTitle}>Barn</span>
-                <span style={styles.choiceDesc}>Logga in med PIN-kod</span>
-              </div>
-              <ArrowRight size={18} color={C.textMuted} />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- PARENT LOGIN ---
-  if (mode === 'parent') {
-    return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <div style={styles.logoWrap}>
-            <div style={styles.logoIcon}><Home size={36} color="#fff" /></div>
-            <h1 style={styles.logoText}>FamTastic</h1>
-          </div>
-
-          <div style={styles.card}>
-            {status === 'sent' ? (
-              <div style={styles.sentWrap}>
-                <CheckCircle size={48} color={C.success} />
-                <h2 style={styles.sentTitle}>Kolla din mejl!</h2>
-                <p style={styles.sentText}>
-                  Vi har skickat en inloggningslänk till <strong>{email}</strong>.
-                </p>
-                <button style={{ ...S.button, ...S.buttonSecondary, marginTop: 16 }}
-                  onClick={() => { setStatus('idle'); setEmail(''); }}>
-                  Tillbaka
-                </button>
-              </div>
-            ) : (
-              <>
-                <button onClick={() => setMode('choose')} style={styles.backLink}>
-                  <ArrowLeft size={16} /> Tillbaka
-                </button>
-                <h2 style={styles.cardTitle}>Förälder-login</h2>
-                <p style={styles.cardDesc}>Ange din e-postadress så skickar vi en magisk länk.</p>
-
-                <form onSubmit={handleParentSubmit}>
-                  <div style={styles.inputWrap}>
-                    <Mail size={20} color={C.textMuted} style={styles.inputIcon} />
-                    <input type="email" placeholder="din@mejl.se" value={email}
-                      onChange={e => setEmail(e.target.value)} style={styles.input}
-                      autoComplete="email" autoFocus />
-                  </div>
-
-                  {status === 'error' && (
-                    <div style={styles.errorBox}>
-                      <AlertCircle size={16} color={C.error} />
-                      <span>{errorMsg || 'Något gick fel.'}</span>
-                    </div>
-                  )}
-
-                  <button type="submit" disabled={status === 'loading' || !email.trim()}
-                    style={{ ...S.button, ...S.buttonPrimary, width: '100%', marginTop: 16,
-                      opacity: (status === 'loading' || !email.trim()) ? 0.6 : 1 }}>
-                    {status === 'loading' ? 'Skickar...' : (<>Skicka inloggningslänk <ArrowRight size={18} /></>)}
-                  </button>
-                </form>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- CHILD: Pick family ---
-  if (mode === 'child-family') {
-    return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <div style={styles.logoWrap}>
-            <div style={styles.logoIcon}><Home size={36} color="#fff" /></div>
-            <h1 style={styles.logoText}>FamTastic</h1>
-          </div>
-
-          <div style={styles.card}>
-            <button onClick={() => setMode('choose')} style={styles.backLink}>
-              <ArrowLeft size={16} /> Tillbaka
-            </button>
-            <h2 style={styles.cardTitle}>Välj din familj</h2>
-
-            {families.length === 0 ? (
-              <p style={styles.emptyText}>Inga familjer hittades.</p>
-            ) : (
-              families.map(fam => (
-                <button key={fam.id} onClick={() => selectFamily(fam)} style={styles.familyBtn}>
-                  <span style={styles.familyIcon}>🏠</span>
-                  <span style={styles.familyName}>{fam.name}</span>
-                  <ArrowRight size={16} color={C.textMuted} />
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- CHILD: Pick avatar ---
-  if (mode === 'child-pick') {
-    return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <div style={styles.logoWrap}>
-            <div style={styles.logoIcon}><Home size={36} color="#fff" /></div>
-            <h1 style={styles.logoText}>FamTastic</h1>
-          </div>
-
-          <div style={styles.card}>
-            <button onClick={() => setMode('child-family')} style={styles.backLink}>
-              <ArrowLeft size={16} /> Tillbaka
-            </button>
-            <h2 style={styles.cardTitle}>Vem är du?</h2>
-            <p style={styles.cardDesc}>{selectedFamily?.name}</p>
-
-            {children.length === 0 ? (
-              <p style={styles.emptyText}>Inga barn i denna familj ännu.</p>
-            ) : (
-              <div style={styles.childGrid}>
-                {children.map(child => (
-                  <button key={child.id} onClick={() => selectChild(child)} style={styles.childCard}>
-                    <span style={styles.childAvatar}>{child.avatar}</span>
-                    <span style={styles.childName}>{child.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- CHILD: Enter PIN ---
-  if (mode === 'child-pin') {
-    return (
-      <div style={styles.page}>
-        <div style={styles.container}>
-          <div style={styles.logoWrap}>
-            <span style={styles.pinAvatar}>{selectedChild?.avatar}</span>
-            <h1 style={styles.pinName}>{selectedChild?.name}</h1>
-          </div>
-
-          <div style={styles.card}>
-            <button onClick={() => { setMode('child-pick'); setPin(''); setPinError(''); }} style={styles.backLink}>
-              <ArrowLeft size={16} /> Tillbaka
-            </button>
-            <h2 style={styles.cardTitle}>Ange din PIN</h2>
-
-            <div style={styles.pinDots}>
-              {[0, 1, 2, 3].map(i => (
-                <div key={i} style={{
-                  ...styles.pinDot,
-                  background: pin.length > i ? C.primary : C.borderLight,
-                }} />
-              ))}
-            </div>
-
-            {pinError && (
-              <div style={styles.errorBox}>
-                <AlertCircle size={16} color={C.error} />
-                <span>{pinError}</span>
-              </div>
-            )}
-
-            {/* Number pad */}
-            <div style={styles.numpad}>
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, 'del'].map((num, i) => {
-                if (num === null) return <div key={i} style={styles.numpadEmpty} />;
-                return (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      if (num === 'del') {
-                        setPin(p => p.slice(0, -1));
-                        setPinError('');
-                      } else if (pin.length < 4) {
-                        const newPin = pin + num;
-                        setPin(newPin);
-                        setPinError('');
-                        if (newPin.length === 4) {
-                          setTimeout(() => {
-                            setPin(newPin);
-                            // Trigger verify
-                          }, 100);
-                        }
-                      }
-                    }}
-                    style={styles.numpadBtn}
-                  >
-                    {num === 'del' ? '⌫' : num}
-                  </button>
-                );
-              })}
-            </div>
-
-            <button
-              onClick={verifyPin}
-              disabled={pin.length !== 4 || verifying}
-              style={{
-                ...S.button, ...S.buttonPrimary, width: '100%', marginTop: 12,
-                opacity: pin.length !== 4 || verifying ? 0.5 : 1,
-              }}
-            >
-              {verifying ? 'Verifierar...' : 'Logga in'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
+const C = {
+  primary:   '#F97316',
+  secondary: '#14B8A6',
+  bg:        '#FFFBF5',
+  card:      '#FFFFFF',
+  text:      '#1F2937',
+  muted:     '#6B7280',
+  border:    '#E5E7EB',
+  danger:    '#EF4444',
 }
 
-// --- Styles ---
-const styles = {
-  page: {
-    minHeight: '100vh',
-    background: `linear-gradient(135deg, ${C.primaryLight} 0%, ${C.bg} 50%, ${C.secondaryLight} 100%)`,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: 16, fontFamily: F.body,
-  },
-  container: { width: '100%', maxWidth: 400 },
-  logoWrap: { textAlign: 'center', marginBottom: 24 },
-  logoIcon: {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    background: C.primary, borderRadius: 20, padding: 14, marginBottom: 12,
-  },
-  logoText: { fontFamily: F.heading, fontSize: F.sizes.hero, fontWeight: F.weights.extra, color: C.primary, margin: '0 0 4px' },
-  tagline: { fontSize: F.sizes.md, color: C.textMuted, margin: 0 },
-  card: { ...S.card, padding: 24 },
-  cardTitle: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.bold, color: C.text, margin: '0 0 8px' },
-  cardDesc: { fontSize: F.sizes.sm, color: C.textMuted, margin: '0 0 16px', lineHeight: 1.5 },
-  backLink: {
-    display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none',
-    color: C.textMuted, fontSize: F.sizes.sm, cursor: 'pointer', padding: 0, marginBottom: 12,
-  },
-  choiceBtn: {
-    display: 'flex', alignItems: 'center', gap: 14, width: '100%', padding: 14,
-    background: C.bg, borderRadius: 14, border: `1px solid ${C.borderLight}`,
-    cursor: 'pointer', textAlign: 'left', marginBottom: 8,
-  },
-  choiceIcon: { width: 48, height: 48, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  choiceContent: { flex: 1 },
-  choiceTitle: { display: 'block', fontFamily: F.heading, fontSize: F.sizes.md, fontWeight: F.weights.bold, color: C.text },
-  choiceDesc: { display: 'block', fontSize: F.sizes.sm, color: C.textMuted, marginTop: 2 },
-  inputWrap: { position: 'relative' },
-  inputIcon: { position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' },
-  input: { ...S.input, paddingLeft: 44 },
-  errorBox: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, padding: '10px 14px', background: C.errorLight, borderRadius: 10, fontSize: F.sizes.sm, color: C.error },
-  sentWrap: { textAlign: 'center', padding: '12px 0' },
-  sentTitle: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.bold, color: C.text, margin: '16px 0 8px' },
-  sentText: { fontSize: F.sizes.md, color: C.textMuted, lineHeight: 1.5, margin: 0 },
-  emptyText: { fontSize: F.sizes.sm, color: C.textMuted, textAlign: 'center', padding: 16 },
-  familyBtn: {
-    display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: 14,
-    background: C.bg, borderRadius: 12, border: `1px solid ${C.borderLight}`,
-    cursor: 'pointer', textAlign: 'left', marginBottom: 6,
-  },
-  familyIcon: { fontSize: 24 },
-  familyName: { flex: 1, fontSize: F.sizes.md, fontWeight: F.weights.semi, color: C.text },
-  childGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 },
-  childCard: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-    padding: 20, background: C.bg, borderRadius: 16, border: `2px solid ${C.borderLight}`,
-    cursor: 'pointer',
-  },
-  childAvatar: { fontSize: 44 },
-  childName: { fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
-  pinAvatar: { fontSize: 64, display: 'block' },
-  pinName: { fontFamily: F.heading, fontSize: F.sizes.xxl, fontWeight: F.weights.extra, color: C.primary, margin: '8px 0 0' },
-  pinDots: { display: 'flex', justifyContent: 'center', gap: 14, margin: '20px 0' },
-  pinDot: { width: 20, height: 20, borderRadius: 10, transition: 'background 0.15s' },
-  numpad: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, maxWidth: 260, margin: '0 auto' },
-  numpadBtn: {
-    padding: 16, fontSize: F.sizes.xl, fontWeight: F.weights.bold, fontFamily: F.heading,
-    background: C.bg, border: `1px solid ${C.borderLight}`, borderRadius: 12,
-    cursor: 'pointer', color: C.text, textAlign: 'center',
-  },
-  numpadEmpty: { padding: 16 },
-};
+const label  = { display: 'block', fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 6 }
+const input  = { width: '100%', padding: '14px 16px', borderRadius: 12, border: `2px solid ${C.border}`, fontSize: 16, boxSizing: 'border-box', outline: 'none', fontFamily: 'Nunito, sans-serif', background: '#fff' }
+const screen = { minHeight: '100dvh', background: C.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }
+
+function PrimaryBtn({ onClick, disabled, children }) {
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      width: '100%', padding: 16, marginTop: 24, borderRadius: 14,
+      background: disabled ? '#D1D5DB' : C.primary,
+      color: '#fff', border: 'none', fontSize: 17, fontWeight: 700,
+      cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+    }}>
+      {children}
+    </button>
+  )
+}
+
+// ─── Steg 1: Familjenamn + lösenord ──────────────────────────────────────────
+function StepLogin({ onSuccess, onRegister }) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPass, setShowPass] = useState(false)
+  const [err,      setErr]      = useState('')
+  const [loading,  setLoading]  = useState(false)
+
+  async function handleLogin() {
+    if (!username.trim() || !password) return
+    setLoading(true); setErr('')
+
+    const { data: rows, error: lookupErr } = await supabase
+      .rpc('get_family_by_username', { p_username: username.trim().toLowerCase() })
+
+    if (lookupErr || !rows?.length) {
+      setErr('Familjenamnet hittades inte')
+      setLoading(false); return
+    }
+
+    const { auth_email, family_id } = rows[0]
+
+    const { error: authErr } = await supabase.auth.signInWithPassword({ email: auth_email, password })
+
+    if (authErr) {
+      setErr('Fel lösenord, försök igen')
+      setLoading(false); return
+    }
+
+    // Ladda familjemedlemmar + familjenamn parallellt
+    const [membersRes, famRes] = await Promise.all([
+      supabase.from('family_members')
+        .select('id, name, avatar, role, color, pin_hash')
+        .eq('family_id', family_id)
+        .order('created_at'),
+      supabase.from('families').select('name').eq('id', family_id).single(),
+    ])
+
+    setLoading(false)
+    onSuccess({
+      members:    membersRes.data || [],
+      familyId:   family_id,
+      familyName: famRes.data?.name || '',
+    })
+  }
+
+  return (
+    <div style={screen}>
+      {/* Logo */}
+      <div style={{ textAlign: 'center', marginBottom: 36 }}>
+        <div style={{ fontSize: 64, marginBottom: 8 }}>🏠</div>
+        <h1 style={{ fontSize: 34, fontWeight: 900, color: C.primary, margin: 0, fontFamily: 'Nunito, sans-serif' }}>FamTastic</h1>
+        <p style={{ color: C.muted, margin: '6px 0 0', fontSize: 16 }}>Din familjeapp</p>
+      </div>
+
+      {/* Kort */}
+      <div style={{ background: C.card, borderRadius: 24, padding: 28, width: '100%', maxWidth: 380, boxShadow: '0 4px 24px rgba(0,0,0,0.09)' }}>
+        <h2 style={{ margin: '0 0 22px', fontSize: 22, fontWeight: 800, color: C.text, fontFamily: 'inherit' }}>Logga in</h2>
+
+        <label style={label}>Familjenamn</label>
+        <input
+          style={input}
+          placeholder="t.ex. familjjohansson"
+          value={username}
+          onChange={e => setUsername(e.target.value)}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          onKeyDown={e => e.key === 'Enter' && handleLogin()}
+        />
+
+        <label style={{ ...label, marginTop: 18 }}>Lösenord</label>
+        <div style={{ position: 'relative' }}>
+          <input
+            style={{ ...input, paddingRight: 48 }}
+            type={showPass ? 'text' : 'password'}
+            placeholder="Ditt lösenord"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+          />
+          <button
+            onClick={() => setShowPass(s => !s)}
+            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}
+          >
+            {showPass ? '🙈' : '👁️'}
+          </button>
+        </div>
+
+        {err && <p style={{ color: C.danger, margin: '12px 0 0', fontSize: 14, fontWeight: 600 }}>{err}</p>}
+
+        <PrimaryBtn onClick={handleLogin} disabled={loading || !username.trim() || !password}>
+          {loading ? 'Loggar in...' : 'Logga in →'}
+        </PrimaryBtn>
+      </div>
+
+      <button
+        onClick={onRegister}
+        style={{ marginTop: 22, background: 'none', border: 'none', color: C.primary, fontSize: 16, cursor: 'pointer', fontWeight: 700 }}
+      >
+        Ny familj? Skapa konto
+      </button>
+    </div>
+  )
+}
+
+// ─── Steg 2: Välj vem du är ───────────────────────────────────────────────────
+function StepMember({ members, familyName, onSelect }) {
+  return (
+    <div style={screen}>
+      <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <div style={{ fontSize: 52, marginBottom: 10 }}>👋</div>
+        <h2 style={{ fontSize: 28, fontWeight: 900, color: C.text, margin: 0, fontFamily: 'Nunito, sans-serif' }}>Vem är du?</h2>
+        {familyName && <p style={{ color: C.muted, margin: '6px 0 0', fontSize: 16 }}>{familyName}</p>}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, width: '100%', maxWidth: 360 }}>
+        {members.map(m => (
+          <button
+            key={m.id}
+            onClick={() => onSelect(m)}
+            style={{
+              background: C.card,
+              border: `2.5px solid ${C.border}`,
+              borderRadius: 22,
+              padding: '22px 16px',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <span style={{ fontSize: 54, lineHeight: 1 }}>{m.avatar || '👤'}</span>
+            <span style={{ fontWeight: 800, fontSize: 17, color: C.text, fontFamily: 'Nunito, sans-serif' }}>{m.name}</span>
+            {(m.role === 'admin' || m.role === 'parent') && (
+              <span style={{ fontSize: 11, color: C.muted, background: '#F3F4F6', borderRadius: 8, padding: '3px 9px', fontWeight: 600 }}>Förälder</span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Steg 3: PIN ──────────────────────────────────────────────────────────────
+function StepPin({ member, onBack, onSuccess }) {
+  const [pin,     setPin]     = useState('')
+  const [err,     setErr]     = useState('')
+  const [loading, setLoading] = useState(false)
+  const numpad = ['1','2','3','4','5','6','7','8','9','','0','⌫']
+
+  async function handleDigit(digit) {
+    if (pin.length >= 4 || loading) return
+    const next = pin + digit
+    setPin(next)
+    if (next.length === 4) await verify(next)
+  }
+
+  function handleDelete() {
+    setPin(p => p.slice(0, -1))
+    setErr('')
+  }
+
+  async function verify(entered) {
+    setLoading(true); setErr('')
+    const { data, error } = await supabase
+      .rpc('verify_member_pin', { p_member_id: member.id, p_pin: entered })
+
+    if (error || !data) {
+      setErr('Fel PIN, försök igen')
+      setPin('')
+      setLoading(false); return
+    }
+    onSuccess(member)
+  }
+
+  return (
+    <div style={screen}>
+      <button
+        onClick={onBack}
+        style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: C.primary, fontSize: 16, cursor: 'pointer', fontWeight: 700, marginBottom: 12 }}
+      >
+        ← Tillbaka
+      </button>
+
+      <div style={{ textAlign: 'center', marginBottom: 28 }}>
+        <div style={{ fontSize: 68, marginBottom: 10, lineHeight: 1 }}>{member.avatar || '👤'}</div>
+        <h2 style={{ fontSize: 26, fontWeight: 900, color: C.text, margin: 0, fontFamily: 'Nunito, sans-serif' }}>Hej {member.name}!</h2>
+        <p style={{ color: C.muted, margin: '6px 0 0', fontSize: 16 }}>Ange din PIN</p>
+      </div>
+
+      {/* 4 prickar */}
+      <div style={{ display: 'flex', gap: 18, marginBottom: 28 }}>
+        {[0,1,2,3].map(i => (
+          <div key={i} style={{
+            width: 22, height: 22, borderRadius: '50%',
+            background:  pin.length > i ? C.primary : 'transparent',
+            border:      `2.5px solid ${pin.length > i ? C.primary : C.border}`,
+            transition:  'all 0.15s',
+          }} />
+        ))}
+      </div>
+
+      {err && <p style={{ color: C.danger, marginBottom: 16, fontSize: 15, fontWeight: 600 }}>{err}</p>}
+
+      {/* Numpad */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, width: '100%', maxWidth: 290 }}>
+        {numpad.map((k, i) => (
+          <button
+            key={i}
+            disabled={k === '' || loading}
+            onClick={() => k === '⌫' ? handleDelete() : handleDigit(k)}
+            style={{
+              height: 74, borderRadius: 18,
+              background:  k === '' ? 'transparent' : C.card,
+              border:      k === '' ? 'none' : `2px solid ${C.border}`,
+              fontSize:    k === '⌫' ? 26 : 30,
+              fontWeight:  700,
+              color:       C.text,
+              cursor:      k === '' ? 'default' : 'pointer',
+              visibility:  k === '' ? 'hidden' : 'visible',
+              fontFamily:  'Nunito, sans-serif',
+            }}
+          >
+            {k}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Huvud-export ─────────────────────────────────────────────────────────────
+export function Login({ onLogin, onRegister, existingSession }) {
+  const [step,       setStep]       = useState('login')
+  const [members,    setMembers]    = useState([])
+  const [familyId,   setFamilyId]   = useState(null)
+  const [familyName, setFamilyName] = useState('')
+  const [selected,   setSelected]   = useState(null)
+  const [loading,    setLoading]    = useState(false)
+
+  // Redan inloggad (session finns) → hoppa direkt till memberväljare
+  useEffect(() => {
+    if (!existingSession) return
+    setLoading(true)
+    async function load() {
+      const { data: myMember } = await supabase
+        .from('family_members')
+        .select('family_id')
+        .eq('auth_user_id', existingSession.user.id)
+        .single()
+
+      if (!myMember) { setLoading(false); return }
+
+      const [membersRes, famRes] = await Promise.all([
+        supabase.from('family_members')
+          .select('id, name, avatar, role, color, pin_hash')
+          .eq('family_id', myMember.family_id)
+          .order('created_at'),
+        supabase.from('families').select('name').eq('id', myMember.family_id).single(),
+      ])
+
+      setMembers(membersRes.data || [])
+      setFamilyId(myMember.family_id)
+      setFamilyName(famRes.data?.name || '')
+      setStep('member')
+      setLoading(false)
+    }
+    load()
+  }, [existingSession])
+
+  if (loading) return (
+    <div style={{ ...screen, gap: 16 }}>
+      <div style={{ fontSize: 48 }}>🏠</div>
+      <p style={{ color: C.muted, fontSize: 16 }}>Laddar...</p>
+    </div>
+  )
+
+  if (step === 'login') return (
+    <StepLogin
+      onSuccess={({ members, familyId, familyName }) => {
+        setMembers(members); setFamilyId(familyId); setFamilyName(familyName)
+        setStep('member')
+      }}
+      onRegister={onRegister}
+    />
+  )
+
+  if (step === 'member') return (
+    <StepMember
+      members={members}
+      familyName={familyName}
+      onSelect={m => { setSelected(m); setStep('pin') }}
+    />
+  )
+
+  return (
+    <StepPin
+      member={selected}
+      onBack={() => { setSelected(null); setStep('member') }}
+      onSuccess={member => onLogin({ ...member, family_id: familyId })}
+    />
+  )
+}
