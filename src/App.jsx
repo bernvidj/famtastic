@@ -74,7 +74,10 @@ function PasswordReset({ onDone }) {
 export function App() {
   const [session,       setSession]       = useState(null);
   const [loading,       setLoading]       = useState(true);
-  const [passwordReset, setPasswordReset] = useState(false);
+  // Kolla direkt om vi kom hit via en recovery-länk i mailet
+  const [passwordReset, setPasswordReset] = useState(
+    () => window.location.hash.includes('type=recovery')
+  );
   const [activeMember,  setActiveMember]  = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('famtastic_active') || 'null'); }
     catch { return null; }
@@ -148,9 +151,15 @@ export function App() {
     // session lever kvar → Login visar direkt memberväljaren
   }
 
-  // --- Password recovery via mail-länk ---
+  // --- Password recovery via mail-länk (visas alltid först om vi kom via reset-länk) ---
   if (passwordReset) {
-    return <PasswordReset onDone={() => { setPasswordReset(false); supabase.auth.signOut(); }} />;
+    return (
+      <PasswordReset onDone={() => {
+        setPasswordReset(false);
+        window.location.hash = '';
+        supabase.auth.signOut();
+      }} />
+    );
   }
 
   // --- Loading ---
