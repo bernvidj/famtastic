@@ -1,5 +1,5 @@
 // ============================================
-// FamTastic — App (router + auth + child mode)
+// FamTastic — App (router + auth + member mode)
 // ============================================
 
 import React, { useState, useEffect } from 'react';
@@ -19,109 +19,75 @@ import { C } from './data';
 import { Home as HomeIcon } from 'lucide-react';
 
 export function App() {
-  const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [familyId, setFamilyId] = useState(null);
-  const [memberData, setMemberData] = useState(null);
+  const [session,      setSession]      = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [activeMember, setActiveMember] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('famtastic_active') || 'null'); }
+    catch { return null; }
+  });
+  const [familyId,   setFamilyId]   = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('famtastic_active') || '{}').family_id || null; }
+    catch { return null; }
+  });
   const [allMembers, setAllMembers] = useState([]);
-  const [page, setPage] = useState('home');
-  const [childSession, setChildSession] = useState(null);
+  const [page,       setPage]       = useState('home');
+  const [showSetup,  setShowSetup]  = useState(false);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem('famtastic_child');
-    if (saved) {
-      try {
-        const data = JSON.parse(saved);
-        setChildSession(data);
-        setFamilyId(data.family_id);
-        setMemberData(data);
-        setLoading(false);
-        return;
-      } catch (e) {
-        sessionStorage.removeItem('famtastic_child');
-      }
-    }
-
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
-      if (s) {
-        loadFamily(s.user.id);
-      } else {
-        setLoading(false);
+      if (s && activeMember?.family_id) {
+        loadAllMembers(activeMember.family_id);
       }
+      setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, s) => {
-        setSession(s);
-        if (s && !childSession) {
-          loadFamily(s.user.id);
-        } else if (!s && !childSession) {
-          setFamilyId(null);
-          setMemberData(null);
-          setAllMembers([]);
-          setLoading(false);
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      if (!s) {
+        sessionStorage.removeItem('famtastic_active');
+        setActiveMember(null);
+        setFamilyId(null);
+        setAllMembers([]);
       }
-    );
+    });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  async function loadFamily(userId) {
-    setLoading(true);
-
-    // Try to auto-link if this is a new parent login
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user?.email) {
-      await supabase.rpc('link_auth_to_member', { p_email: user.email });
-    }
-
-    const { data: me } = await supabase
+  async function loadAllMembers(fid) {
+    const { data } = await supabase
       .from('family_members')
-      .select('id, family_id, name, role, avatar, color')
-      .eq('auth_user_id', userId)
-      .limit(1)
-      .maybeSingle();
-
-    if (me) {
-      setFamilyId(me.family_id);
-      setMemberData(me);
-      const { data: members } = await supabase
-        .from('family_members')
-        .select('id, name, role, avatar, color')
-        .eq('family_id', me.family_id)
-        .order('created_at');
-      setAllMembers(members || []);
-    } else {
-      setFamilyId(null);
-      setMemberData(null);
-      setAllMembers([]);
-    }
-    setLoading(false);
+      .select('id, name, role, avatar, color')
+      .eq('family_id', fid)
+      .order('created_at');
+    setAllMembers(data || []);
   }
 
-  function handleChildLogin(childData) {
-    sessionStorage.setItem('famtastic_child', JSON.stringify(childData));
-    setChildSession(childData);
-    setFamilyId(childData.family_id);
-    setMemberData(childData);
-    setLoading(false);
+  function handleLogin(member) {
+    sessionStorage.setItem('famtastic_active', JSON.stringify(member));
+    setActiveMember(member);
+    setFamilyId(member.family_id);
+    loadAllMembers(member.family_id);
   }
 
   function handleLogout() {
-    if (childSession) {
-      sessionStorage.removeItem('famtastic_child');
-      setChildSession(null);
-      setFamilyId(null);
-      setMemberData(null);
-      setAllMembers([]);
-      setPage('home');
-    } else {
-      supabase.auth.signOut();
-    }
+    sessionStorage.removeItem('famtastic_active');
+    setActiveMember(null);
+    setFamilyId(null);
+    setAllMembers([]);
+    setPage('home');
+    supabase.auth.signOut();
   }
 
+  function handleSwitchMember() {
+    sessionStorage.removeItem('famtastic_active');
+    setActiveMember(null);
+    setPage('home');
+    // session lever kvar → Login visar direkt memberväljaren
+  }
+
+  // --- Loading ---
   if (loading) {
     return (
       <div style={styles.loading}>
@@ -130,53 +96,72 @@ export function App() {
     );
   }
 
-  if (!session && !childSession) {
-    return <Login onChildLogin={handleChildLogin} />;
-  }
-
-  if (session && !childSession && !familyId) {
+  // --- Registrering ---
+  if (showSetup) {
     return (
       <FamilySetup
-        userId={session.user.id}
-        onComplete={() => loadFamily(session.user.id)}
+        onComplete={() => setShowSetup(false)}
       />
     );
   }
 
-  if (!familyId) {
+  // --- Ingen session → visa login (steg 1: familjenamn + lösenord) ---
+  if (!session) {
     return (
-      <div style={styles.loading}>
-        <HomeIcon size={32} color={C.primary} />
-      </div>
+      <Login
+        onLogin={handleLogin}
+        onRegister={() => setShowSetup(true)}
+      />
     );
   }
 
-  // --- Child mode ---
-  if (childSession) {
-    return <ChildApp familyId={familyId} member={memberData} onLogout={handleLogout} />;
+  // --- Session finns men ingen aktiv medlem → visa memberväljare (steg 2+3) ---
+  if (!activeMember) {
+    return (
+      <Login
+        onLogin={handleLogin}
+        onRegister={() => setShowSetup(true)}
+        existingSession={session}
+      />
+    );
   }
 
-  // --- Parent mode ---
+  // --- Barnvy ---
+  const isParent = activeMember.role === 'admin' || activeMember.role === 'parent';
+  if (!isParent) {
+    return (
+      <ChildApp
+        familyId={familyId}
+        member={activeMember}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // --- Föräldravy ---
   function renderPage() {
     switch (page) {
       case 'home':
-        return <Home familyId={familyId} member={memberData} members={allMembers} />;
+        return <Home familyId={familyId} member={activeMember} members={allMembers} />;
       case 'schedule':
-        return <ScheduleView familyId={familyId} member={memberData} members={allMembers} />;
+        return <ScheduleView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'chores':
-        return <ChoresView familyId={familyId} member={memberData} members={allMembers} />;
+        return <ChoresView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'money':
-        return <MoneyView familyId={familyId} member={memberData} members={allMembers} />;
+        return <MoneyView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'meals':
-        return <MealPlan familyId={familyId} member={memberData} members={allMembers} onGenerateShopping={() => setPage('shopping')} />;
+        return <MealPlan familyId={familyId} member={activeMember} members={allMembers} onGenerateShopping={() => setPage('shopping')} />;
       case 'shopping':
-        return <ShoppingView familyId={familyId} member={memberData} members={allMembers} />;
+        return <ShoppingView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'settings':
         return (
           <SettingsView
-            familyId={familyId} member={memberData} members={allMembers}
-            onUpdate={() => loadFamily(session.user.id)}
+            familyId={familyId}
+            member={activeMember}
+            members={allMembers}
+            onUpdate={() => loadAllMembers(familyId)}
             onLogout={handleLogout}
+            onSwitchMember={handleSwitchMember}
           />
         );
       default:
