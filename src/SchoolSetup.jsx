@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { C, F, S, safeArray } from './data';
+import { SchoolSlotModal } from './SchoolSlotModal';
 import { X, ChevronRight, ChevronLeft, Check, Plus, Trash2 } from 'lucide-react';
 
 const DAYS = [
@@ -16,14 +17,6 @@ const DAYS = [
   { value: 4, label: 'Tor' },
   { value: 5, label: 'Fre' },
 ];
-
-// 5-minute intervals 07:00–16:55
-const TIMES = [];
-for (let h = 7; h <= 16; h++) {
-  for (let m = 0; m < 60; m += 5) {
-    TIMES.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
-  }
-}
 
 const RULE_SUGGESTIONS = {
   'Idrott':     { title: 'Packa idrottskläder', icon: '👟', days_before: 1, time_of_day: 'evening' },
@@ -65,7 +58,7 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
       const usedSubjects = [...new Set(schedData.map(s => s.subject_id))];
       setSelectedSubjects(usedSubjects);
     } else {
-      setShowSubjects(true); // First time — show subject picker open
+      setShowSubjects(true);
     }
 
     const { data: rulesData } = await supabase.from('school_rules')
@@ -283,58 +276,14 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
         </div>
 
         {/* Slot editor modal */}
-        {editingSlot && (
-          <div style={styles.overlay}>
-            <div style={styles.modal}>
-              <h3 style={styles.modalTitle}>{DAYS.find(d => d.value === editingSlot.day)?.label} — Lektion</h3>
-
-              <label style={styles.fieldLabel}>Ämne</label>
-              <div style={styles.subjectPicker}>
-                {allSubjects.map(s => (
-                  <button key={s.id} onClick={() => setSlotForm(prev => ({ ...prev, subject_id: s.id }))} style={{
-                    ...styles.subjectOption,
-                    background: slotForm.subject_id === s.id ? (s.color || C.primary) + '20' : C.bgCard,
-                    borderColor: slotForm.subject_id === s.id ? (s.color || C.primary) : C.borderLight,
-                  }}>
-                    {s.icon} {s.short_name}
-                  </button>
-                ))}
-              </div>
-
-              <div style={styles.timeRow}>
-                <div style={{ flex: 1 }}>
-                  <label style={styles.fieldLabel}>Start</label>
-                  <select value={slotForm.start_time} onChange={e => {
-                    const newStart = e.target.value;
-                    setSlotForm(prev => {
-                      const [sh, sm] = newStart.split(':').map(Number);
-                      const endH = sh + 1;
-                      const autoEnd = endH <= 16 ? `${String(endH).padStart(2,'0')}:${String(sm).padStart(2,'0')}` : '16:55';
-                      const newEnd = prev.end_time > newStart ? prev.end_time : autoEnd;
-                      return { ...prev, start_time: newStart, end_time: newEnd };
-                    });
-                  }} style={styles.timeSelect}>
-                    {TIMES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={styles.fieldLabel}>Slut</label>
-                  <select value={slotForm.end_time} onChange={e => setSlotForm(prev => ({ ...prev, end_time: e.target.value }))} style={styles.timeSelect}>
-                    {TIMES.filter(t => t > slotForm.start_time).map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div style={styles.modalFooter}>
-                <button onClick={() => setEditingSlot(null)} style={styles.cancelBtn}>Avbryt</button>
-                <button onClick={saveSlot} disabled={!slotForm.subject_id || slotForm.end_time <= slotForm.start_time}
-                  style={{ ...styles.saveBtn, opacity: slotForm.subject_id && slotForm.end_time > slotForm.start_time ? 1 : 0.5 }}>
-                  <Check size={16} /> Spara
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <SchoolSlotModal
+          editingSlot={editingSlot}
+          slotForm={slotForm}
+          setSlotForm={setSlotForm}
+          allSubjects={allSubjects}
+          onSave={saveSlot}
+          onCancel={() => setEditingSlot(null)}
+        />
 
         <div style={styles.footer}>
           <div style={{ flex: 1 }} />
@@ -442,7 +391,6 @@ const styles = {
   subtitle: { fontSize: F.sizes.sm, color: C.textMuted, fontFamily: F.heading, margin: '0 0 16px' },
   hint: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading, margin: '-4px 0 8px' },
   footer: { position: 'fixed', bottom: 60, left: 0, right: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderTop: `1px solid ${C.borderLight}`, background: C.bgCard, zIndex: 50 },
-  // Subject toggle
   subjectToggle: { display: 'flex', alignItems: 'center', width: '100%', padding: '12px 16px', borderRadius: 14, border: `1.5px solid ${C.borderLight}`, background: C.bgCard, cursor: 'pointer', textAlign: 'left', marginBottom: 8 },
   subjectToggleText: { flex: 1, fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
   subjectSection: { padding: '8px 0 12px', borderBottom: `1px solid ${C.borderLight}`, marginBottom: 8 },
@@ -454,7 +402,6 @@ const styles = {
   addCustomRow: { display: 'flex', gap: 8, marginTop: 8 },
   addCustomInput: { flex: 1, padding: '10px 14px', borderRadius: 12, border: `1.5px solid ${C.border}`, fontSize: F.sizes.sm, fontFamily: F.heading, color: C.text, background: C.bgCard },
   addCustomBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '10px 14px', borderRadius: 12, border: 'none', background: C.secondary, color: '#fff', fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', minHeight: 44 },
-  // Day sections
   daySection: { marginBottom: 14 },
   dayHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   dayLabel: { fontSize: F.sizes.md, fontWeight: F.weights.extra, fontFamily: F.heading, color: C.text },
@@ -465,19 +412,6 @@ const styles = {
   slotInfo: { flex: 1 },
   slotName: { display: 'block', fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
   slotTime: { display: 'block', fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading },
-  // Modal
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 16 },
-  modal: { width: '100%', maxWidth: 400, background: C.bgCard, borderRadius: 20, padding: 20, maxHeight: '80vh', overflowY: 'auto' },
-  modalTitle: { fontFamily: F.heading, fontSize: F.sizes.lg, fontWeight: F.weights.bold, color: C.text, margin: '0 0 16px' },
-  fieldLabel: { display: 'block', fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.textMuted, marginBottom: 6, marginTop: 12 },
-  subjectPicker: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  subjectOption: { padding: '8px 12px', borderRadius: 10, border: '1.5px solid', fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', minHeight: 40 },
-  timeRow: { display: 'flex', gap: 12, marginTop: 4 },
-  timeSelect: { width: '100%', padding: '10px 12px', borderRadius: 12, border: `1.5px solid ${C.border}`, fontSize: F.sizes.sm, fontFamily: F.heading, color: C.text, background: C.bgCard },
-  modalFooter: { display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' },
-  cancelBtn: { padding: '10px 18px', borderRadius: 12, border: `1.5px solid ${C.border}`, background: C.bgCard, color: C.text, fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', minHeight: 44 },
-  saveBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '10px 18px', borderRadius: 12, border: 'none', background: C.primary, color: '#fff', fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', minHeight: 44 },
-  // Rules
   ruleCard: { display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 14px', borderRadius: 14, border: '1.5px solid', cursor: 'pointer', marginBottom: 8, textAlign: 'left' },
   ruleIcon: { fontSize: 24 },
   ruleInfo: { flex: 1 },
