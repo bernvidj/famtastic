@@ -6,9 +6,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { C, F, S, getWeekNumber, todayStr, safeArray, formatKr } from './data';
 import { ParentActionItems } from './ParentActionItems';
-import { ChevronLeft, ChevronRight, Flame, TrendingUp, GraduationCap } from 'lucide-react';
-
-const WEEKDAYS_SHORT = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
+import { HomeSchoolSection } from './HomeSchoolSection';
+import { HomeWeekChart } from './HomeWeekChart';
+import { HomeMoneyOverview } from './HomeMoneyOverview';
+import { ChevronLeft, ChevronRight, Flame } from 'lucide-react';
 
 function getWeekDates(offset) {
   const now = new Date();
@@ -73,7 +74,6 @@ export function Home({ familyId, member, members }) {
         .gte('event_date', startDate).lte('event_date', endDate).order('event_date'),
       supabase.from('savings_goals').select('*').eq('family_id', familyId)
         .eq('is_family_goal', true).is('achieved_at', null),
-      // School data
       childIds.length > 0
         ? supabase.from('school_schedule').select('*').in('member_id', childIds)
         : Promise.resolve({ data: [] }),
@@ -82,7 +82,6 @@ export function Home({ familyId, member, members }) {
       childIds.length > 0
         ? supabase.from('school_special_events').select('*').in('member_id', childIds)
         : Promise.resolve({ data: [] }),
-      // Exams
       childIds.length > 0
         ? supabase.from('school_exams').select('*').eq('family_id', familyId).gte('exam_date', today).order('exam_date')
         : Promise.resolve({ data: [] }),
@@ -144,30 +143,6 @@ export function Home({ familyId, member, members }) {
     })).filter(p => p.claimer);
   }
 
-  function dayCompletions(dateStr) {
-    return completions.filter(c => c.completed_date === dateStr).length;
-  }
-
-  function dayExpected(dateStr) {
-    const dow = new Date(dateStr + 'T12:00:00').getDay() || 7;
-    let count = 0;
-    for (const c of chores) {
-      if (c.pool) continue;
-      if (c.scheduled_date) {
-        if (c.scheduled_date !== dateStr) continue;
-        count += c.assigned_to ? 1 : children.length;
-        continue;
-      }
-      if (c.is_recurring && c.recurrence_rule) {
-        if (c.recurrence_rule.until && dateStr > c.recurrence_rule.until) continue;
-        const days = safeArray(c.recurrence_rule.days);
-        if (days.length > 0 && !days.includes(dow)) continue;
-      }
-      count += c.assigned_to ? 1 : children.length;
-    }
-    return count;
-  }
-
   function weekBonusTotal() {
     return allWeekTx.filter(tx => tx.type === 'chore_bonus').reduce((s, tx) => s + tx.amount, 0);
   }
@@ -176,75 +151,12 @@ export function Home({ familyId, member, members }) {
     return allWeekTx.filter(tx => tx.member_id === childId && tx.type === 'chore_bonus').reduce((s, tx) => s + tx.amount, 0);
   }
 
-  function childMonthSummary(childId) {
-    const txs = monthTx.filter(tx => tx.member_id === childId);
-    return {
-      allowance: txs.filter(tx => tx.type === 'base_allowance').reduce((s, tx) => s + tx.amount, 0),
-      bonus: txs.filter(tx => tx.type === 'chore_bonus').reduce((s, tx) => s + tx.amount, 0),
-      savings: txs.filter(tx => tx.type === 'saving').reduce((s, tx) => s + Math.abs(tx.amount), 0),
-      withdrawals: txs.filter(tx => tx.type === 'withdrawal').reduce((s, tx) => s + Math.abs(tx.amount), 0),
-      familyGoal: txs.filter(tx => tx.type === 'family_goal').reduce((s, tx) => s + Math.abs(tx.amount), 0),
-    };
-  }
-
   function todayMeal() {
     const mp = mealPlan.find(m => m.plan_date === today);
     return mp ? (mp.meals?.title || mp.free_text || null) : null;
   }
 
   function todayEvents() { return events.filter(e => e.event_date === today); }
-
-  // --- School helpers ---
-  const subjectMap = {};
-  schoolSubjects.forEach(s => { subjectMap[s.id] = s; });
-
-  function childTodayLessons(childId) {
-    if (todayDow > 5) return { lessons: [], special: null };
-    const daySpecials = schoolSpecialEvents.filter(
-      se => se.member_id === childId && se.event_date === today
-    );
-    const fullDay = daySpecials.find(se => se.period === 'full_day');
-    if (fullDay) return { lessons: [], special: fullDay };
-
-    const lessons = schoolSchedule
-      .filter(sl => sl.member_id === childId && sl.day_of_week === todayDow)
-      .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
-      .map(sl => {
-        const startHour = parseInt((sl.start_time || '08:00').split(':')[0], 10);
-        const morningSpec = daySpecials.find(se => se.period === 'morning');
-        const afternoonSpec = daySpecials.find(se => se.period === 'afternoon');
-        if (morningSpec && startHour < 12) return null; // replaced by special
-        if (afternoonSpec && startHour >= 12) return null;
-        const subj = subjectMap[sl.subject_id];
-        return {
-          title: subj?.title || 'Lektion',
-          icon: subj?.icon || '📚',
-          color: subj?.color || C.secondary,
-          time: sl.start_time ? sl.start_time.slice(0, 5) : '',
-          endTime: sl.end_time ? sl.end_time.slice(0, 5) : '',
-        };
-      })
-      .filter(Boolean);
-    const morningSpec = daySpecials.find(se => se.period === 'morning');
-    const afternoonSpec = daySpecials.find(se => se.period === 'afternoon');
-    return { lessons, morningSpecial: morningSpec, afternoonSpecial: afternoonSpec };
-  }
-
-  function childUpcomingExams(childId) {
-    return schoolExams.filter(e => e.member_id === childId).slice(0, 3);
-  }
-
-  function daysUntilExam(dateStr) {
-    const t = new Date(); t.setHours(0, 0, 0, 0);
-    const target = new Date(dateStr + 'T12:00:00'); target.setHours(0, 0, 0, 0);
-    return Math.round((target - t) / 86400000);
-  }
-
-  // Check if any child has school today
-  const childrenWithSchool = children.filter(child => {
-    const { lessons, special, morningSpecial, afternoonSpecial } = childTodayLessons(child.id);
-    return lessons.length > 0 || special || morningSpecial || afternoonSpecial || childUpcomingExams(child.id).length > 0;
-  });
 
   const totalTodayChores = children.reduce((s, c) => s + todayChoresForChild(c.id).length, 0);
   const totalTodayDone = children.reduce((s, c) => s + todayChoresForChild(c.id).filter(ch => isCompletedToday(ch.id, c.id)).length, 0);
@@ -321,74 +233,15 @@ export function Home({ familyId, member, members }) {
           </div>
 
           {/* 3b. School today */}
-          {childrenWithSchool.length > 0 && (
-            <div style={styles.section}>
-              <p style={S.sectionLabel}><GraduationCap size={12} color={C.textMuted} /> Skola idag</p>
-              {childrenWithSchool.map(child => {
-                const { lessons, special, morningSpecial, afternoonSpecial } = childTodayLessons(child.id);
-                return (
-                  <div key={child.id} style={styles.schoolCard}>
-                    <div style={styles.schoolHeader}>
-                      <div style={{ ...styles.schoolAvatar, background: child.color || C.primary }}>
-                        <span style={{ fontSize: 16 }}>{child.avatar}</span>
-                      </div>
-                      <span style={styles.schoolName}>{child.name}</span>
-                    </div>
-                    {special && (
-                      <div style={styles.schoolSpecialBanner}>
-                        <span style={{ fontSize: 14 }}>{special.icon || '🎉'}</span>
-                        <span style={styles.schoolSpecialText}>{special.title}</span>
-                      </div>
-                    )}
-                    {morningSpecial && (
-                      <div style={styles.schoolSpecialBanner}>
-                        <span style={{ fontSize: 14 }}>{morningSpecial.icon || '🎉'}</span>
-                        <span style={styles.schoolSpecialText}>{morningSpecial.title} (fm)</span>
-                      </div>
-                    )}
-                    {afternoonSpecial && (
-                      <div style={styles.schoolSpecialBanner}>
-                        <span style={{ fontSize: 14 }}>{afternoonSpecial.icon || '🎉'}</span>
-                        <span style={styles.schoolSpecialText}>{afternoonSpecial.title} (em)</span>
-                      </div>
-                    )}
-                    {lessons.length > 0 && (
-                      <div style={styles.schoolLessons}>
-                        {lessons.map((l, li) => (
-                          <div key={li} style={{ ...styles.schoolLesson, borderLeftColor: l.color }}>
-                            <span style={{ fontSize: 13 }}>{l.icon}</span>
-                            <span style={styles.schoolLessonTime}>{l.time}{l.endTime ? `–${l.endTime}` : ''}</span>
-                            <span style={styles.schoolLessonTitle}>{l.title}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {childUpcomingExams(child.id).length > 0 && (
-                      <div style={{ marginTop: lessons.length > 0 ? 6 : 0 }}>
-                        {childUpcomingExams(child.id).map(exam => {
-                          const days = daysUntilExam(exam.exam_date);
-                          const urgent = days <= 2;
-                          return (
-                            <div key={exam.id} style={{
-                              ...styles.schoolExamRow,
-                              background: urgent ? C.primaryLight : 'rgba(0,0,0,0.02)',
-                              borderColor: urgent ? C.primary : C.borderLight,
-                            }}>
-                              <span style={{ fontSize: 13 }}>{exam.icon || '📝'}</span>
-                              <span style={styles.schoolExamTitle}>{exam.title}</span>
-                              <span style={{ ...styles.schoolExamDays, color: urgent ? C.primary : C.textMuted }}>
-                                {days === 0 ? 'Idag!' : days === 1 ? 'Imorgon' : `${days}d`}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <HomeSchoolSection
+            children={children}
+            schoolSchedule={schoolSchedule}
+            schoolSubjects={schoolSubjects}
+            schoolSpecialEvents={schoolSpecialEvents}
+            schoolExams={schoolExams}
+            today={today}
+            todayDow={todayDow}
+          />
 
           {/* 4. Pool claims */}
           {claims.length > 0 && (
@@ -403,30 +256,14 @@ export function Home({ familyId, member, members }) {
           )}
 
           {/* 5. Weekly chart */}
-          <div style={styles.section}>
-            <p style={S.sectionLabel}>Veckans sysslor</p>
-            <div style={styles.chartWrap}>
-              {weekDates.map((d, i) => {
-                const ds = fmtDate(d);
-                const done = dayCompletions(ds);
-                const expected = dayExpected(ds);
-                const pct = expected > 0 ? (done / expected) * 100 : 0;
-                const isToday2 = ds === today;
-                const isFuture = ds > today;
-                const barColor = isFuture ? C.borderLight : pct >= 100 ? C.success : pct > 0 ? C.primary : C.borderLight;
-                return (
-                  <div key={i} style={styles.chartCol}>
-                    <div style={styles.chartBarBg}>
-                      <div style={{ ...styles.chartBar, height: `${Math.max(4, pct)}%`, background: barColor }} />
-                    </div>
-                    <span style={{ ...styles.chartLabel, color: isToday2 ? C.primary : C.textMuted, fontWeight: isToday2 ? F.weights.bold : F.weights.normal }}>
-                      {WEEKDAYS_SHORT[i]}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <HomeWeekChart
+            weekDates={weekDates}
+            chores={chores}
+            completions={completions}
+            children={children}
+            today={today}
+            fmtDate={fmtDate}
+          />
 
           {/* 6. Family goal */}
           {savingsGoals.length > 0 && (
@@ -455,65 +292,7 @@ export function Home({ familyId, member, members }) {
           )}
 
           {/* 7. Money overview (30 days) */}
-          {children.some(c => {
-            const s = childMonthSummary(c.id);
-            return s.allowance > 0 || s.bonus > 0 || s.savings > 0 || s.withdrawals > 0 || s.familyGoal > 0;
-          }) && (
-            <div style={styles.section}>
-              <p style={S.sectionLabel}><TrendingUp size={12} color={C.textMuted} /> Pengaöversikt — 30 dagar</p>
-              {children.map(child => {
-                const s = childMonthSummary(child.id);
-                if (s.allowance === 0 && s.bonus === 0 && s.savings === 0 && s.withdrawals === 0 && s.familyGoal === 0) return null;
-                return (
-                  <div key={child.id} style={styles.overviewCard}>
-                    <div style={styles.overviewHeader}>
-                      <div style={{ ...styles.overviewAvatar, background: child.color || C.primary }}>
-                        <span style={{ fontSize: 18 }}>{child.avatar}</span>
-                      </div>
-                      <span style={styles.overviewName}>{child.name}</span>
-                    </div>
-                    <div style={styles.overviewGrid}>
-                      {s.allowance > 0 && (
-                        <div style={styles.overviewItem}>
-                          <span style={styles.overviewEmoji}>💰</span>
-                          <span style={styles.overviewItemLabel}>Veckopeng</span>
-                          <span style={{ ...styles.overviewItemVal, color: C.success }}>+{formatKr(s.allowance)}</span>
-                        </div>
-                      )}
-                      {s.bonus > 0 && (
-                        <div style={styles.overviewItem}>
-                          <span style={styles.overviewEmoji}>⭐</span>
-                          <span style={styles.overviewItemLabel}>Bonus</span>
-                          <span style={{ ...styles.overviewItemVal, color: C.success }}>+{formatKr(s.bonus)}</span>
-                        </div>
-                      )}
-                      {s.savings > 0 && (
-                        <div style={styles.overviewItem}>
-                          <span style={styles.overviewEmoji}>🐷</span>
-                          <span style={styles.overviewItemLabel}>Sparat</span>
-                          <span style={{ ...styles.overviewItemVal, color: C.secondary }}>{formatKr(s.savings)}</span>
-                        </div>
-                      )}
-                      {s.withdrawals > 0 && (
-                        <div style={styles.overviewItem}>
-                          <span style={styles.overviewEmoji}>💸</span>
-                          <span style={styles.overviewItemLabel}>Utbetalt</span>
-                          <span style={{ ...styles.overviewItemVal, color: C.primary }}>{formatKr(s.withdrawals)}</span>
-                        </div>
-                      )}
-                      {s.familyGoal > 0 && (
-                        <div style={styles.overviewItem}>
-                          <span style={styles.overviewEmoji}>🎯</span>
-                          <span style={styles.overviewItemLabel}>Familjemål</span>
-                          <span style={{ ...styles.overviewItemVal, color: C.accent }}>{formatKr(s.familyGoal)}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <HomeMoneyOverview children={children} monthTx={monthTx} />
 
           {/* 8. Meal + events */}
           <div style={styles.section}>
@@ -563,27 +342,7 @@ const styles = {
   streakInline: { display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.primaryDark },
   childBarBg: { height: 6, background: C.borderLight, borderRadius: 99, overflow: 'hidden' },
   childBarFill: { height: '100%', borderRadius: 99, transition: 'width 0.4s ease' },
-  // School section
-  schoolCard: { padding: 12, background: C.bgCard, borderRadius: 14, border: `1.5px solid ${C.borderLight}`, marginBottom: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
-  schoolHeader: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 },
-  schoolAvatar: { width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  schoolName: { fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
-  schoolSpecialBanner: { display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: C.accentLight, borderRadius: 10, border: `1px solid ${C.accent}`, marginBottom: 4 },
-  schoolSpecialText: { fontSize: F.sizes.sm, fontWeight: F.weights.semi, fontFamily: F.heading, color: '#92400E' },
-  schoolLessons: { display: 'flex', flexDirection: 'column', gap: 2 },
-  schoolLesson: { display: 'flex', alignItems: 'center', gap: 6, padding: '3px 8px', borderLeft: '3px solid', borderRadius: '0 8px 8px 0', background: 'rgba(0,0,0,0.02)' },
-  schoolLessonTime: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading, fontWeight: F.weights.semi, minWidth: 68, flexShrink: 0 },
-  schoolLessonTitle: { fontSize: F.sizes.sm, color: C.text, fontFamily: F.heading, fontWeight: F.weights.semi },
-  schoolExamRow: { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 10, border: '1px solid', marginBottom: 3 },
-  schoolExamTitle: { flex: 1, fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
-  schoolExamDays: { fontSize: F.sizes.xs, fontWeight: F.weights.extra, fontFamily: F.heading, flexShrink: 0 },
-  // Existing
   poolAlert: { padding: '10px 14px', background: C.accentLight, borderRadius: 14, border: `1.5px solid ${C.accent}`, fontSize: F.sizes.sm, fontFamily: F.heading, color: '#92400E', lineHeight: 1.5 },
-  chartWrap: { display: 'flex', gap: 4, padding: '8px 4px', background: C.bgCard, borderRadius: 16, border: `1.5px solid ${C.borderLight}`, height: 110, alignItems: 'flex-end' },
-  chartCol: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, height: '100%', justifyContent: 'flex-end' },
-  chartBarBg: { width: '100%', flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
-  chartBar: { width: '70%', borderRadius: '6px 6px 0 0', minHeight: 4, transition: 'height 0.3s ease' },
-  chartLabel: { fontSize: 10, fontFamily: F.heading, flexShrink: 0 },
   goalCard: { padding: 14, background: `linear-gradient(135deg, ${C.primaryLight}, ${C.accentLight})`, borderRadius: 16, border: `1.5px solid ${C.primary}`, marginBottom: 8 },
   goalTop: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 },
   goalTitle: { display: 'block', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.primaryDark },
@@ -591,15 +350,6 @@ const styles = {
   goalPct: { fontSize: F.sizes.lg, fontWeight: F.weights.extra, fontFamily: F.heading, color: C.primaryDark, flexShrink: 0 },
   goalBarBg: { height: 8, background: 'rgba(255,255,255,0.6)', borderRadius: 99, overflow: 'hidden' },
   goalBarFill: { height: '100%', borderRadius: 99, transition: 'width 0.4s ease' },
-  overviewCard: { padding: 14, background: C.bgCard, borderRadius: 16, border: `1.5px solid ${C.borderLight}`, marginBottom: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
-  overviewHeader: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 },
-  overviewAvatar: { width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  overviewName: { fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
-  overviewGrid: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  overviewItem: { display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', background: C.bg, borderRadius: 10 },
-  overviewEmoji: { fontSize: 14, flexShrink: 0 },
-  overviewItemLabel: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading },
-  overviewItemVal: { fontSize: F.sizes.sm, fontWeight: F.weights.extra, fontFamily: F.heading, marginLeft: 2 },
   infoRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: C.bgCard, borderRadius: 14, border: `1.5px solid ${C.borderLight}`, marginBottom: 6 },
   infoText: { flex: 1, fontSize: F.sizes.sm, fontWeight: F.weights.semi, fontFamily: F.heading, color: C.text },
 };
