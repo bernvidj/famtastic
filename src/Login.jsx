@@ -2,30 +2,124 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 
 const C = {
-  primary:   '#F97316',
-  secondary: '#14B8A6',
-  bg:        '#FFFBF5',
-  card:      '#FFFFFF',
-  text:      '#1F2937',
-  muted:     '#6B7280',
-  border:    '#E5E7EB',
-  danger:    '#EF4444',
+  primary:        '#FF7A59',
+  primaryLight:   '#FFE8C2',
+  secondary:      '#3CB4A6',
+  secondaryLight: '#E1F5F3',
+  mint:           '#A8E6DF',
+  peach:          '#FFA071',
+  bg:             '#FFFBF5',
+  card:           '#FFFFFF',
+  text:           '#1C1917',
+  muted:          '#78716C',
+  border:         '#E5E7EB',
+  danger:         '#EF4444',
 }
 
-const label  = { display: 'block', fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 6 }
-const input  = { width: '100%', padding: '14px 16px', borderRadius: 12, border: `2px solid ${C.border}`, fontSize: 16, boxSizing: 'border-box', outline: 'none', fontFamily: 'Nunito, sans-serif', background: '#fff' }
-const screen = { minHeight: '100dvh', background: C.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24 }
+// ─── Bakgrundsformer ──────────────────────────────────────────────────────────
+function BgShapes() {
+  return (
+    <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.18, pointerEvents: 'none' }}
+      viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <path d="M -40 -30 Q 100 -60, 180 80 Q 230 180, 120 240 Q 20 290, -30 180 Q -80 80, -40 -30 Z" fill="#3CB4A6" />
+      <path d="M 200 -40 Q 360 -20, 420 130 Q 460 240, 340 290 Q 230 330, 185 220 Q 140 120, 200 -40 Z" fill="#A8E6DF" />
+      <path d="M 240 580 Q 420 530, 450 670 Q 465 760, 320 780 Q 180 795, 155 690 Q 135 600, 240 580 Z" fill="#FF7A59" />
+      <path d="M -60 640 Q 40 580, 130 650 Q 195 710, 145 790 Q 80 840, -20 800 Q -100 765, -60 640 Z" fill="#FFA071" />
+    </svg>
+  )
+}
+
+// ─── App-ikon (inline SVG) ────────────────────────────────────────────────────
+function AppIcon({ size = 88 }) {
+  return (
+    <svg viewBox="0 0 512 512" width={size} height={size} xmlns="http://www.w3.org/2000/svg"
+      style={{ borderRadius: size * 0.225, flexShrink: 0 }}>
+      <rect width="512" height="512" rx="115" fill="#FFE8C2" />
+      <path d="M 200 40 Q 360 0, 410 140 Q 450 260, 320 305 Q 185 345, 130 225 Q 80 115, 200 40 Z" fill="#3CB4A6" />
+      <path d="M 310 80 Q 460 60, 500 200 Q 520 310, 420 360 Q 330 395, 290 300 Q 255 210, 310 80 Z" fill="#A8E6DF" />
+      <path d="M 40 195 Q 115 80, 255 135 Q 355 175, 325 305 Q 295 420, 155 440 Q 25 450, 10 320 Q -5 215, 40 195 Z" fill="#FFA071" />
+      <path d="M 215 250 Q 375 195, 468 318 Q 535 420, 420 478 Q 300 535, 190 468 Q 90 405, 120 318 Q 148 250, 215 250 Z" fill="#FF7A59" />
+      <circle cx="308" cy="375" r="28" fill="rgba(255,255,255,0.9)" />
+    </svg>
+  )
+}
+
+// ─── Gemensamma styles ────────────────────────────────────────────────────────
+const screen = {
+  minHeight: '100dvh',
+  background: C.bg,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'flex-start',
+  overflowY: 'auto',
+  padding: '48px 24px 40px',
+  position: 'relative',
+}
+
+const inputStyle = {
+  width: '100%',
+  padding: '13px 16px',
+  borderRadius: 12,
+  border: `2px solid ${C.border}`,
+  fontSize: 16,
+  boxSizing: 'border-box',
+  outline: 'none',
+  fontFamily: 'Nunito, sans-serif',
+  background: '#F9FAFB',
+  color: C.text,
+}
+
+const labelStyle = {
+  display: 'block',
+  fontSize: 13,
+  fontWeight: 700,
+  color: '#374151',
+  marginBottom: 6,
+}
 
 function PrimaryBtn({ onClick, disabled, children }) {
   return (
     <button onClick={onClick} disabled={disabled} style={{
-      width: '100%', padding: 16, marginTop: 24, borderRadius: 14,
+      width: '100%', padding: 15, marginTop: 16, borderRadius: 14,
       background: disabled ? '#D1D5DB' : C.primary,
-      color: '#fff', border: 'none', fontSize: 17, fontWeight: 700,
+      color: '#fff', border: 'none', fontSize: 16, fontWeight: 800,
       cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
     }}>
       {children}
     </button>
+  )
+}
+
+// ─── Feature-kort ─────────────────────────────────────────────────────────────
+const FEATURES = [
+  { emoji: '✅', bg: '#E1F5F3', title: 'Sysslor & belöningar',  desc: 'Gamifierade uppgifter med streaks och firande' },
+  { emoji: '💰', bg: '#FFE8C2', title: 'Veckopeng & sparande',  desc: 'Spara, spendera och sätta sparmål' },
+  { emoji: '🗓️', bg: '#F5F3FF', title: 'Schema & kalender',     desc: 'Lektioner, läxor och familjeaktiviteter' },
+]
+
+function FeatureCards() {
+  return (
+    <div style={{ width: '100%', marginTop: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <div style={{ flex: 1, height: 1, background: 'rgba(0,0,0,0.08)' }} />
+        <span style={{ fontSize: 10, color: C.muted, fontWeight: 700, letterSpacing: '0.1em' }}>ALLT DIN FAMILJ BEHÖVER</span>
+        <div style={{ flex: 1, height: 1, background: 'rgba(0,0,0,0.08)' }} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {FEATURES.map(f => (
+          <div key={f.title} style={{ background: C.card, borderRadius: 16, padding: '13px 16px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+            <div style={{ width: 42, height: 42, borderRadius: 12, background: f.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
+              {f.emoji}
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: C.text, marginBottom: 2 }}>{f.title}</div>
+              <div style={{ fontSize: 12, color: C.muted }}>{f.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -50,7 +144,6 @@ function StepLogin({ onSuccess, onRegister }) {
     }
 
     const { auth_email, family_id } = rows[0]
-
     const { error: authErr } = await supabase.auth.signInWithPassword({ email: auth_email, password })
 
     if (authErr) {
@@ -58,7 +151,6 @@ function StepLogin({ onSuccess, onRegister }) {
       setLoading(false); return
     }
 
-    // Ladda familjemedlemmar + familjenamn parallellt
     const [membersRes, famRes] = await Promise.all([
       supabase.from('family_members')
         .select('id, name, avatar, role, color, pin_hash')
@@ -68,69 +160,69 @@ function StepLogin({ onSuccess, onRegister }) {
     ])
 
     setLoading(false)
-    onSuccess({
-      members:    membersRes.data || [],
-      familyId:   family_id,
-      familyName: famRes.data?.name || '',
-    })
+    onSuccess({ members: membersRes.data || [], familyId: family_id, familyName: famRes.data?.name || '' })
   }
 
   return (
     <div style={screen}>
-      {/* Logo */}
-      <div style={{ textAlign: 'center', marginBottom: 36 }}>
-        <div style={{ fontSize: 64, marginBottom: 8 }}>🏠</div>
-        <h1 style={{ fontSize: 34, fontWeight: 900, color: C.primary, margin: 0, fontFamily: 'Nunito, sans-serif' }}>FamTastic</h1>
-        <p style={{ color: C.muted, margin: '6px 0 0', fontSize: 16 }}>Din familjeapp</p>
-      </div>
+      <BgShapes />
+      <div style={{ position: 'relative', width: '100%', maxWidth: 380, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
-      {/* Kort */}
-      <div style={{ background: C.card, borderRadius: 24, padding: 28, width: '100%', maxWidth: 380, boxShadow: '0 4px 24px rgba(0,0,0,0.09)' }}>
-        <h2 style={{ margin: '0 0 22px', fontSize: 22, fontWeight: 800, color: C.text, fontFamily: 'inherit' }}>Logga in</h2>
+        <AppIcon size={88} />
+        <h1 style={{ fontSize: 30, fontWeight: 900, margin: '10px 0 2px', fontFamily: 'Nunito, sans-serif', color: C.primary }}>
+          Fam<span style={{ color: C.secondary }}>Tastic</span>
+        </h1>
+        <p style={{ color: C.muted, margin: '0 0 24px', fontSize: 12, letterSpacing: '0.15em', fontWeight: 600 }}>VARDAG · TILLSAMMANS</p>
 
-        <label style={label}>Familjenamn</label>
-        <input
-          style={input}
-          placeholder="t.ex. familjjohansson"
-          value={username}
-          onChange={e => setUsername(e.target.value)}
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          onKeyDown={e => e.key === 'Enter' && handleLogin()}
-        />
+        <div style={{ background: C.card, borderRadius: 24, padding: 24, width: '100%', boxShadow: '0 4px 24px rgba(0,0,0,0.09)', boxSizing: 'border-box' }}>
+          <h2 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 800, color: C.text, fontFamily: 'inherit' }}>Logga in</h2>
 
-        <label style={{ ...label, marginTop: 18 }}>Lösenord</label>
-        <div style={{ position: 'relative' }}>
+          <label style={labelStyle}>Familjenamn</label>
           <input
-            style={{ ...input, paddingRight: 48 }}
-            type={showPass ? 'text' : 'password'}
-            placeholder="Ditt lösenord"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
+            style={inputStyle}
+            placeholder="t.ex. familjjohansson"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
           />
-          <button
-            onClick={() => setShowPass(s => !s)}
-            style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}
-          >
-            {showPass ? '🙈' : '👁️'}
-          </button>
+
+          <label style={{ ...labelStyle, marginTop: 16 }}>Lösenord</label>
+          <div style={{ position: 'relative' }}>
+            <input
+              style={{ ...inputStyle, paddingRight: 48 }}
+              type={showPass ? 'text' : 'password'}
+              placeholder="Ditt lösenord"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            />
+            <button
+              onClick={() => setShowPass(s => !s)}
+              style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, lineHeight: 1 }}
+            >
+              {showPass ? '🙈' : '👁️'}
+            </button>
+          </div>
+
+          {err && <p style={{ color: C.danger, margin: '10px 0 0', fontSize: 14, fontWeight: 600 }}>{err}</p>}
+
+          <PrimaryBtn onClick={handleLogin} disabled={loading || !username.trim() || !password}>
+            {loading ? 'Loggar in...' : 'Logga in →'}
+          </PrimaryBtn>
         </div>
 
-        {err && <p style={{ color: C.danger, margin: '12px 0 0', fontSize: 14, fontWeight: 600 }}>{err}</p>}
+        <button
+          onClick={onRegister}
+          style={{ marginTop: 18, background: 'none', border: 'none', color: C.primary, fontSize: 15, cursor: 'pointer', fontWeight: 700 }}
+        >
+          Ny familj? Skapa konto
+        </button>
 
-        <PrimaryBtn onClick={handleLogin} disabled={loading || !username.trim() || !password}>
-          {loading ? 'Loggar in...' : 'Logga in →'}
-        </PrimaryBtn>
+        <FeatureCards />
       </div>
-
-      <button
-        onClick={onRegister}
-        style={{ marginTop: 22, background: 'none', border: 'none', color: C.primary, fontSize: 16, cursor: 'pointer', fontWeight: 700 }}
-      >
-        Ny familj? Skapa konto
-      </button>
     </div>
   )
 }
@@ -139,36 +231,41 @@ function StepLogin({ onSuccess, onRegister }) {
 function StepMember({ members, familyName, onSelect }) {
   return (
     <div style={screen}>
-      <div style={{ textAlign: 'center', marginBottom: 32 }}>
-        <div style={{ fontSize: 52, marginBottom: 10 }}>👋</div>
-        <h2 style={{ fontSize: 28, fontWeight: 900, color: C.text, margin: 0, fontFamily: 'Nunito, sans-serif' }}>Vem är du?</h2>
-        {familyName && <p style={{ color: C.muted, margin: '6px 0 0', fontSize: 16 }}>{familyName}</p>}
-      </div>
+      <BgShapes />
+      <div style={{ position: 'relative', width: '100%', maxWidth: 380, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, width: '100%', maxWidth: 360 }}>
-        {members.map(m => (
-          <button
-            key={m.id}
-            onClick={() => onSelect(m)}
-            style={{
-              background: C.card,
-              border: `2.5px solid ${C.border}`,
-              borderRadius: 22,
-              padding: '22px 16px',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 10,
-            }}
-          >
-            <span style={{ fontSize: 54, lineHeight: 1 }}>{m.avatar || '👤'}</span>
-            <span style={{ fontWeight: 800, fontSize: 17, color: C.text, fontFamily: 'Nunito, sans-serif' }}>{m.name}</span>
-            {(m.role === 'admin' || m.role === 'parent') && (
-              <span style={{ fontSize: 11, color: C.muted, background: '#F3F4F6', borderRadius: 8, padding: '3px 9px', fontWeight: 600 }}>Förälder</span>
-            )}
-          </button>
-        ))}
+        <AppIcon size={56} />
+        <h2 style={{ fontSize: 26, fontWeight: 900, color: C.text, margin: '14px 0 4px', fontFamily: 'Nunito, sans-serif' }}>Vem är du?</h2>
+        {familyName && <p style={{ color: C.muted, margin: '0 0 28px', fontSize: 15 }}>{familyName}</p>}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, width: '100%' }}>
+          {members.map(m => (
+            <button
+              key={m.id}
+              onClick={() => onSelect(m)}
+              style={{
+                background: C.card,
+                border: `2px solid ${C.border}`,
+                borderRadius: 22,
+                padding: '20px 12px',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 8,
+                boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+              }}
+            >
+              <div style={{ width: 62, height: 62, borderRadius: '50%', background: m.color ? `${m.color}22` : C.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 34 }}>
+                {m.avatar || '👤'}
+              </div>
+              <span style={{ fontWeight: 800, fontSize: 16, color: C.text, fontFamily: 'Nunito, sans-serif' }}>{m.name}</span>
+              {(m.role === 'admin' || m.role === 'parent') && (
+                <span style={{ fontSize: 11, color: C.secondary, background: C.secondaryLight, borderRadius: 8, padding: '3px 10px', fontWeight: 700 }}>Förälder</span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -207,56 +304,59 @@ function StepPin({ member, onBack, onSuccess }) {
   }
 
   return (
-    <div style={screen}>
-      <button
-        onClick={onBack}
-        style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: C.primary, fontSize: 16, cursor: 'pointer', fontWeight: 700, marginBottom: 12 }}
-      >
-        ← Tillbaka
-      </button>
+    <div style={{ ...screen, justifyContent: 'center' }}>
+      <BgShapes />
+      <div style={{ position: 'relative', width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
 
-      <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <div style={{ fontSize: 68, marginBottom: 10, lineHeight: 1 }}>{member.avatar || '👤'}</div>
-        <h2 style={{ fontSize: 26, fontWeight: 900, color: C.text, margin: 0, fontFamily: 'Nunito, sans-serif' }}>Hej {member.name}!</h2>
-        <p style={{ color: C.muted, margin: '6px 0 0', fontSize: 16 }}>Ange din PIN</p>
-      </div>
+        <button
+          onClick={onBack}
+          style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: C.primary, fontSize: 15, cursor: 'pointer', fontWeight: 700, marginBottom: 20 }}
+        >
+          ← Tillbaka
+        </button>
 
-      {/* 4 prickar */}
-      <div style={{ display: 'flex', gap: 18, marginBottom: 28 }}>
-        {[0,1,2,3].map(i => (
-          <div key={i} style={{
-            width: 22, height: 22, borderRadius: '50%',
-            background:  pin.length > i ? C.primary : 'transparent',
-            border:      `2.5px solid ${pin.length > i ? C.primary : C.border}`,
-            transition:  'all 0.15s',
-          }} />
-        ))}
-      </div>
+        <div style={{ width: 80, height: 80, borderRadius: '50%', background: member.color ? `${member.color}22` : C.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 44, marginBottom: 12 }}>
+          {member.avatar || '👤'}
+        </div>
+        <h2 style={{ fontSize: 24, fontWeight: 900, color: C.text, margin: '0 0 4px', fontFamily: 'Nunito, sans-serif' }}>Hej {member.name}!</h2>
+        <p style={{ color: C.muted, margin: '0 0 24px', fontSize: 15 }}>Ange din PIN</p>
 
-      {err && <p style={{ color: C.danger, marginBottom: 16, fontSize: 15, fontWeight: 600 }}>{err}</p>}
+        <div style={{ display: 'flex', gap: 18, marginBottom: 24 }}>
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{
+              width: 20, height: 20, borderRadius: '50%',
+              background: pin.length > i ? C.primary : 'transparent',
+              border: `2.5px solid ${pin.length > i ? C.primary : C.border}`,
+              transition: 'all 0.15s',
+            }} />
+          ))}
+        </div>
 
-      {/* Numpad */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, width: '100%', maxWidth: 290 }}>
-        {numpad.map((k, i) => (
-          <button
-            key={i}
-            disabled={k === '' || loading}
-            onClick={() => k === '⌫' ? handleDelete() : handleDigit(k)}
-            style={{
-              height: 74, borderRadius: 18,
-              background:  k === '' ? 'transparent' : C.card,
-              border:      k === '' ? 'none' : `2px solid ${C.border}`,
-              fontSize:    k === '⌫' ? 26 : 30,
-              fontWeight:  700,
-              color:       C.text,
-              cursor:      k === '' ? 'default' : 'pointer',
-              visibility:  k === '' ? 'hidden' : 'visible',
-              fontFamily:  'Nunito, sans-serif',
-            }}
-          >
-            {k}
-          </button>
-        ))}
+        {err && <p style={{ color: C.danger, marginBottom: 14, fontSize: 14, fontWeight: 600 }}>{err}</p>}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, width: '100%', maxWidth: 280 }}>
+          {numpad.map((k, i) => (
+            <button
+              key={i}
+              disabled={k === '' || loading}
+              onClick={() => k === '⌫' ? handleDelete() : handleDigit(k)}
+              style={{
+                height: 72, borderRadius: 18,
+                background: k === '' ? 'transparent' : C.card,
+                border: k === '' ? 'none' : `2px solid ${C.border}`,
+                fontSize: k === '⌫' ? 24 : 28,
+                fontWeight: 700,
+                color: C.text,
+                cursor: k === '' ? 'default' : 'pointer',
+                visibility: k === '' ? 'hidden' : 'visible',
+                fontFamily: 'Nunito, sans-serif',
+                boxShadow: k === '' ? 'none' : '0 2px 6px rgba(0,0,0,0.06)',
+              }}
+            >
+              {k}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -271,7 +371,6 @@ export function Login({ onLogin, onRegister, existingSession }) {
   const [selected,   setSelected]   = useState(null)
   const [loading,    setLoading]    = useState(false)
 
-  // Redan inloggad (session finns) → hoppa direkt till memberväljare
   useEffect(() => {
     if (!existingSession) return
     setLoading(true)
@@ -302,9 +401,10 @@ export function Login({ onLogin, onRegister, existingSession }) {
   }, [existingSession])
 
   if (loading) return (
-    <div style={{ ...screen, gap: 16 }}>
-      <div style={{ fontSize: 48 }}>🏠</div>
-      <p style={{ color: C.muted, fontSize: 16 }}>Laddar...</p>
+    <div style={{ ...screen, justifyContent: 'center', gap: 16 }}>
+      <BgShapes />
+      <AppIcon size={72} />
+      <p style={{ color: C.muted, fontSize: 16, position: 'relative' }}>Laddar...</p>
     </div>
   )
 
