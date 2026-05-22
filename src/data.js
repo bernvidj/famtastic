@@ -6,19 +6,19 @@
 // Color tokens
 export const C = {
   // Primary palette
-  primary: '#F97316',       // Warm coral/orange
-  primaryLight: '#FFF7ED',  // Light orange bg
-  primaryDark: '#EA580C',   // Hover/active
-  secondary: '#14B8A6',     // Teal/mint
-  secondaryLight: '#F0FDFA',
-  secondaryDark: '#0D9488',
+  primary: '#FF7A59',       // FamTastic korall
+  primaryLight: '#FFE8C2',  // Beige/aprikost bg
+  primaryDark: '#E8623A',   // Hover/active
+  secondary: '#3CB4A6',     // FamTastic teal
+  secondaryLight: '#E1F5F3',
+  secondaryDark: '#2A9089',
   accent: '#FBBF24',        // Sunny yellow
   accentLight: '#FFFBEB',
   purple: '#8B5CF6',        // Fun purple
   purpleLight: '#F5F3FF',
 
   // Backgrounds
-  bg: 'linear-gradient(135deg, #F5F3FF 0%, #FFF7ED 50%, #FFECD2 100%)', // Lila → persika
+  bg: '#FFFBF5',            // Varm vit
   bgCard: '#FFFFFF',
   bgDark: '#1C1917',
 
@@ -39,7 +39,7 @@ export const C = {
 
   // Member colors (assigned to family members)
   memberColors: [
-    '#F97316', '#14B8A6', '#8B5CF6', '#EC4899',
+    '#FF7A59', '#3CB4A6', '#8B5CF6', '#EC4899',
     '#3B82F6', '#22C55E', '#F59E0B', '#EF4444',
   ],
 };
