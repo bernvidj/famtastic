@@ -251,7 +251,7 @@ const styles = {
   },
   headerZone: {
     position: 'sticky',
-    top: 0,
+    top: 52,
     zIndex: 10,
     background: 'rgba(255,251,245,0.88)',
     backdropFilter: 'blur(16px)',

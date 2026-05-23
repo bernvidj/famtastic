@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { C, F } from '../data';
+import { C, F, TOPBAR_H } from '../data';
 
 function formatMsgTime(ts) {
   if (!ts) return '';
@@ -190,7 +190,7 @@ const styles = {
   },
   header: {
     padding: '20px 16px 12px',
-    position: 'sticky', top: 0, zIndex: 10,
+    position: 'sticky', top: TOPBAR_H, zIndex: 10,
     backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
     background: 'rgba(255,251,245,0.92)',
     borderBottom: `1px solid ${C.borderLight}`,

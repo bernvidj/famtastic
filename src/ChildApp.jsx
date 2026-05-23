@@ -16,9 +16,9 @@ import { useLocationSharing } from './location/useLocationSharing';
 import { LocationView } from './location/LocationView';
 import { ChatView } from './chat/ChatView';
 import { Home, Calendar, CheckSquare, PiggyBank, LogOut } from 'lucide-react';
+import { TOPBAR_H } from './data';
 
 const BASE_NAV = [
-  { id: 'home',     label: 'Hem',      icon: Home },
   { id: 'chores',   label: 'Sysslor',  icon: CheckSquare },
   { id: 'money',    label: 'Pengar',   icon: PiggyBank },
   { id: 'calendar', label: 'Kalender', icon: Calendar },
@@ -327,18 +327,24 @@ export function ChildApp({ familyId, member, onLogout }) {
   // --- Render ---
   return (
     <div style={styles.appPage}>
-      {/* Top bar */}
+      {/* Top bar (fixed, samma höjd som AppTopBar) */}
       <div style={styles.topBar}>
         <div style={{ ...styles.topAvatar, background: member.color ? `${member.color}22` : C.primaryLight }}>
           <span style={{ fontSize: 22 }}>{member.avatar}</span>
         </div>
         <span style={styles.topName}>{member.name}</span>
+        {page !== 'home' && (
+          <button onClick={() => setPage('home')} style={styles.topIconBtn}>
+            <Home size={18} color={C.textMuted} />
+          </button>
+        )}
         <button onClick={onLogout} style={styles.topLogout}>
           <LogOut size={16} color={C.textMuted} />
         </button>
       </div>
 
-      {/* Page content */}
+      {/* Page content — paddingTop för fixed topbar */}
+      <div style={{ paddingTop: TOPBAR_H }}>
       {page === 'home' && (
         <ChildHome
           member={member}
@@ -415,6 +421,8 @@ export function ChildApp({ familyId, member, onLogout }) {
         />
       )}
 
+      </div>{/* /paddingTop wrapper */}
+
       <Celebration type={celebrationType} active={celebrationActive} onDone={() => setCelebrationActive(false)} />
 
       {/* Bottom nav — pill-stil som Nav.jsx */}
@@ -456,7 +464,8 @@ const styles = {
   loading: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, position: 'relative', overflow: 'hidden' },
   loadingAvatar: { width: 80, height: 80, borderRadius: '50%', background: C.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   loadingText: { fontSize: F.sizes.md, color: C.textMuted, fontFamily: F.heading, margin: 0 },
-  topBar: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: C.bgCard, borderBottom: `1.5px solid ${C.borderLight}`, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' },
+  topBar: { position: 'fixed', top: 0, left: 0, right: 0, height: TOPBAR_H, display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px 0 16px', background: 'rgba(255,251,245,0.94)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: `1px solid ${C.borderLight}`, zIndex: 150 },
+  topIconBtn: { background: 'none', border: 'none', cursor: 'pointer', padding: 8, minHeight: 36, minWidth: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   topAvatar: { width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   topName: { flex: 1, fontFamily: F.heading, fontSize: F.sizes.md, fontWeight: F.weights.bold, color: C.text },
   topLogout: { background: 'none', border: 'none', cursor: 'pointer', padding: 8, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },

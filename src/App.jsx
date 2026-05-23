@@ -18,7 +18,8 @@ import { ChildApp } from './ChildApp';
 import { LocationView } from './location/LocationView';
 import { useLocationSharing } from './location/useLocationSharing';
 import { ChatView } from './chat/ChatView';
-import { C } from './data';
+import { AppTopBar } from './AppTopBar';
+import { C, TOPBAR_H } from './data';
 import { Home as HomeIcon } from 'lucide-react';
 
 // ── Lösenordsåterställning (visas när användaren klickar reset-länk i mail) ──
@@ -274,7 +275,10 @@ export function App() {
 
   return (
     <div>
-      {renderPage()}
+      <AppTopBar page={page} onNavigate={setPage} />
+      <div style={{ paddingTop: TOPBAR_H }}>
+        {renderPage()}
+      </div>
       <Nav active={page} onNavigate={setPage} locationEnabled={locationFeatureEnabled} chatEnabled={chatEnabled} />
     </div>
   );

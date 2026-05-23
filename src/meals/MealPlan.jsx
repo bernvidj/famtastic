@@ -272,7 +272,7 @@ const styles = {
   page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', paddingBottom: 'calc(90px + env(safe-area-inset-bottom, 0px))' },
   headerZone: {
     position: 'sticky',
-    top: 0,
+    top: 52,
     zIndex: 10,
     background: 'rgba(255,251,245,0.88)',
     backdropFilter: 'blur(16px)',

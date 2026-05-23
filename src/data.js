@@ -3,6 +3,9 @@
 // Duolingo-vibe design tokens
 // ============================================
 
+// Topbar height — used by all view sticky headers (top: TOPBAR_H)
+export const TOPBAR_H = 52;
+
 // Color tokens
 export const C = {
   // Primary palette
