@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { useChildData } from './useChildData';
-import { C, F, todayStr, safeArray, formatKr } from './data';
+import { C, F, todayStr, safeArray } from './data';
 import { ChildHome } from './ChildHome';
 import { ChildChores } from './ChildChores';
 import { ChildCalendar } from './ChildCalendar';
@@ -15,11 +15,31 @@ import { Celebration } from './Celebrations';
 import { Home, Calendar, CheckSquare, PiggyBank, LogOut } from 'lucide-react';
 
 const NAV = [
-  { id: 'home', label: 'Hem', icon: Home },
-  { id: 'chores', label: 'Sysslor', icon: CheckSquare },
-  { id: 'money', label: 'Pengar', icon: PiggyBank },
+  { id: 'home',     label: 'Hem',      icon: Home },
+  { id: 'chores',   label: 'Sysslor',  icon: CheckSquare },
+  { id: 'money',    label: 'Pengar',   icon: PiggyBank },
   { id: 'calendar', label: 'Kalender', icon: Calendar },
 ];
+
+// ─── Bakgrundsformer (loading-skärm) ─────────────────────────────────────────
+function BgShapes() {
+  return (
+    <svg
+      style={{
+        position: 'absolute', top: 0, left: 0,
+        width: '100%', height: '100%',
+        opacity: 0.12, pointerEvents: 'none',
+      }}
+      viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      <path d="M -40 -30 Q 100 -60, 180 80 Q 230 180, 120 240 Q 20 290, -30 180 Q -80 80, -40 -30 Z" fill="#3CB4A6" />
+      <path d="M 300 -20 Q 430 10, 440 140 Q 448 230, 350 260 Q 260 285, 230 190 Q 205 105, 300 -20 Z" fill="#A8E6DF" />
+      <path d="M 220 640 Q 400 600, 440 720 Q 462 800, 320 810 Q 180 818, 160 720 Q 145 640, 220 640 Z" fill="#FF7A59" />
+      <path d="M -50 700 Q 50 650, 130 710 Q 185 755, 140 820 Q 75 855, -15 820 Q -90 790, -50 700 Z" fill="#FFA071" />
+    </svg>
+  );
+}
 
 export function ChildApp({ familyId, member, onLogout }) {
   const [page, setPage] = useState('home');
@@ -27,11 +47,10 @@ export function ChildApp({ familyId, member, onLogout }) {
   const [celebrationActive, setCelebrationActive] = useState(false);
   const { data, loading, reload } = useChildData(familyId, member.id, true);
 
-  // School data (loaded separately — not in RPC)
-  const [schoolSchedule, setSchoolSchedule] = useState([]);
-  const [schoolSubjects, setSchoolSubjects] = useState([]);
-  const [schoolSpecialEvents, setSchoolSpecialEvents] = useState([]);
-  const [exams, setExams] = useState([]);
+  const [schoolSchedule,     setSchoolSchedule]     = useState([]);
+  const [schoolSubjects,     setSchoolSubjects]      = useState([]);
+  const [schoolSpecialEvents,setSchoolSpecialEvents] = useState([]);
+  const [exams,              setExams]               = useState([]);
 
   useEffect(() => {
     if (!familyId || !member.id) return;
@@ -52,34 +71,39 @@ export function ChildApp({ familyId, member, onLogout }) {
     setExams(safeArray(examRes.data));
   }
 
-  const today = todayStr();
+  const today    = todayStr();
   const todayDow = new Date().getDay() || 7;
 
   if (loading || !data) {
     return (
       <div style={styles.loading}>
-        <span style={{ fontSize: 48 }}>{member.avatar}</span>
-        <p style={styles.loadingText}>Laddar...</p>
+        <BgShapes />
+        <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <div style={styles.loadingAvatar}>
+            <span style={{ fontSize: 40 }}>{member.avatar}</span>
+          </div>
+          <p style={styles.loadingText}>Laddar...</p>
+        </div>
       </div>
     );
   }
 
   const { chores, completions, events, transactions, goals, members, meal_plan } = data;
-  const balance = transactions.reduce((sum, tx) => sum + tx.amount, 0);
+  const balance      = transactions.reduce((sum, tx) => sum + tx.amount, 0);
   const personalGoals = goals.filter(g => !g.is_family_goal);
-  const familyGoals = goals.filter(g => g.is_family_goal);
+  const familyGoals   = goals.filter(g => g.is_family_goal);
 
-  // --- School lesson helpers ---
+  // --- School helpers ---
   const subjectMap = {};
   safeArray(schoolSubjects).forEach(s => { subjectMap[s.id] = s; });
 
   function getTodaySchool() {
     if (todayDow > 5) return { lessons: [], special: null, morningSpecial: null, afternoonSpecial: null };
-    const specials = safeArray(schoolSpecialEvents).filter(se => se.event_date === today);
-    const fullDay = specials.find(se => se.period === 'full_day');
+    const specials     = safeArray(schoolSpecialEvents).filter(se => se.event_date === today);
+    const fullDay      = specials.find(se => se.period === 'full_day');
     if (fullDay) return { lessons: [], special: fullDay, morningSpecial: null, afternoonSpecial: null };
 
-    const morningSpec = specials.find(se => se.period === 'morning');
+    const morningSpec   = specials.find(se => se.period === 'morning');
     const afternoonSpec = specials.find(se => se.period === 'afternoon');
 
     const lessons = safeArray(schoolSchedule)
@@ -87,16 +111,10 @@ export function ChildApp({ familyId, member, onLogout }) {
       .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''))
       .map(sl => {
         const startHour = parseInt((sl.start_time || '08:00').split(':')[0], 10);
-        if (morningSpec && startHour < 12) return null;
+        if (morningSpec   && startHour < 12) return null;
         if (afternoonSpec && startHour >= 12) return null;
         const subj = subjectMap[sl.subject_id];
-        return {
-          title: subj?.title || 'Lektion',
-          icon: subj?.icon || '📚',
-          color: subj?.color || C.secondary,
-          startTime: sl.start_time,
-          endTime: sl.end_time,
-        };
+        return { title: subj?.title || 'Lektion', icon: subj?.icon || '📚', color: subj?.color || C.secondary, startTime: sl.start_time, endTime: sl.end_time };
       })
       .filter(Boolean);
 
@@ -134,9 +152,7 @@ export function ChildApp({ familyId, member, onLogout }) {
   }
 
   function isCompleted(choreId) {
-    return completions.some(
-      c => c.chore_id === choreId && c.member_id === member.id && c.completed_date === today
-    );
+    return completions.some(c => c.chore_id === choreId && c.member_id === member.id && c.completed_date === today);
   }
 
   function weekDone(choreId) {
@@ -167,9 +183,7 @@ export function ChildApp({ familyId, member, onLogout }) {
   }
 
   function isCompletedOnDate(choreId, dateStr) {
-    return completions.some(
-      c => c.chore_id === choreId && c.member_id === member.id && c.completed_date === dateStr
-    );
+    return completions.some(c => c.chore_id === choreId && c.member_id === member.id && c.completed_date === dateStr);
   }
 
   function getMyEvents(dateStr) {
@@ -185,8 +199,7 @@ export function ChildApp({ familyId, member, onLogout }) {
 
   function todayMeal() {
     const mp = meal_plan.find(m => m.plan_date === today);
-    if (!mp) return null;
-    return mp.free_text || mp.title || null;
+    return mp ? (mp.free_text || mp.title || null) : null;
   }
 
   function calcStreak() {
@@ -197,8 +210,7 @@ export function ChildApp({ familyId, member, onLogout }) {
     const d = new Date();
     for (let i = 0; i < 30; i++) {
       const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      if (dates.includes(ds)) { streak++; }
-      else if (i > 0) { break; }
+      if (dates.includes(ds)) { streak++; } else if (i > 0) { break; }
       d.setDate(d.getDate() - 1);
     }
     return streak;
@@ -213,30 +225,22 @@ export function ChildApp({ familyId, member, onLogout }) {
   async function toggleChore(choreId) {
     const done = isCompleted(choreId);
     if (done) {
-      await supabase.rpc('uncomplete_chore', {
-        p_chore_id: choreId, p_member_id: member.id, p_completed_date: today,
-      });
+      await supabase.rpc('uncomplete_chore', { p_chore_id: choreId, p_member_id: member.id, p_completed_date: today });
     } else {
       const { data: result } = await supabase.rpc('complete_chore', {
         p_chore_id: choreId, p_family_id: familyId, p_member_id: member.id, p_completed_date: today,
       });
       const todayList = getTodayChores();
-      const nowDone = todayList.filter(c => c.id === choreId || isCompleted(c.id)).length;
-      if (nowDone >= todayList.length) {
-        triggerCelebration('fireworks');
-      } else if (result?.points_earned > 0) {
-        triggerCelebration('sparkle');
-      } else {
-        triggerCelebration('confetti');
-      }
+      const nowDone   = todayList.filter(c => c.id === choreId || isCompleted(c.id)).length;
+      if (nowDone >= todayList.length) { triggerCelebration('fireworks'); }
+      else if (result?.points_earned > 0) { triggerCelebration('sparkle'); }
+      else { triggerCelebration('confetti'); }
     }
     reload();
   }
 
   async function claimPoolChore(choreId) {
-    await supabase.rpc('child_claim_pool_chore', {
-      p_family_id: familyId, p_member_id: member.id, p_chore_id: choreId,
-    });
+    await supabase.rpc('child_claim_pool_chore', { p_family_id: familyId, p_member_id: member.id, p_chore_id: choreId });
     triggerCelebration('sparkle');
     reload();
   }
@@ -244,14 +248,18 @@ export function ChildApp({ familyId, member, onLogout }) {
   // --- Render ---
   return (
     <div style={styles.appPage}>
+      {/* Top bar */}
       <div style={styles.topBar}>
-        <span style={{ fontSize: 28 }}>{member.avatar}</span>
+        <div style={{ ...styles.topAvatar, background: member.color ? `${member.color}22` : C.primaryLight }}>
+          <span style={{ fontSize: 22 }}>{member.avatar}</span>
+        </div>
         <span style={styles.topName}>{member.name}</span>
         <button onClick={onLogout} style={styles.topLogout}>
           <LogOut size={16} color={C.textMuted} />
         </button>
       </div>
 
+      {/* Page content */}
       {page === 'home' && (
         <ChildHome
           member={member}
@@ -306,16 +314,27 @@ export function ChildApp({ familyId, member, onLogout }) {
 
       <Celebration type={celebrationType} active={celebrationActive} onDone={() => setCelebrationActive(false)} />
 
+      {/* Bottom nav — pill-stil som Nav.jsx */}
       <nav style={styles.nav}>
         {NAV.map(item => {
-          const Icon = item.icon;
-          const active = page === item.id;
+          const Icon     = item.icon;
+          const isActive = page === item.id;
           return (
-            <button key={item.id} onClick={() => setPage(item.id)} style={{
-              ...styles.navBtn, color: active ? C.primary : C.textMuted,
-            }}>
-              <Icon size={22} strokeWidth={active ? 2.5 : 2} />
-              <span style={{ ...styles.navLabel, fontWeight: active ? F.weights.bold : F.weights.normal }}>
+            <button key={item.id} onClick={() => setPage(item.id)} style={styles.navBtn}>
+              <div style={{
+                ...styles.iconWrap,
+                background:   isActive ? C.primary : 'transparent',
+                borderRadius: isActive ? 12 : 0,
+                padding:      isActive ? '5px 14px' : '5px 6px',
+                transition:   'all 0.18s ease',
+              }}>
+                <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#fff' : C.textMuted} />
+              </div>
+              <span style={{
+                ...styles.navLabel,
+                color:      isActive ? C.primary : C.textMuted,
+                fontWeight: isActive ? F.weights.bold : F.weights.normal,
+              }}>
                 {item.label}
               </span>
             </button>
@@ -328,12 +347,15 @@ export function ChildApp({ familyId, member, onLogout }) {
 
 const styles = {
   appPage: { minHeight: '100vh', background: C.bg, fontFamily: F.body, paddingBottom: 80 },
-  loading: { minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: C.bg, gap: 12 },
-  loadingText: { fontSize: F.sizes.md, color: C.textMuted, fontFamily: F.heading },
-  topBar: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: C.bgCard, borderBottom: `1px solid ${C.borderLight}` },
+  loading: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, position: 'relative', overflow: 'hidden' },
+  loadingAvatar: { width: 80, height: 80, borderRadius: '50%', background: C.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  loadingText: { fontSize: F.sizes.md, color: C.textMuted, fontFamily: F.heading, margin: 0 },
+  topBar: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: C.bgCard, borderBottom: `1.5px solid ${C.borderLight}`, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' },
+  topAvatar: { width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   topName: { flex: 1, fontFamily: F.heading, fontSize: F.sizes.md, fontWeight: F.weights.bold, color: C.text },
   topLogout: { background: 'none', border: 'none', cursor: 'pointer', padding: 8, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  nav: { position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-around', alignItems: 'center', background: C.bgCard, borderTop: `1px solid ${C.border}`, padding: '6px 0 env(safe-area-inset-bottom, 8px)', zIndex: 100 },
-  navBtn: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px', minWidth: 44, minHeight: 44 },
+  nav: { position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-around', alignItems: 'center', background: C.bgCard, borderTop: `1.5px solid ${C.borderLight}`, padding: '4px 0 env(safe-area-inset-bottom, 8px)', zIndex: 100, boxShadow: '0 -2px 12px rgba(0,0,0,0.06)' },
+  navBtn: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 2px', minWidth: 44, fontFamily: F.heading },
+  iconWrap: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
   navLabel: { fontSize: F.sizes.xs, fontFamily: F.heading },
 };
