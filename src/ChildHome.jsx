@@ -23,6 +23,7 @@ export function ChildHome({
   member, todayChores, isCompleted, toggleChore, streak,
   balance, todayEvents, meal, poolCount, familyGoals, onGoToChores,
   todayLessons, schoolSpecial, morningSpecial, afternoonSpecial, exams,
+  locationFeatureEnabled, locationSharing, onToggleLocationSharing,
 }) {
   const schoolChores  = todayChores.filter(c => c.reference_id);
   const regularChores = todayChores.filter(c => !c.reference_id);
@@ -216,6 +217,38 @@ export function ChildHome({
           </div>
         )}
 
+        {/* Platsdelning-toggle */}
+        {locationFeatureEnabled && (
+          <div style={styles.section}>
+            <div style={styles.locationCard}>
+              <span style={{ fontSize: 22 }}>📍</span>
+              <div style={{ flex: 1 }}>
+                <span style={styles.locationLabel}>Dela min plats</span>
+                <span style={styles.locationDesc}>
+                  {locationSharing ? 'Familjen ser var du är' : 'Ingen ser var du är just nu'}
+                </span>
+              </div>
+              <button
+                onClick={onToggleLocationSharing}
+                style={{
+                  width: 48, height: 26, borderRadius: 13, border: 'none',
+                  background: locationSharing ? C.secondary : C.border,
+                  cursor: 'pointer', position: 'relative', flexShrink: 0,
+                  transition: 'background 0.2s',
+                }}
+              >
+                <div style={{
+                  width: 22, height: 22, borderRadius: 11, background: '#fff',
+                  position: 'absolute', top: 2,
+                  transform: locationSharing ? 'translateX(22px)' : 'translateX(2px)',
+                  transition: 'transform 0.2s',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                }} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Family goal */}
         {familyGoals.map(fg => (
           <div key={fg.id} style={styles.section}>
@@ -279,4 +312,7 @@ const styles = {
   familyGoalCard: { display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: `linear-gradient(135deg, ${C.primaryLight}, ${C.accentLight})`, borderRadius: 16, border: `1.5px solid ${C.primary}` },
   fgTitle: { display: 'block', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.primaryDark },
   fgTarget: { display: 'block', fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading },
+  locationCard: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: C.bgCard, borderRadius: 14, border: `1.5px solid ${C.borderLight}` },
+  locationLabel: { display: 'block', fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
+  locationDesc: { display: 'block', fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.body, marginTop: 2 },
 };

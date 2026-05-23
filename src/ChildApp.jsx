@@ -12,6 +12,7 @@ import { ChildChores } from './ChildChores';
 import { ChildCalendar } from './ChildCalendar';
 import { ChildMoneyView } from './money/ChildMoneyView';
 import { Celebration } from './Celebrations';
+import { useLocationSharing } from './location/useLocationSharing';
 import { Home, Calendar, CheckSquare, PiggyBank, LogOut } from 'lucide-react';
 
 const NAV = [
@@ -45,7 +46,12 @@ export function ChildApp({ familyId, member, onLogout }) {
   const [page, setPage] = useState('home');
   const [celebrationType, setCelebrationType] = useState(null);
   const [celebrationActive, setCelebrationActive] = useState(false);
+  const [locationFeatureOn, setLocationFeatureOn] = useState(false);
+  const [childSharingEnabled, setChildSharingEnabled] = useState(false);
   const { data, loading, reload } = useChildData(familyId, member.id, true);
+
+  // GPS: hook alltid på toppnivå — watchPosition startar när båda flaggor är true
+  useLocationSharing(member.id, locationFeatureOn && childSharingEnabled);
 
   const [schoolSchedule,     setSchoolSchedule]     = useState([]);
   const [schoolSubjects,     setSchoolSubjects]      = useState([]);
@@ -56,6 +62,15 @@ export function ChildApp({ familyId, member, onLogout }) {
     if (!familyId || !member.id) return;
     loadSchoolData();
   }, [familyId, member.id]);
+
+  // Läs family features via SECURITY DEFINER RPC (barn saknar auth-session)
+  useEffect(() => {
+    if (!familyId) return;
+    supabase.rpc('get_family_features', { p_family_id: familyId })
+      .then(({ data: features }) => {
+        if (features) setLocationFeatureOn(!!features.location_sharing);
+      });
+  }, [familyId]);
 
   async function loadSchoolData() {
     const [schedRes, subjRes, specRes, examRes] = await Promise.all([
@@ -216,6 +231,33 @@ export function ChildApp({ familyId, member, onLogout }) {
     return streak;
   }
 
+  // --- GPS toggle ---
+  async function handleLocationToggle() {
+    if (childSharingEnabled) {
+      setChildSharingEnabled(false);
+      // useLocationSharing-hooken anropar disable_location_sharing automatiskt
+    } else {
+      if (!navigator.geolocation) {
+        alert('Din webbläsare stöder inte platsinformation.');
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          await supabase.rpc('upsert_member_location', {
+            p_member_id: member.id,
+            p_latitude:  pos.coords.latitude,
+            p_longitude: pos.coords.longitude,
+            p_accuracy:  Math.round(pos.coords.accuracy),
+            p_battery:   null,
+          });
+          setChildSharingEnabled(true);
+        },
+        () => alert('Kunde inte hämta din position. Kontrollera att du tillåtit platsbehörighet.'),
+        { enableHighAccuracy: true, timeout: 15_000 }
+      );
+    }
+  }
+
   // --- Actions ---
   function triggerCelebration(type) {
     setCelebrationType(type);
@@ -278,6 +320,9 @@ export function ChildApp({ familyId, member, onLogout }) {
           morningSpecial={todaySchool.morningSpecial}
           afternoonSpecial={todaySchool.afternoonSpecial}
           exams={exams}
+          locationFeatureEnabled={locationFeatureOn}
+          locationSharing={childSharingEnabled}
+          onToggleLocationSharing={handleLocationToggle}
         />
       )}
 
