@@ -13,9 +13,9 @@ function BgShapes() {
   return (
     <svg
       style={{
-        position: 'fixed', top: 0, left: 0,
+        position: 'absolute', top: 0, left: 0,
         width: '100%', height: '100%',
-        opacity: 0.07, pointerEvents: 'none', zIndex: 0,
+        opacity: 0.18, pointerEvents: 'none',
       }}
       viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="xMidYMid slice"
@@ -70,7 +70,7 @@ export function ScheduleView({ familyId, member, members }) {
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative' },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', overflow: 'hidden' },
   tabRow: { display: 'flex', gap: 8, padding: '12px 16px 0' },
   tabBtn: {
     display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 20px',
