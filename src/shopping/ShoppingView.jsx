@@ -1,20 +1,18 @@
 // ============================================
-// FamTastic — ShoppingView (lists + items + priser)
+// FamTastic — ShoppingView
+// Huvud-vy: state, Supabase, header, listflikar
 // Placeras i: src/shopping/ShoppingView.jsx
 // ============================================
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F, S, safeArray } from '../data';
-import { estimateListCost, formatPrice, lookupPrice } from '../priceDb';
-import { Plus, Trash2, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { formatPrice, estimateListCost } from '../priceDb';
+import { ShoppingAddItem } from './ShoppingAddItem';
+import { ShoppingItemList } from './ShoppingItemList';
+import { Plus, Trash2 } from 'lucide-react';
 
-const CATEGORIES = [
-  'Mejeri', 'Frukt & grönt', 'Kött & fisk', 'Frys',
-  'Bröd', 'Skafferi', 'Dryck', 'Hygien', 'Övrigt',
-];
-
-// ─── Bakgrundsformer (lätt variant) ──────────────────────────────────────────
+// ─── Bakgrundsformer ──────────────────────────────────────────────────────────
 function BgShapes() {
   return (
     <svg
@@ -34,39 +32,20 @@ function BgShapes() {
   );
 }
 
-// ─── Pris-chip ────────────────────────────────────────────────────────────────
-function PriceChip({ min, max, small = false }) {
-  return (
-    <span style={{
-      fontSize: small ? 11 : 12,
-      fontWeight: 700,
-      color: C.secondary,
-      background: '#E1F5F3',
-      borderRadius: 8,
-      padding: small ? '2px 6px' : '3px 8px',
-      whiteSpace: 'nowrap',
-      flexShrink: 0,
-    }}>
-      {formatPrice(min, max)}
-    </span>
-  );
-}
-
 // ─── Huvud-vy ─────────────────────────────────────────────────────────────────
-export function ShoppingView({ familyId, member, members }) {
+export function ShoppingView({ familyId, member }) {
   const [lists,        setLists]        = useState([]);
   const [selectedList, setSelectedList] = useState(null);
   const [items,        setItems]        = useState([]);
   const [loading,      setLoading]      = useState(true);
-  const [newItemName,  setNewItemName]  = useState('');
-  const [newItemQty,   setNewItemQty]   = useState('');
-  const [newItemCat,   setNewItemCat]   = useState('Övrigt');
   const [showAddItem,  setShowAddItem]  = useState(false);
-  const [showChecked,  setShowChecked]  = useState(false);
   const [newListName,  setNewListName]  = useState('');
   const [showNewList,  setShowNewList]  = useState(false);
 
-  const isParent = member.role === 'admin' || member.role === 'parent';
+  const isParent   = member.role === 'admin' || member.role === 'parent';
+  const hasUnchecked = items.some(i => !i.checked);
+  const costEstimate = hasUnchecked ? estimateListCost(items) : null;
+  const currentList  = lists.find(l => l.id === selectedList);
 
   useEffect(() => { loadLists(); }, [familyId]);
   useEffect(() => { if (selectedList) loadItems(); }, [selectedList]);
@@ -117,49 +96,33 @@ export function ShoppingView({ familyId, member, members }) {
     loadLists();
   }
 
-  async function addItem() {
-    if (!newItemName.trim() || !selectedList) return;
+  async function handleAddItem({ name, quantity, category }) {
     await supabase.from('shopping_items').insert({
       list_id: selectedList,
       family_id: familyId,
-      name: newItemName.trim(),
-      quantity: newItemQty.trim() || null,
-      category: newItemCat,
+      name, quantity, category,
       added_by: member.id,
     });
-    setNewItemName('');
-    setNewItemQty('');
     setShowAddItem(false);
     loadItems();
   }
 
-  async function toggleItem(item) {
+  async function handleToggle(item) {
     await supabase.from('shopping_items')
       .update({ checked: !item.checked, checked_by: !item.checked ? member.id : null })
       .eq('id', item.id);
     loadItems();
   }
 
-  async function removeItem(itemId) {
+  async function handleRemove(itemId) {
     await supabase.from('shopping_items').delete().eq('id', itemId);
     loadItems();
   }
 
-  async function clearChecked() {
+  async function handleClearChecked() {
     await supabase.from('shopping_items')
       .delete().eq('list_id', selectedList).eq('checked', true);
     loadItems();
-  }
-
-  function groupedUnchecked() {
-    const filtered = items.filter(i => !i.checked);
-    const groups = {};
-    filtered.forEach(item => {
-      const cat = item.category || 'Övrigt';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(item);
-    });
-    return groups;
   }
 
   function getListBadge(list) {
@@ -167,19 +130,6 @@ export function ShoppingView({ familyId, member, members }) {
     const unchecked = listItems.filter(i => !i.checked).length;
     return unchecked > 0 ? unchecked : null;
   }
-
-  // Prisberäkning för aktiv lista
-  const costEstimate = useMemo(() => estimateListCost(items), [items]);
-  const hasUnchecked = items.some(i => !i.checked);
-
-  const uncheckedGroups = groupedUnchecked();
-  const checkedItems    = items.filter(i => i.checked);
-  const currentList     = lists.find(l => l.id === selectedList);
-
-  // Pris-preview vid ny vara
-  const previewPrice = newItemName.trim()
-    ? lookupPrice(newItemName.trim(), newItemCat)
-    : null;
 
   return (
     <div style={styles.page}>
@@ -189,7 +139,7 @@ export function ShoppingView({ familyId, member, members }) {
       <div style={styles.header}>
         <div>
           <h1 style={styles.pageTitle}>🛒 Handla</h1>
-          {hasUnchecked && (
+          {hasUnchecked && costEstimate && (
             <p style={styles.costSummary}>
               Uppskattad kostnad:{' '}
               <strong style={{ color: C.secondary }}>
@@ -199,7 +149,7 @@ export function ShoppingView({ familyId, member, members }) {
           )}
         </div>
         <button
-          onClick={() => setShowNewList(!showNewList)}
+          onClick={() => setShowNewList(s => !s)}
           style={{ ...S.button, ...S.buttonSecondary, padding: '8px 14px', position: 'relative', zIndex: 1 }}
         >
           <Plus size={16} /> Ny lista
@@ -279,137 +229,19 @@ export function ShoppingView({ familyId, member, members }) {
               <Plus size={16} color={C.primary} /> Lägg till vara...
             </button>
           ) : (
-            <div style={styles.addItemForm}>
-              <input
-                type="text"
-                placeholder="Vara, t.ex. Mjölk"
-                value={newItemName}
-                onChange={e => setNewItemName(e.target.value)}
-                style={{ ...S.input }}
-                autoFocus
-                onKeyDown={e => e.key === 'Enter' && addItem()}
-              />
-              {/* Pris-preview */}
-              {previewPrice && (
-                <div style={styles.pricePreview}>
-                  <span style={{ fontSize: 12, color: C.textMuted }}>Ungefärligt pris:</span>
-                  <PriceChip min={previewPrice[0]} max={previewPrice[1]} small />
-                </div>
-              )}
-              <div style={styles.addItemRow2}>
-                <input
-                  type="text"
-                  placeholder="Mängd (valfritt)"
-                  value={newItemQty}
-                  onChange={e => setNewItemQty(e.target.value)}
-                  style={styles.qtyInput}
-                />
-                <select
-                  value={newItemCat}
-                  onChange={e => setNewItemCat(e.target.value)}
-                  style={styles.catSelect}
-                >
-                  {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
-              </div>
-              <div style={styles.addItemActions}>
-                <button
-                  onClick={() => { setShowAddItem(false); setNewItemName(''); setNewItemQty(''); }}
-                  style={{ ...S.button, ...S.buttonSecondary, flex: 1 }}
-                >
-                  Avbryt
-                </button>
-                <button
-                  onClick={addItem}
-                  disabled={!newItemName.trim()}
-                  style={{ ...S.button, ...S.buttonPrimary, flex: 1, opacity: newItemName.trim() ? 1 : 0.5 }}
-                >
-                  Lägg till
-                </button>
-              </div>
-            </div>
+            <ShoppingAddItem
+              onAdd={handleAddItem}
+              onCancel={() => setShowAddItem(false)}
+            />
           )}
 
-          {/* ── Varor per kategori ── */}
-          {Object.keys(uncheckedGroups).length === 0 && checkedItems.length === 0 ? (
-            <div style={styles.emptyList}>
-              <span style={{ fontSize: 36 }}>✨</span>
-              <p style={styles.emptyListText}>Listan är tom — lägg till varor!</p>
-            </div>
-          ) : (
-            <>
-              {Object.entries(uncheckedGroups).map(([cat, catItems]) => (
-                <div key={cat}>
-                  <h3 style={styles.catTitle}>{cat}</h3>
-                  {catItems.map(item => {
-                    const itemPrice = costEstimate.perItem[item.id];
-                    return (
-                      <div key={item.id} style={styles.itemRow}>
-                        <button onClick={() => toggleItem(item)} style={styles.itemCheck}>
-                          <div style={styles.checkCircle} />
-                        </button>
-                        <div style={styles.itemContent}>
-                          <span style={styles.itemName}>{item.name}</span>
-                          {item.quantity && (
-                            <span style={styles.itemQty}>{item.quantity}</span>
-                          )}
-                          {item.from_meal_plan && <span style={{ fontSize: 12 }}>🍽️</span>}
-                        </div>
-                        {itemPrice && (
-                          <PriceChip min={itemPrice[0]} max={itemPrice[1]} small />
-                        )}
-                        <button onClick={() => removeItem(item.id)} style={styles.removeItemBtn}>
-                          <X size={14} color={C.textMuted} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-
-              {/* ── Totalsumma-kort ── */}
-              {hasUnchecked && (
-                <div style={styles.totalCard}>
-                  <span style={styles.totalLabel}>Uppskattad totalkostnad</span>
-                  <span style={styles.totalAmount}>
-                    {formatPrice(costEstimate.min, costEstimate.max)}
-                  </span>
-                </div>
-              )}
-
-              {/* ── Avbockade ── */}
-              {checkedItems.length > 0 && (
-                <div style={styles.checkedSection}>
-                  <button
-                    onClick={() => setShowChecked(!showChecked)}
-                    style={styles.checkedToggle}
-                  >
-                    {showChecked ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    Avbockade ({checkedItems.length})
-                  </button>
-                  {showChecked && (
-                    <>
-                      {checkedItems.map(item => (
-                        <div key={item.id} style={{ ...styles.itemRow, opacity: 0.5 }}>
-                          <button onClick={() => toggleItem(item)} style={styles.itemCheck}>
-                            <Check size={16} color={C.success} />
-                          </button>
-                          <div style={styles.itemContent}>
-                            <span style={{ ...styles.itemName, textDecoration: 'line-through', color: C.textMuted }}>
-                              {item.name}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                      <button onClick={clearChecked} style={styles.clearBtn}>
-                        <Trash2 size={14} /> Rensa avbockade
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </>
-          )}
+          {/* ── Varulista ── */}
+          <ShoppingItemList
+            items={items}
+            onToggle={handleToggle}
+            onRemove={handleRemove}
+            onClearChecked={handleClearChecked}
+          />
 
           {/* ── Ta bort lista ── */}
           {currentList && !currentList.is_default && isParent && (
@@ -425,7 +257,6 @@ export function ShoppingView({ familyId, member, members }) {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = {
   page: {
     minHeight: '100vh',
@@ -514,168 +345,6 @@ const styles = {
     marginBottom: 12,
     boxSizing: 'border-box',
   },
-  addItemForm: {
-    padding: 14,
-    background: C.bgCard,
-    borderRadius: 14,
-    border: `1.5px solid ${C.border}`,
-    marginBottom: 12,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-  },
-  pricePreview: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 6,
-    padding: '4px 0',
-  },
-  addItemRow2: {
-    display: 'flex',
-    gap: 8,
-    marginTop: 8,
-  },
-  qtyInput: {
-    flex: 1,
-    padding: '8px 12px',
-    borderRadius: 8,
-    border: `1px solid ${C.border}`,
-    fontSize: F.sizes.sm,
-    fontFamily: F.body,
-    outline: 'none',
-    background: C.bg,
-  },
-  catSelect: {
-    flex: 1,
-    padding: '8px 10px',
-    borderRadius: 8,
-    border: `1px solid ${C.border}`,
-    fontSize: F.sizes.sm,
-    fontFamily: F.body,
-    background: C.bgCard,
-    outline: 'none',
-  },
-  addItemActions: {
-    display: 'flex',
-    gap: 8,
-    marginTop: 10,
-  },
-  catTitle: {
-    fontFamily: F.heading,
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.bold,
-    color: C.textMuted,
-    margin: '14px 0 6px',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  itemRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '10px 12px',
-    background: C.bgCard,
-    borderRadius: 10,
-    border: `1px solid ${C.borderLight}`,
-    marginBottom: 4,
-  },
-  itemCheck: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    padding: 2,
-    flexShrink: 0,
-  },
-  checkCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    border: `2px solid ${C.border}`,
-  },
-  itemContent: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    minWidth: 0,
-    overflow: 'hidden',
-  },
-  itemName: {
-    fontSize: F.sizes.md,
-    color: C.text,
-    fontWeight: F.weights.semi,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  itemQty: {
-    fontSize: F.sizes.xs,
-    color: C.textMuted,
-    background: C.bg,
-    padding: '2px 6px',
-    borderRadius: 4,
-    flexShrink: 0,
-  },
-  removeItemBtn: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    padding: 4,
-    flexShrink: 0,
-  },
-  totalCard: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 4,
-    padding: '14px 16px',
-    background: 'linear-gradient(135deg, #E1F5F3 0%, #F0FBF9 100%)',
-    borderRadius: 14,
-    border: `1.5px solid ${C.secondary}33`,
-  },
-  totalLabel: {
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.bold,
-    color: C.text,
-    fontFamily: F.heading,
-  },
-  totalAmount: {
-    fontSize: F.sizes.lg,
-    fontWeight: F.weights.extra,
-    color: C.secondary,
-    fontFamily: F.heading,
-  },
-  checkedSection: {
-    marginTop: 16,
-  },
-  checkedToggle: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    background: 'none',
-    border: 'none',
-    color: C.textMuted,
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-    cursor: 'pointer',
-    padding: '8px 0',
-  },
-  clearBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-    margin: '8px 0',
-    padding: '8px 14px',
-    borderRadius: 8,
-    border: 'none',
-    background: C.errorLight,
-    color: C.error,
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.semi,
-    cursor: 'pointer',
-    fontFamily: F.body,
-  },
   emptyState: {
     textAlign: 'center',
     padding: '48px 20px',
@@ -693,15 +362,6 @@ const styles = {
     fontSize: F.sizes.sm,
     color: C.textMuted,
     margin: 0,
-  },
-  emptyList: {
-    textAlign: 'center',
-    padding: '28px 20px',
-  },
-  emptyListText: {
-    fontSize: F.sizes.sm,
-    color: C.textMuted,
-    marginTop: 8,
   },
   deleteListBtn: {
     display: 'flex',
