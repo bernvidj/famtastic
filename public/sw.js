@@ -1,4 +1,4 @@
-const CACHE = 'famtastic-v2';
+const CACHE = 'famtastic-v3';
 
 // Only pre-cache immutable assets (not index.html — it changes on every deploy)
 const STATIC = [
@@ -43,7 +43,10 @@ self.addEventListener('fetch', e => {
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(res => {
-        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        if (res.ok) {
+          const clone = res.clone(); // klona synkront innan res konsumeras
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
         return res;
       });
     })

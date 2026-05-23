@@ -22,7 +22,7 @@ import { Home as HomeIcon } from 'lucide-react';
 
 // ── Lösenordsåterställning (visas när användaren klickar reset-länk i mail) ──
 function PasswordReset({ onDone }) {
-  const [ready,   setReady]   = useState(false);  // väntar på Supabase recovery-session
+  const [ready,   setReady]   = useState(false);
   const [pw,      setPw]      = useState('');
   const [pw2,     setPw2]     = useState('');
   const [saving,  setSaving]  = useState(false);
@@ -30,11 +30,8 @@ function PasswordReset({ onDone }) {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    // Vänta på att Supabase etablerar recovery-sessionen via hash-token
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setReady(true);
-      }
+      if (event === 'PASSWORD_RECOVERY') setReady(true);
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -88,17 +85,17 @@ function PasswordReset({ onDone }) {
 }
 
 export function App() {
-  const [session,       setSession]       = useState(null);
-  const [loading,       setLoading]       = useState(true);
-  // Kolla direkt om vi kom hit via en recovery-länk i mailet
-  const [passwordReset, setPasswordReset] = useState(
+  // ── All state deklareras överst — inga hooks efter conditional returns ──
+  const [session,        setSession]        = useState(null);
+  const [loading,        setLoading]        = useState(true);
+  const [passwordReset,  setPasswordReset]  = useState(
     () => window.location.hash.includes('type=recovery')
   );
-  const [activeMember,  setActiveMember]  = useState(() => {
+  const [activeMember,   setActiveMember]   = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('famtastic_active') || 'null'); }
     catch { return null; }
   });
-  const [familyId,   setFamilyId]   = useState(() => {
+  const [familyId,       setFamilyId]       = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('famtastic_active') || '{}').family_id || null; }
     catch { return null; }
   });
@@ -106,6 +103,16 @@ export function App() {
   const [familySettings, setFamilySettings] = useState({});
   const [page,           setPage]           = useState('home');
   const [showSetup,      setShowSetup]      = useState(false);
+
+  // locationFeatureEnabled baseras på familySettings — alltid beräknat, inte konditionellt
+  const locationFeatureEnabled = !!((familySettings.features || {}).location_sharing);
+  const isParent = !!(activeMember && (activeMember.role === 'admin' || activeMember.role === 'parent'));
+
+  // useLocationSharing anropas alltid på toppnivå — enabled=false om villkor ej uppfyllt
+  useLocationSharing(
+    activeMember?.id ?? null,
+    isParent && locationFeatureEnabled
+  );
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -117,7 +124,6 @@ export function App() {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      // Fånga upp password recovery-länk från mail
       if (_event === 'PASSWORD_RECOVERY') {
         setPasswordReset(true);
         setLoading(false);
@@ -129,6 +135,7 @@ export function App() {
         setActiveMember(null);
         setFamilyId(null);
         setAllMembers([]);
+        setFamilySettings({});
         setLoading(false);
       }
     });
@@ -147,7 +154,7 @@ export function App() {
         .from('families')
         .select('settings')
         .eq('id', fid)
-        .single(),
+        .maybeSingle(),   // maybeSingle undviker 406 om ingen rad hittas
     ]);
     setAllMembers(membRes.data || []);
     setFamilySettings(famRes.data?.settings || {});
@@ -165,6 +172,7 @@ export function App() {
     setActiveMember(null);
     setFamilyId(null);
     setAllMembers([]);
+    setFamilySettings({});
     setPage('home');
     supabase.auth.signOut();
   }
@@ -173,10 +181,9 @@ export function App() {
     sessionStorage.removeItem('famtastic_active');
     setActiveMember(null);
     setPage('home');
-    // session lever kvar → Login visar direkt memberväljaren
   }
 
-  // --- Password recovery via mail-länk (visas alltid först om vi kom via reset-länk) ---
+  // ── Conditional renders ────────────────────────────────────────────────────
   if (passwordReset) {
     return (
       <PasswordReset onDone={() => {
@@ -187,7 +194,6 @@ export function App() {
     );
   }
 
-  // --- Loading ---
   if (loading) {
     return (
       <div style={styles.loading}>
@@ -196,26 +202,14 @@ export function App() {
     );
   }
 
-  // --- Registrering ---
   if (showSetup) {
-    return (
-      <FamilySetup
-        onComplete={() => setShowSetup(false)}
-      />
-    );
+    return <FamilySetup onComplete={() => setShowSetup(false)} />;
   }
 
-  // --- Ingen session → visa login (steg 1: familjenamn + lösenord) ---
   if (!session) {
-    return (
-      <Login
-        onLogin={handleLogin}
-        onRegister={() => setShowSetup(true)}
-      />
-    );
+    return <Login onLogin={handleLogin} onRegister={() => setShowSetup(true)} />;
   }
 
-  // --- Session finns men ingen aktiv medlem → visa memberväljare (steg 2+3) ---
   if (!activeMember) {
     return (
       <Login
@@ -226,8 +220,6 @@ export function App() {
     );
   }
 
-  // --- Barnvy ---
-  const isParent = activeMember.role === 'admin' || activeMember.role === 'parent';
   if (!isParent) {
     return (
       <ChildApp
@@ -238,19 +230,7 @@ export function App() {
     );
   }
 
-  // --- GPS-feature flags ---
-  const locationFeatureEnabled = !!((familySettings.features || {}).location_sharing);
-  // memberSharing-state läses från Supabase i LocationView — här startar vi bara watchPosition
-  // när feature är på. Sharing_enabled per-member styrs av toggle i LocationView.
-  // Vi skickar enabled=false här; LocationView sköter sin egen toggle och kallar RPCn direkt.
-  // Hook sitter i App för att överleva navigering.
-  const [memberSharingEnabled, setMemberSharingEnabled] = React.useState(false);
-  useLocationSharing(
-    activeMember?.id ?? null,
-    locationFeatureEnabled && memberSharingEnabled
-  );
-
-  // --- Föräldravy ---
+  // ── Föräldravy ─────────────────────────────────────────────────────────────
   function renderPage() {
     switch (page) {
       case 'home':
@@ -266,13 +246,7 @@ export function App() {
       case 'shopping':
         return <ShoppingView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'location':
-        return (
-          <LocationView
-            familyId={familyId}
-            member={activeMember}
-            members={allMembers}
-          />
-        );
+        return <LocationView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'settings':
         return (
           <SettingsView
