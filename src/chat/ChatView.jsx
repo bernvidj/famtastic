@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F, TOPBAR_H } from '../data';
+import { MoodCard } from './MoodCard';
 
 function formatMsgTime(ts) {
   if (!ts) return '';
@@ -71,7 +72,7 @@ function MessageBubble({ msg, sender, isMe }) {
   );
 }
 
-export function ChatView({ familyId, member, members }) {
+export function ChatView({ familyId, member, members, moodEnabled }) {
   const [messages, setMessages] = useState([]);
   const [text,     setText]     = useState('');
   const [sending,  setSending]  = useState(false);
@@ -135,6 +136,11 @@ export function ChatView({ familyId, member, members }) {
       <div style={styles.header}>
         <h1 style={styles.title}>💬 Familjechatten</h1>
       </div>
+
+      {/* Familjestämning */}
+      {moodEnabled && (
+        <MoodCard familyId={familyId} member={member} members={members} />
+      )}
 
       {/* Innehåll */}
       {loading ? (

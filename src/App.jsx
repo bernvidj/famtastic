@@ -110,6 +110,7 @@ export function App() {
   // locationFeatureEnabled baseras på familySettings — alltid beräknat, inte konditionellt
   const locationFeatureEnabled = !!((familySettings.features || {}).location_sharing);
   const chatEnabled            = !!((familySettings.features || {}).chat);
+  const moodEnabled            = !!((familySettings.features || {}).mood);
   const isParent = !!(activeMember && (activeMember.role === 'admin' || activeMember.role === 'parent'));
 
   // useLocationSharing anropas alltid på toppnivå — enabled=false om villkor ej uppfyllt
@@ -248,7 +249,7 @@ export function App() {
       case 'meals':
         return <MealShoppingView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'chat':
-        return <ChatView familyId={familyId} member={activeMember} members={allMembers} />;
+        return <ChatView familyId={familyId} member={activeMember} members={allMembers} moodEnabled={moodEnabled} />;
       case 'location':
         return <LocationView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'settings':

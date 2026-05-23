@@ -399,6 +399,25 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout }) 
                 <div style={{ ...styles.toggleKnob, transform: getFeature('kids_shopping') ? 'translateX(22px)' : 'translateX(2px)' }} />
               </button>
             </div>
+
+            <div style={{ height: 1, background: C.borderLight, margin: '10px 0' }} />
+
+            <div style={styles.settingRow}>
+              <div style={{ flex: 1 }}>
+                <span style={styles.settingLabel}>😊 Familjestämning</span>
+                <span style={styles.settingDesc}>
+                  {getFeature('mood')
+                    ? 'Aktiverad — daglig stämningskoll i chatten'
+                    : 'Inaktiverad'}
+                </span>
+              </div>
+              <button
+                onClick={() => toggleFeature('mood')}
+                style={{ ...styles.toggleSwitch, background: getFeature('mood') ? C.secondary : C.border }}
+              >
+                <div style={{ ...styles.toggleKnob, transform: getFeature('mood') ? 'translateX(22px)' : 'translateX(2px)' }} />
+              </button>
+            </div>
           </div>
         )}
 
