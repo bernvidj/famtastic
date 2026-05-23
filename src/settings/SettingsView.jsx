@@ -12,28 +12,6 @@ import { Save, UserPlus, LogOut } from 'lucide-react';
 const AVATARS = ['😀','😎','🦊','🐻','🦄','🌟','🎨','⚽','🎵','🌈','🍕','🐱','🐶','🦋','🚀','💪'];
 const MEMBER_COLORS = C.memberColors;
 
-// ── Teal/mint former i headern ──
-function BgShapes() {
-  return (
-    <svg viewBox="0 0 390 120" xmlns="http://www.w3.org/2000/svg"
-      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}
-      preserveAspectRatio="xMidYMid slice">
-      <path d="M 298 -22 Q 418 -8, 412 72 Q 406 132, 308 116 Q 208 98, 224 34 Q 244 -18, 298 -22 Z" fill="#3CB4A6" opacity="0.18" />
-      <path d="M 328 -10 Q 424 12, 418 82 Q 410 136, 344 120 Q 280 104, 296 52 Q 314 6, 328 -10 Z" fill="#A8E6DF" opacity="0.22" />
-    </svg>
-  );
-}
-
-// ── Orange/coral former längst ner på sidan ──
-function PageBgShapes() {
-  return (
-    <svg style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: 260, pointerEvents: 'none', zIndex: 0 }}
-      viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
-      <path d="M 180 40 Q 390 0, 440 120 Q 468 205, 310 225 Q 155 242, 125 130 Q 100 45, 180 40 Z" fill="#FF7A59" opacity="0.2" />
-      <path d="M -65 115 Q 55 65, 150 125 Q 215 170, 162 248 Q 82 288, -25 256 Q -105 225, -65 115 Z" fill="#FFA071" opacity="0.2" />
-    </svg>
-  );
-}
 
 // ── App-ikon (inline SVG, identisk med Login/FamilySetup) ──
 function AppIcon({ size = 44 }) {
@@ -168,12 +146,10 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout }) 
 
   return (
     <div style={styles.page}>
-      <PageBgShapes />
       {toast && <div style={styles.toast}>{toast}</div>}
 
       {/* Header med organiska former */}
       <div style={styles.header}>
-        <BgShapes />
         <div style={styles.headerContent}>
           <AppIcon size={40} />
           <div>
@@ -357,7 +333,7 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout }) 
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', overflow: 'hidden' },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body },
 
   // Header med organiska former
   header: {

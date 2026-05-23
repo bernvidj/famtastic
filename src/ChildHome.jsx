@@ -17,27 +17,6 @@ function daysUntil(dateStr) {
   return Math.round((target - today) / 86400000);
 }
 
-// ─── Bakgrundsformer ──────────────────────────────────────────────────────────
-function BgShapes() {
-  return (
-    <svg style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: 260, pointerEvents: 'none', zIndex: 0 }}
-      viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
-      <path d="M 180 40 Q 390 0, 440 120 Q 468 205, 310 225 Q 155 242, 125 130 Q 100 45, 180 40 Z" fill="#FF7A59" opacity="0.2" />
-      <path d="M -65 115 Q 55 65, 150 125 Q 215 170, 162 248 Q 82 288, -25 256 Q -105 225, -65 115 Z" fill="#FFA071" opacity="0.2" />
-    </svg>
-  );
-}
-
-function HeaderBgShapes() {
-  return (
-    <svg viewBox="0 0 390 120" xmlns="http://www.w3.org/2000/svg"
-      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: -1 }}
-      preserveAspectRatio="xMidYMid slice">
-      <path d="M 298 -22 Q 418 -8, 412 72 Q 406 132, 308 116 Q 208 98, 224 34 Q 244 -18, 298 -22 Z" fill="#3CB4A6" opacity="0.18" />
-      <path d="M 328 -10 Q 424 12, 418 82 Q 410 136, 344 120 Q 280 104, 296 52 Q 314 6, 328 -10 Z" fill="#A8E6DF" opacity="0.22" />
-    </svg>
-  );
-}
 
 export function ChildHome({
   member, todayChores, isCompleted, toggleChore, streak,
@@ -82,7 +61,6 @@ export function ChildHome({
       <BgShapes />
 
       <div style={styles.headerZone}>
-        <HeaderBgShapes />
         <h1 style={styles.greeting}>{getGreeting(member.name)}</h1>
         {streak > 0 && (
           <div style={styles.streakPill}>
@@ -261,7 +239,6 @@ const styles = {
     position: 'relative',
     zIndex: 1,
     background: C.bg,
-    overflow: 'hidden',
     borderRadius: '0 0 24px 24px',
     borderBottom: '1px solid rgba(60,180,166,0.12)',
     padding: '16px 16px 20px',
