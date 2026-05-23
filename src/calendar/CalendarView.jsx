@@ -1,5 +1,6 @@
 // ============================================
 // FamTastic — CalendarView (week + day + recurring)
+// Placeras i: src/calendar/CalendarView.jsx
 // ============================================
 
 import React, { useState, useEffect } from 'react';
@@ -9,19 +10,15 @@ import { ChevronLeft, ChevronRight, Plus, X, Save, Clock, Users, CheckSquare, Tr
 
 const WEEKDAYS_SHORT = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
 const WEEKDAYS_PICK = [
-  { value: 1, label: 'Mån' },
-  { value: 2, label: 'Tis' },
-  { value: 3, label: 'Ons' },
-  { value: 4, label: 'Tor' },
-  { value: 5, label: 'Fre' },
-  { value: 6, label: 'Lör' },
+  { value: 1, label: 'Mån' }, { value: 2, label: 'Tis' }, { value: 3, label: 'Ons' },
+  { value: 4, label: 'Tor' }, { value: 5, label: 'Fre' }, { value: 6, label: 'Lör' },
   { value: 7, label: 'Sön' },
 ];
 const CATEGORIES = [
   { value: 'activity', label: 'Aktivitet', icon: '⚽' },
-  { value: 'school', label: 'Skola', icon: '📚' },
-  { value: 'birthday', label: 'Födelsedag', icon: '🎂' },
-  { value: 'other', label: 'Övrigt', icon: '📌' },
+  { value: 'school',   label: 'Skola',     icon: '📚' },
+  { value: 'birthday', label: 'Födelsedag',icon: '🎂' },
+  { value: 'other',    label: 'Övrigt',    icon: '📌' },
 ];
 
 function getWeekDates(offset) {
@@ -42,88 +39,85 @@ function fmtDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function fmtTime(t) {
-  if (!t) return '';
-  return t.slice(0, 5);
-}
+function fmtTime(t) { return t ? t.slice(0, 5) : ''; }
 
 function dateToDow(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
-  return d.getDay() || 7; // 1=Mon, 7=Sun
+  return d.getDay() || 7;
 }
 
 const EMPTY_EVENT = {
-  title: '',
-  description: '',
-  event_date: '',
-  start_time: '',
-  end_time: '',
-  category: 'other',
-  member_ids: [],
-  color: '',
-  is_recurring: false,
+  title: '', description: '', event_date: '', start_time: '', end_time: '',
+  category: 'other', member_ids: [], color: '', is_recurring: false,
   recurrence_rule: { frequency: 'weekly', days: [] },
 };
 
+// ─── Bakgrundsformer ──────────────────────────────────────────────────────────
+function BgShapes() {
+  return (
+    <svg
+      style={{
+        position: 'fixed', top: 0, left: 0,
+        width: '100%', height: '100%',
+        opacity: 0.07, pointerEvents: 'none', zIndex: 0,
+      }}
+      viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      <path d="M -40 -30 Q 100 -60, 180 80 Q 230 180, 120 240 Q 20 290, -30 180 Q -80 80, -40 -30 Z" fill="#3CB4A6" />
+      <path d="M 300 -20 Q 430 10, 440 140 Q 448 230, 350 260 Q 260 285, 230 190 Q 205 105, 300 -20 Z" fill="#A8E6DF" />
+      <path d="M 220 640 Q 400 600, 440 720 Q 462 800, 320 810 Q 180 818, 160 720 Q 145 640, 220 640 Z" fill="#FF7A59" />
+      <path d="M -50 700 Q 50 650, 130 710 Q 185 755, 140 820 Q 75 855, -15 820 Q -90 790, -50 700 Z" fill="#FFA071" />
+    </svg>
+  );
+}
+
 export function CalendarView({ familyId, member, members }) {
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [events, setEvents] = useState([]);
-  const [chores, setChores] = useState([]);
-  const [completions, setCompletions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [weekOffset,   setWeekOffset]   = useState(0);
+  const [events,       setEvents]       = useState([]);
+  const [chores,       setChores]       = useState([]);
+  const [completions,  setCompletions]  = useState([]);
+  const [loading,      setLoading]      = useState(true);
   const [selectedDate, setSelectedDate] = useState(null);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState(EMPTY_EVENT);
+  const [editing,      setEditing]      = useState(null);
+  const [form,         setForm]         = useState(EMPTY_EVENT);
 
   const weekDates = getWeekDates(weekOffset);
-  const weekNum = getWeekNumber(weekDates[0]);
-  const today = todayStr();
-  const isParent = member.role === 'admin' || member.role === 'parent';
+  const weekNum   = getWeekNumber(weekDates[0]);
+  const today     = todayStr();
+  const isParent  = member.role === 'admin' || member.role === 'parent';
+  const children  = members.filter(m => m.role === 'child');
 
-  useEffect(() => {
-    loadData();
-  }, [weekOffset, familyId]);
+  useEffect(() => { loadData(); }, [weekOffset, familyId]);
 
   async function loadData() {
     setLoading(true);
     const startDate = fmtDate(weekDates[0]);
-    const endDate = fmtDate(weekDates[6]);
-
+    const endDate   = fmtDate(weekDates[6]);
     const [evRes, chRes, compRes] = await Promise.all([
-      // Get events for this week + all recurring events
-      supabase.from('calendar_events').select('*')
-        .eq('family_id', familyId)
+      supabase.from('calendar_events').select('*').eq('family_id', familyId)
         .or(`and(event_date.gte.${startDate},event_date.lte.${endDate}),is_recurring.eq.true`)
         .order('start_time'),
-      supabase.from('chores').select('*')
-        .eq('family_id', familyId),
-      supabase.from('chore_completions').select('*')
-        .eq('family_id', familyId)
-        .gte('completed_date', startDate)
-        .lte('completed_date', endDate),
+      supabase.from('chores').select('*').eq('family_id', familyId),
+      supabase.from('chore_completions').select('*').eq('family_id', familyId)
+        .gte('completed_date', startDate).lte('completed_date', endDate),
     ]);
-
     setEvents(evRes.data || []);
     setChores(chRes.data || []);
     setCompletions(compRes.data || []);
     setLoading(false);
   }
 
-  // --- Get events for a specific date (including recurring) ---
   function getEventsForDate(dateStr) {
     const dow = dateToDow(dateStr);
     return events.filter(ev => {
-      // Non-recurring: exact date match
       if (!ev.is_recurring) return ev.event_date === dateStr;
-      // Recurring: check day of week
       const days = safeArray(ev.recurrence_rule?.days);
       if (days.length > 0) return days.includes(dow);
-      // Recurring without specific days: show on same weekday as created
       return dateToDow(ev.event_date) === dow;
     });
   }
 
-  // --- Chores for a specific date ---
   function getChoresForDate(dateStr) {
     const dow = dateToDow(dateStr);
     return chores.filter(c => {
@@ -131,20 +125,15 @@ export function CalendarView({ familyId, member, members }) {
         const days = safeArray(c.recurrence_rule.days);
         if (days.length > 0) return days.includes(dow);
       }
-      if (!c.is_recurring) return true;
-      return false;
+      return !c.is_recurring;
     });
   }
 
   function isChoreCompleted(choreId, memberId, dateStr) {
-    return completions.some(
-      c => c.chore_id === choreId && c.member_id === memberId && c.completed_date === dateStr
-    );
+    return completions.some(c => c.chore_id === choreId && c.member_id === memberId && c.completed_date === dateStr);
   }
 
-  function getMember(id) {
-    return members.find(m => m.id === id);
-  }
+  function getMember(id) { return members.find(m => m.id === id); }
 
   function getMemberColor(memberIds) {
     if (!Array.isArray(memberIds) || memberIds.length === 0) return C.secondary;
@@ -152,23 +141,16 @@ export function CalendarView({ familyId, member, members }) {
     return m?.color || C.secondary;
   }
 
-  // --- Event CRUD ---
-  function openNewEvent(dateStr) {
-    setForm({ ...EMPTY_EVENT, event_date: dateStr });
-    setEditing('new');
-  }
+  function openNewEvent(dateStr) { setForm({ ...EMPTY_EVENT, event_date: dateStr }); setEditing('new'); }
 
   function openEditEvent(event) {
     setForm({
-      title: event.title || '',
-      description: event.description || '',
+      title: event.title || '', description: event.description || '',
       event_date: event.event_date || '',
       start_time: event.start_time ? fmtTime(event.start_time) : '',
-      end_time: event.end_time ? fmtTime(event.end_time) : '',
-      category: event.category || 'other',
-      member_ids: safeArray(event.member_ids),
-      color: event.color || '',
-      is_recurring: event.is_recurring || false,
+      end_time:   event.end_time   ? fmtTime(event.end_time)   : '',
+      category: event.category || 'other', member_ids: safeArray(event.member_ids),
+      color: event.color || '', is_recurring: event.is_recurring || false,
       recurrence_rule: event.recurrence_rule || { frequency: 'weekly', days: [] },
     });
     setEditing(event);
@@ -178,39 +160,28 @@ export function CalendarView({ familyId, member, members }) {
     setForm(prev => {
       const rule = { ...prev.recurrence_rule };
       const days = Array.isArray(rule.days) ? [...rule.days] : [];
-      if (days.includes(day)) {
-        rule.days = days.filter(d => d !== day);
-      } else {
-        rule.days = [...days, day].sort((a, b) => a - b);
-      }
+      rule.days = days.includes(day) ? days.filter(d => d !== day) : [...days, day].sort((a, b) => a - b);
       return { ...prev, recurrence_rule: rule };
     });
   }
 
   async function handleSave() {
     if (!form.title.trim()) return;
-
     const data = {
-      family_id: familyId,
-      title: form.title.trim(),
+      family_id: familyId, title: form.title.trim(),
       description: form.description.trim() || null,
       event_date: form.event_date,
-      start_time: form.start_time || null,
-      end_time: form.end_time || null,
-      category: form.category,
-      member_ids: form.member_ids,
-      color: form.color || null,
-      is_recurring: form.is_recurring,
+      start_time: form.start_time || null, end_time: form.end_time || null,
+      category: form.category, member_ids: form.member_ids,
+      color: form.color || null, is_recurring: form.is_recurring,
       recurrence_rule: form.is_recurring ? form.recurrence_rule : null,
       created_by: member.id,
     };
-
     if (editing && editing !== 'new' && editing.id) {
       await supabase.from('calendar_events').update(data).eq('id', editing.id);
     } else {
       await supabase.from('calendar_events').insert(data);
     }
-
     setEditing(null);
     loadData();
   }
@@ -230,18 +201,15 @@ export function CalendarView({ familyId, member, members }) {
     }));
   }
 
-  const children = members.filter(m => m.role === 'child');
-
   return (
     <div style={styles.page}>
+      <BgShapes />
+
       {/* Header */}
       <div style={styles.header}>
-        <h1 style={styles.pageTitle}>Kalender</h1>
+        <h1 style={styles.pageTitle}>📅 Kalender</h1>
         {isParent && selectedDate && (
-          <button
-            onClick={() => openNewEvent(selectedDate)}
-            style={{ ...S.button, ...S.buttonPrimary, padding: '8px 16px' }}
-          >
+          <button onClick={() => openNewEvent(selectedDate)} style={{ ...S.button, ...S.buttonPrimary, padding: '8px 16px' }}>
             <Plus size={18} /> Ny händelse
           </button>
         )}
@@ -266,40 +234,25 @@ export function CalendarView({ familyId, member, members }) {
       {/* Week strip */}
       <div style={styles.weekStrip}>
         {weekDates.map((d, i) => {
-          const dateStr = fmtDate(d);
-          const isToday = dateStr === today;
-          const isSelected = dateStr === selectedDate;
+          const dateStr     = fmtDate(d);
+          const isToday     = dateStr === today;
+          const isSelected  = dateStr === selectedDate;
           const eventsForDay = getEventsForDate(dateStr);
-
           return (
             <button
               key={i}
               onClick={() => setSelectedDate(dateStr === selectedDate ? null : dateStr)}
-              style={{
-                ...styles.dayCol,
-                background: isSelected ? C.primary : isToday ? C.primaryLight : 'transparent',
-                borderRadius: 14,
-              }}
+              style={{ ...styles.dayCol, background: isSelected ? C.primary : isToday ? C.primaryLight : 'transparent', borderRadius: 14 }}
             >
-              <span style={{
-                ...styles.dayName,
-                color: isSelected ? '#fff' : isToday ? C.primary : C.textMuted,
-              }}>
+              <span style={{ ...styles.dayName, color: isSelected ? '#fff' : isToday ? C.primary : C.textMuted }}>
                 {WEEKDAYS_SHORT[i]}
               </span>
-              <span style={{
-                ...styles.dayNum,
-                color: isSelected ? '#fff' : isToday ? C.primary : C.text,
-                fontWeight: isToday || isSelected ? F.weights.extra : F.weights.semi,
-              }}>
+              <span style={{ ...styles.dayNum, color: isSelected ? '#fff' : isToday ? C.primary : C.text, fontWeight: isToday || isSelected ? F.weights.extra : F.weights.semi }}>
                 {d.getDate()}
               </span>
               <div style={styles.dotRow}>
                 {eventsForDay.slice(0, 3).map((ev, ei) => (
-                  <div key={ev.id + '-' + ei} style={{
-                    ...styles.dot,
-                    background: isSelected ? 'rgba(255,255,255,0.7)' : (ev.color || getMemberColor(safeArray(ev.member_ids))),
-                  }} />
+                  <div key={ev.id + '-' + ei} style={{ ...styles.dot, background: isSelected ? 'rgba(255,255,255,0.7)' : (ev.color || getMemberColor(safeArray(ev.member_ids))) }} />
                 ))}
               </div>
             </button>
@@ -307,28 +260,19 @@ export function CalendarView({ familyId, member, members }) {
         })}
       </div>
 
+      {/* Content */}
       {loading ? (
         <p style={styles.loadingText}>Laddar...</p>
       ) : !selectedDate ? (
-        /* --- Week overview --- */
         <div style={styles.content}>
           {weekDates.map((d, i) => {
             const dateStr = fmtDate(d);
-            const evs = getEventsForDate(dateStr);
-            const chs = getChoresForDate(dateStr);
+            const evs     = getEventsForDate(dateStr);
+            const chs     = getChoresForDate(dateStr);
             const isToday = dateStr === today;
             if (evs.length === 0 && chs.length === 0) return null;
-
             return (
-              <button
-                key={i}
-                onClick={() => setSelectedDate(dateStr)}
-                style={{
-                  ...styles.weekDayRow,
-                  borderLeft: isToday ? `4px solid ${C.primary}` : `4px solid transparent`,
-                  background: isToday ? C.primaryLight : C.bgCard,
-                }}
-              >
+              <button key={i} onClick={() => setSelectedDate(dateStr)} style={{ ...styles.weekDayRow, borderLeft: isToday ? `4px solid ${C.primary}` : `4px solid transparent`, background: isToday ? C.primaryLight : C.bgCard }}>
                 <div style={styles.weekDayHeader}>
                   <span style={{ ...styles.weekDayName, color: isToday ? C.primary : C.text }}>
                     {WEEKDAYS_SHORT[i]} {d.getDate()}/{d.getMonth() + 1}
@@ -336,33 +280,21 @@ export function CalendarView({ familyId, member, members }) {
                 </div>
                 {evs.map((ev, ei) => (
                   <div key={ev.id + '-' + ei} style={styles.weekEventRow}>
-                    <div style={{
-                      ...styles.weekEventDot,
-                      background: ev.color || getMemberColor(safeArray(ev.member_ids)),
-                    }} />
-                    <span style={styles.weekEventTitle}>
-                      {ev.start_time ? fmtTime(ev.start_time) + ' ' : ''}
-                      {ev.title}
-                    </span>
+                    <div style={{ ...styles.weekEventDot, background: ev.color || getMemberColor(safeArray(ev.member_ids)) }} />
+                    <span style={styles.weekEventTitle}>{ev.start_time ? fmtTime(ev.start_time) + ' ' : ''}{ev.title}</span>
                     {ev.is_recurring && <Repeat size={10} color={C.textMuted} />}
                   </div>
                 ))}
                 {chs.length > 0 && (
                   <div style={styles.weekChoreRow}>
                     <CheckSquare size={12} color={C.textMuted} />
-                    <span style={styles.weekChoreText}>
-                      {chs.length} syssla{chs.length > 1 ? 'or' : ''}
-                    </span>
+                    <span style={styles.weekChoreText}>{chs.length} syssla{chs.length > 1 ? 'or' : ''}</span>
                   </div>
                 )}
               </button>
             );
           })}
-
-          {weekDates.every(d => {
-            const dateStr = fmtDate(d);
-            return getEventsForDate(dateStr).length === 0 && getChoresForDate(dateStr).length === 0;
-          }) && (
+          {weekDates.every(d => getEventsForDate(fmtDate(d)).length === 0 && getChoresForDate(fmtDate(d)).length === 0) && (
             <div style={styles.emptyState}>
               <span style={{ fontSize: 40 }}>📅</span>
               <p style={styles.emptyTitle}>Lugn vecka!</p>
@@ -371,7 +303,6 @@ export function CalendarView({ familyId, member, members }) {
           )}
         </div>
       ) : (
-        /* --- Day detail --- */
         <div style={styles.content}>
           <div style={styles.dayDetailHeader}>
             <h2 style={styles.dayDetailTitle}>
@@ -384,21 +315,13 @@ export function CalendarView({ familyId, member, members }) {
             )}
           </div>
 
-          {/* Events */}
           {getEventsForDate(selectedDate).length > 0 && (
             <div style={styles.section}>
               <h3 style={styles.sectionLabel}>Händelser</h3>
               {getEventsForDate(selectedDate).map((ev, ei) => {
                 const catInfo = CATEGORIES.find(c => c.value === ev.category) || CATEGORIES[3];
                 return (
-                  <button
-                    key={ev.id + '-' + ei}
-                    onClick={() => isParent && openEditEvent(ev)}
-                    style={{
-                      ...styles.eventCard,
-                      borderLeft: `4px solid ${ev.color || getMemberColor(safeArray(ev.member_ids))}`,
-                    }}
-                  >
+                  <button key={ev.id + '-' + ei} onClick={() => isParent && openEditEvent(ev)} style={{ ...styles.eventCard, borderLeft: `4px solid ${ev.color || getMemberColor(safeArray(ev.member_ids))}` }}>
                     <div style={styles.eventTop}>
                       <span style={styles.eventIcon}>{catInfo.icon}</span>
                       <div style={styles.eventContent}>
@@ -429,14 +352,11 @@ export function CalendarView({ familyId, member, members }) {
             </div>
           )}
 
-          {/* Chores */}
           {getChoresForDate(selectedDate).length > 0 && (
             <div style={styles.section}>
               <h3 style={styles.sectionLabel}>Sysslor</h3>
               {children.map(child => {
-                const childChores = getChoresForDate(selectedDate).filter(c =>
-                  !c.assigned_to || c.assigned_to === child.id
-                );
+                const childChores = getChoresForDate(selectedDate).filter(c => !c.assigned_to || c.assigned_to === child.id);
                 if (childChores.length === 0) return null;
                 return (
                   <div key={child.id} style={styles.choreGroup}>
@@ -445,18 +365,10 @@ export function CalendarView({ familyId, member, members }) {
                       const done = isChoreCompleted(chore.id, child.id, selectedDate);
                       return (
                         <div key={chore.id} style={{ ...styles.choreItem, opacity: done ? 0.5 : 1 }}>
-                          <span style={{ ...styles.choreCheck, color: done ? C.success : C.border }}>
-                            {done ? '✅' : '○'}
-                          </span>
-                          <span style={{ ...styles.choreName, textDecoration: done ? 'line-through' : 'none' }}>
-                            {chore.icon} {chore.title}
-                          </span>
-                          {chore.chore_type === 'bonus' && chore.points > 0 && (
-                            <span style={styles.chorePoints}>{chore.points} kr</span>
-                          )}
-                          {chore.chore_type === 'base' && (
-                            <span style={styles.choreBase}>Grund</span>
-                          )}
+                          <span style={{ ...styles.choreCheck, color: done ? C.success : C.border }}>{done ? '✅' : '○'}</span>
+                          <span style={{ ...styles.choreName, textDecoration: done ? 'line-through' : 'none' }}>{chore.icon} {chore.title}</span>
+                          {chore.chore_type === 'bonus' && chore.points > 0 && <span style={styles.chorePoints}>{chore.points} kr</span>}
+                          {chore.chore_type === 'base' && <span style={styles.choreBase}>Grund</span>}
                         </div>
                       );
                     })}
@@ -467,9 +379,7 @@ export function CalendarView({ familyId, member, members }) {
           )}
 
           {getEventsForDate(selectedDate).length === 0 && getChoresForDate(selectedDate).length === 0 && (
-            <div style={styles.emptyDay}>
-              <p style={styles.emptyDayText}>Inget planerat denna dag</p>
-            </div>
+            <div style={styles.emptyDay}><p style={styles.emptyDayText}>Inget planerat denna dag</p></div>
           )}
         </div>
       )}
@@ -481,67 +391,31 @@ export function CalendarView({ familyId, member, members }) {
         <div style={styles.overlay}>
           <div style={styles.modal}>
             <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>
-                {editing === 'new' ? 'Ny händelse' : 'Redigera händelse'}
-              </h2>
-              <button onClick={() => setEditing(null)} style={styles.closeBtn}>
-                <X size={20} color={C.textMuted} />
-              </button>
+              <h2 style={styles.modalTitle}>{editing === 'new' ? 'Ny händelse' : 'Redigera händelse'}</h2>
+              <button onClick={() => setEditing(null)} style={styles.closeBtn}><X size={20} color={C.textMuted} /></button>
             </div>
-
             <div style={styles.modalBody}>
               <label style={styles.label}>Titel</label>
-              <input
-                type="text"
-                placeholder="T.ex. Fotbollsträning"
-                value={form.title}
-                onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
-                style={S.input}
-                autoFocus
-              />
+              <input type="text" placeholder="T.ex. Fotbollsträning" value={form.title} onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))} style={S.input} autoFocus />
 
               <label style={{ ...styles.label, marginTop: 14 }}>Datum</label>
-              <input
-                type="date"
-                value={form.event_date}
-                onChange={e => setForm(prev => ({ ...prev, event_date: e.target.value }))}
-                style={S.input}
-              />
+              <input type="date" value={form.event_date} onChange={e => setForm(prev => ({ ...prev, event_date: e.target.value }))} style={S.input} />
 
               <div style={styles.timeRow}>
                 <div style={{ flex: 1 }}>
                   <label style={styles.label}>Starttid</label>
-                  <input
-                    type="time"
-                    value={form.start_time}
-                    onChange={e => setForm(prev => ({ ...prev, start_time: e.target.value }))}
-                    style={S.input}
-                  />
+                  <input type="time" value={form.start_time} onChange={e => setForm(prev => ({ ...prev, start_time: e.target.value }))} style={S.input} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={styles.label}>Sluttid</label>
-                  <input
-                    type="time"
-                    value={form.end_time}
-                    onChange={e => setForm(prev => ({ ...prev, end_time: e.target.value }))}
-                    style={S.input}
-                  />
+                  <input type="time" value={form.end_time} onChange={e => setForm(prev => ({ ...prev, end_time: e.target.value }))} style={S.input} />
                 </div>
               </div>
 
               <label style={{ ...styles.label, marginTop: 14 }}>Kategori</label>
               <div style={styles.catRow}>
                 {CATEGORIES.map(cat => (
-                  <button
-                    key={cat.value}
-                    onClick={() => setForm(prev => ({ ...prev, category: cat.value }))}
-                    style={{
-                      ...styles.catBtn,
-                      background: form.category === cat.value ? C.primary : C.bgCard,
-                      color: form.category === cat.value ? '#fff' : C.text,
-                      border: form.category === cat.value ? `2px solid ${C.primary}` : `2px solid ${C.border}`,
-                    }}
-                  >
+                  <button key={cat.value} onClick={() => setForm(prev => ({ ...prev, category: cat.value }))} style={{ ...styles.catBtn, background: form.category === cat.value ? C.primary : C.bgCard, color: form.category === cat.value ? '#fff' : C.text, border: form.category === cat.value ? `2px solid ${C.primary}` : `2px solid ${C.border}` }}>
                     {cat.icon} {cat.label}
                   </button>
                 ))}
@@ -550,61 +424,25 @@ export function CalendarView({ familyId, member, members }) {
               <label style={{ ...styles.label, marginTop: 14 }}>Vilka gäller det?</label>
               <div style={styles.memberRow}>
                 {members.map(m => (
-                  <button
-                    key={m.id}
-                    onClick={() => toggleMember(m.id)}
-                    style={{
-                      ...styles.memberBtn,
-                      background: form.member_ids.includes(m.id) ? C.primaryLight : C.bgCard,
-                      border: form.member_ids.includes(m.id) ? `2px solid ${C.primary}` : `2px solid ${C.border}`,
-                    }}
-                  >
+                  <button key={m.id} onClick={() => toggleMember(m.id)} style={{ ...styles.memberBtn, background: form.member_ids.includes(m.id) ? C.primaryLight : C.bgCard, border: form.member_ids.includes(m.id) ? `2px solid ${C.primary}` : `2px solid ${C.border}` }}>
                     {m.avatar} {m.name}
                   </button>
                 ))}
               </div>
 
-              {/* Recurring */}
               <label style={{ ...styles.label, marginTop: 14 }}>Återkommande</label>
               <div style={styles.toggleRow}>
-                <button
-                  onClick={() => setForm(prev => ({ ...prev, is_recurring: false }))}
-                  style={{
-                    ...styles.toggleBtn,
-                    background: !form.is_recurring ? C.text : C.bgCard,
-                    color: !form.is_recurring ? '#fff' : C.text,
-                  }}
-                >
-                  Engång
-                </button>
-                <button
-                  onClick={() => setForm(prev => ({ ...prev, is_recurring: true }))}
-                  style={{
-                    ...styles.toggleBtn,
-                    background: form.is_recurring ? C.text : C.bgCard,
-                    color: form.is_recurring ? '#fff' : C.text,
-                  }}
-                >
-                  Varje vecka
-                </button>
+                <button onClick={() => setForm(prev => ({ ...prev, is_recurring: false }))} style={{ ...styles.toggleBtn, background: !form.is_recurring ? C.text : C.bgCard, color: !form.is_recurring ? '#fff' : C.text }}>Engång</button>
+                <button onClick={() => setForm(prev => ({ ...prev, is_recurring: true }))} style={{ ...styles.toggleBtn, background: form.is_recurring ? C.text : C.bgCard, color: form.is_recurring ? '#fff' : C.text }}>Varje vecka</button>
               </div>
 
               {form.is_recurring && (
                 <div style={styles.dayPickRow}>
                   {WEEKDAYS_PICK.map(d => {
-                    const days = Array.isArray(form.recurrence_rule?.days) ? form.recurrence_rule.days : [];
+                    const days   = Array.isArray(form.recurrence_rule?.days) ? form.recurrence_rule.days : [];
                     const active = days.includes(d.value);
                     return (
-                      <button
-                        key={d.value}
-                        onClick={() => toggleFormDay(d.value)}
-                        style={{
-                          ...styles.dayPickBtn,
-                          background: active ? C.primary : C.bgCard,
-                          color: active ? '#fff' : C.text,
-                          border: active ? `2px solid ${C.primary}` : `2px solid ${C.border}`,
-                        }}
-                      >
+                      <button key={d.value} onClick={() => toggleFormDay(d.value)} style={{ ...styles.dayPickBtn, background: active ? C.primary : C.bgCard, color: active ? '#fff' : C.text, border: active ? `2px solid ${C.primary}` : `2px solid ${C.border}` }}>
                         {d.label}
                       </button>
                     );
@@ -613,30 +451,15 @@ export function CalendarView({ familyId, member, members }) {
               )}
 
               <label style={{ ...styles.label, marginTop: 14 }}>Beskrivning (valfritt)</label>
-              <input
-                type="text"
-                placeholder="Extra info..."
-                value={form.description}
-                onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))}
-                style={S.input}
-              />
+              <input type="text" placeholder="Extra info..." value={form.description} onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))} style={S.input} />
             </div>
 
             <div style={styles.modalFooter}>
               {editing !== 'new' && editing.id && (
-                <button onClick={() => handleDelete(editing.id)} style={styles.deleteBtn}>
-                  <Trash2 size={16} /> Ta bort
-                </button>
+                <button onClick={() => handleDelete(editing.id)} style={styles.deleteBtn}><Trash2 size={16} /> Ta bort</button>
               )}
               <div style={{ flex: 1 }} />
-              <button
-                onClick={handleSave}
-                disabled={!form.title.trim() || !form.event_date}
-                style={{
-                  ...S.button, ...S.buttonPrimary,
-                  opacity: form.title.trim() && form.event_date ? 1 : 0.5,
-                }}
-              >
+              <button onClick={handleSave} disabled={!form.title.trim() || !form.event_date} style={{ ...S.button, ...S.buttonPrimary, opacity: form.title.trim() && form.event_date ? 1 : 0.5 }}>
                 <Save size={16} /> {editing === 'new' ? 'Skapa' : 'Spara'}
               </button>
             </div>
@@ -648,22 +471,22 @@ export function CalendarView({ familyId, member, members }) {
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 16px 8px' },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 16px 8px', position: 'relative', zIndex: 1 },
   pageTitle: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: 0 },
-  weekNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 16px' },
+  weekNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 16px', position: 'relative', zIndex: 1 },
   weekBtn: { background: 'none', border: 'none', cursor: 'pointer', padding: 8 },
   weekTitle: { display: 'flex', alignItems: 'center', gap: 8 },
   weekLabel: { fontFamily: F.heading, fontSize: F.sizes.lg, fontWeight: F.weights.extra, color: C.text },
   todayBtn: { padding: '4px 12px', borderRadius: 8, border: 'none', background: C.primaryLight, color: C.primary, fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer' },
-  weekStrip: { display: 'flex', gap: 4, padding: '8px 12px 12px', overflowX: 'auto' },
+  weekStrip: { display: 'flex', gap: 4, padding: '8px 12px 12px', overflowX: 'auto', position: 'relative', zIndex: 1 },
   dayCol: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 4px', minWidth: 44, cursor: 'pointer', border: 'none', background: 'none' },
   dayName: { fontSize: F.sizes.xs, marginBottom: 4, fontFamily: F.heading, fontWeight: F.weights.semi },
   dayNum: { fontSize: F.sizes.lg, marginBottom: 4, fontFamily: F.heading },
   dotRow: { display: 'flex', gap: 3, marginTop: 2 },
   dot: { width: 6, height: 6, borderRadius: 3 },
-  content: { padding: '0 16px' },
-  loadingText: { textAlign: 'center', color: C.textMuted, padding: 32 },
+  content: { padding: '0 16px', position: 'relative', zIndex: 1 },
+  loadingText: { textAlign: 'center', color: C.textMuted, padding: 32, position: 'relative', zIndex: 1 },
   weekDayRow: { display: 'block', width: '100%', padding: '10px 14px', borderRadius: 12, border: `1px solid ${C.borderLight}`, marginBottom: 6, cursor: 'pointer', textAlign: 'left' },
   weekDayHeader: { marginBottom: 4 },
   weekDayName: { fontFamily: F.heading, fontSize: F.sizes.sm, fontWeight: F.weights.bold },
