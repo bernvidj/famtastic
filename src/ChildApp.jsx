@@ -14,6 +14,7 @@ import { ChildMoneyView } from './money/ChildMoneyView';
 import { Celebration } from './Celebrations';
 import { useLocationSharing } from './location/useLocationSharing';
 import { LocationView } from './location/LocationView';
+import { ChatView } from './chat/ChatView';
 import { Home, Calendar, CheckSquare, PiggyBank, LogOut } from 'lucide-react';
 
 const BASE_NAV = [
@@ -51,15 +52,19 @@ export function ChildApp({ familyId, member, onLogout }) {
   const [childSharingEnabled, setChildSharingEnabled] = useState(false);
   const [kidsShoppingEnabled, setKidsShoppingEnabled] = useState(false);
   const [defaultListId, setDefaultListId] = useState(null);
+  const [chatEnabled, setChatEnabled] = useState(false);
   const { data, loading, reload } = useChildData(familyId, member.id, true);
 
   // GPS: hook alltid på toppnivå — watchPosition startar när båda flaggor är true
   useLocationSharing(member.id, locationFeatureOn && childSharingEnabled);
 
-  // Dynamisk nav — lägg till Plats-flik när GPS-feature är på
-  const NAV = locationFeatureOn
-    ? [...BASE_NAV, { id: 'location', label: 'Plats', emoji: '📍' }]
-    : BASE_NAV;
+  // Dynamisk nav — lägg till funktionsflikar beroende på aktiva features
+  const NAV = (() => {
+    let items = [...BASE_NAV];
+    if (chatEnabled)     items.push({ id: 'chat',     label: 'Chatt', emoji: '💬' });
+    if (locationFeatureOn) items.push({ id: 'location', label: 'Plats', emoji: '📍' });
+    return items;
+  })();
 
   const [schoolSchedule,     setSchoolSchedule]     = useState([]);
   const [schoolSubjects,     setSchoolSubjects]      = useState([]);
@@ -79,6 +84,7 @@ export function ChildApp({ familyId, member, onLogout }) {
         if (features) {
           setLocationFeatureOn(!!features.location_sharing);
           setKidsShoppingEnabled(!!features.kids_shopping);
+          setChatEnabled(!!features.chat);
         }
       });
   }, [familyId]);
@@ -390,6 +396,14 @@ export function ChildApp({ familyId, member, onLogout }) {
           schoolSchedule={schoolSchedule} schoolSubjects={schoolSubjects}
           schoolSpecialEvents={schoolSpecialEvents} exams={exams}
           onReload={() => { loadSchoolData(); reload(); }}
+        />
+      )}
+
+      {page === 'chat' && (
+        <ChatView
+          familyId={familyId}
+          member={member}
+          members={members}
         />
       )}
 

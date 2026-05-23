@@ -16,10 +16,10 @@ const NAV_ITEMS = [
   { id: 'settings', label: 'Mer',     icon: Settings },
 ];
 
-export function Nav({ active, onNavigate, locationEnabled }) {
-  const items = locationEnabled
-    ? [...NAV_ITEMS, { id: 'location', label: 'Plats', emoji: '📍' }]
-    : NAV_ITEMS;
+export function Nav({ active, onNavigate, locationEnabled, chatEnabled }) {
+  let items = [...NAV_ITEMS];
+  if (chatEnabled)    items.push({ id: 'chat',     label: 'Chatt', emoji: '💬' });
+  if (locationEnabled) items.push({ id: 'location', label: 'Plats', emoji: '📍' });
 
   return (
     <nav style={styles.nav}>

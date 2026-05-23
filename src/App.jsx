@@ -17,6 +17,7 @@ import { SettingsView } from './settings/SettingsView';
 import { ChildApp } from './ChildApp';
 import { LocationView } from './location/LocationView';
 import { useLocationSharing } from './location/useLocationSharing';
+import { ChatView } from './chat/ChatView';
 import { C } from './data';
 import { Home as HomeIcon } from 'lucide-react';
 
@@ -109,6 +110,7 @@ export function App() {
 
   // locationFeatureEnabled baseras på familySettings — alltid beräknat, inte konditionellt
   const locationFeatureEnabled = !!((familySettings.features || {}).location_sharing);
+  const chatEnabled            = !!((familySettings.features || {}).chat);
   const isParent = !!(activeMember && (activeMember.role === 'admin' || activeMember.role === 'parent'));
 
   // useLocationSharing anropas alltid på toppnivå — enabled=false om villkor ej uppfyllt
@@ -250,6 +252,8 @@ export function App() {
         return <MealPlan familyId={familyId} member={activeMember} members={allMembers} onGenerateShopping={() => setPage('shopping')} />;
       case 'shopping':
         return <ShoppingView familyId={familyId} member={activeMember} members={allMembers} />;
+      case 'chat':
+        return <ChatView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'location':
         return <LocationView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'settings':
@@ -271,7 +275,7 @@ export function App() {
   return (
     <div>
       {renderPage()}
-      <Nav active={page} onNavigate={setPage} locationEnabled={locationFeatureEnabled} />
+      <Nav active={page} onNavigate={setPage} locationEnabled={locationFeatureEnabled} chatEnabled={chatEnabled} />
     </div>
   );
 }
