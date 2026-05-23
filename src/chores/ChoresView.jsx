@@ -12,6 +12,26 @@ import { ChorePoolCard } from './ChorePoolCard';
 import { ChoreEditor } from './ChoreEditor';
 import { Plus, List, CalendarDays, Trophy, HandMetal } from 'lucide-react';
 
+// ─── Bakgrundsformer ──────────────────────────────────────────────────────────
+function BgShapes() {
+  return (
+    <svg
+      style={{
+        position: 'absolute', top: 0, left: 0,
+        width: '100%', height: '100%',
+        opacity: 0.18, pointerEvents: 'none',
+      }}
+      viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      <path d="M -40 -30 Q 100 -60, 180 80 Q 230 180, 120 240 Q 20 290, -30 180 Q -80 80, -40 -30 Z" fill="#3CB4A6" />
+      <path d="M 300 -20 Q 430 10, 440 140 Q 448 230, 350 260 Q 260 285, 230 190 Q 205 105, 300 -20 Z" fill="#A8E6DF" />
+      <path d="M 220 640 Q 400 600, 440 720 Q 462 800, 320 810 Q 180 818, 160 720 Q 145 640, 220 640 Z" fill="#FF7A59" />
+      <path d="M -50 700 Q 50 650, 130 710 Q 185 755, 140 820 Q 75 855, -15 820 Q -90 790, -50 700 Z" fill="#FFA071" />
+    </svg>
+  );
+}
+
 export function ChoresView({ familyId, member, members }) {
   const [tab, setTab] = useState('today');
   const [chores, setChores] = useState([]);
@@ -112,15 +132,12 @@ export function ChoresView({ familyId, member, members }) {
   function getPoolChores() {
     return chores.filter(c => {
       if (!c.pool || c.assigned_to) return false;
-      // One-off dated: only show on that date
       if (c.scheduled_date) return c.scheduled_date !== today ? false : true;
-      // Recurring with days: only show on scheduled days
       if (c.is_recurring && c.recurrence_rule) {
         if (c.recurrence_rule.until && today > c.recurrence_rule.until) return false;
         const days = safeArray(c.recurrence_rule.days);
         if (days.length > 0 && !days.includes(todayDow)) return false;
       }
-      // No schedule = show always
       return true;
     });
   }
@@ -201,9 +218,11 @@ export function ChoresView({ familyId, member, members }) {
 
   return (
     <div style={styles.page}>
+      <BgShapes />
+
       {toastMsg && <div style={styles.toast}>{toastMsg}</div>}
 
-      <div style={styles.header}>
+      <div style={{ ...styles.header, position: 'relative', zIndex: 1 }}>
         <h1 style={styles.pageTitle}>Sysslor</h1>
         {isParent && (
           <button onClick={() => setEditing('new')} style={styles.addBtn}>
@@ -212,7 +231,7 @@ export function ChoresView({ familyId, member, members }) {
         )}
       </div>
 
-      <div style={styles.tabRow}>
+      <div style={{ ...styles.tabRow, position: 'relative', zIndex: 1 }}>
         {[
           { key: 'today', label: 'Idag', icon: CalendarDays },
           ...(hasPool ? [{ key: 'pool', label: 'Plocka', icon: HandMetal }] : []),
@@ -237,7 +256,7 @@ export function ChoresView({ familyId, member, members }) {
       </div>
 
       {tab === 'today' && members.filter(m => m.role === 'child').length > 1 && (
-        <div style={styles.filterRow}>
+        <div style={{ ...styles.filterRow, position: 'relative', zIndex: 1 }}>
           <button
             onClick={() => setFilterMember(null)}
             style={{
@@ -259,9 +278,9 @@ export function ChoresView({ familyId, member, members }) {
       )}
 
       {loading ? (
-        <p style={styles.loadingText}>Laddar sysslor...</p>
+        <p style={{ ...styles.loadingText, position: 'relative', zIndex: 1 }}>Laddar sysslor...</p>
       ) : tab === 'today' ? (
-        <div style={styles.content}>
+        <div style={{ ...styles.content, position: 'relative', zIndex: 1 }}>
           {getTodayChores().length === 0 ? (
             <div style={S.emptyState}>
               <span style={{ fontSize: 48 }}>🎉</span>
@@ -310,7 +329,7 @@ export function ChoresView({ familyId, member, members }) {
           )}
         </div>
       ) : tab === 'pool' ? (
-        <div style={styles.content}>
+        <div style={{ ...styles.content, position: 'relative', zIndex: 1 }}>
           {poolChores.length > 0 && (
             <div style={styles.choreGroup}>
               <p style={S.sectionLabel}>Öppna sysslor — plocka en!</p>
@@ -354,7 +373,7 @@ export function ChoresView({ familyId, member, members }) {
           )}
         </div>
       ) : (
-        <div style={styles.content}>
+        <div style={{ ...styles.content, position: 'relative', zIndex: 1 }}>
           {chores.length === 0 ? (
             <div style={S.emptyState}>
               <span style={{ fontSize: 48 }}>📋</span>
@@ -428,7 +447,7 @@ export function ChoresView({ familyId, member, members }) {
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', overflow: 'hidden' },
   toast: {
     position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
     background: C.text, color: '#fff', padding: '12px 24px', borderRadius: 99,
