@@ -2,11 +2,12 @@
 // FamTastic — SavingsGoal (progress card)
 // ============================================
 
-import React from 'react';
+import React, { useState } from 'react';
 import { C, F, formatKr } from '../data';
-import { Target, PartyPopper } from 'lucide-react';
+import { Trash2, X, Check } from 'lucide-react';
 
-export function SavingsGoal({ goal, saved, members }) {
+export function SavingsGoal({ goal, saved, members, onDelete }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const progress = Math.min(100, (saved / goal.target_amount) * 100);
   const isFamily = goal.is_family_goal;
   const owner = !isFamily && goal.member_id
@@ -30,7 +31,23 @@ export function SavingsGoal({ goal, saved, members }) {
           <span style={styles.savedAmount}>{formatKr(saved)}</span>
           <span style={styles.targetAmount}>av {formatKr(goal.target_amount)}</span>
         </div>
+        {onDelete && !confirmDelete && (
+          <button onClick={() => setConfirmDelete(true)} style={styles.deleteBtn} title="Ta bort mål">
+            <Trash2 size={14} color={C.textMuted} />
+          </button>
+        )}
       </div>
+
+      {/* Bekräftelse för ta bort */}
+      {confirmDelete && (
+        <div style={styles.confirmRow}>
+          <span style={styles.confirmText}>Ta bort "{goal.title}"? Sparade pengar behålls.</span>
+          <button onClick={() => setConfirmDelete(false)} style={styles.confirmNo}><X size={14} /></button>
+          <button onClick={() => { setConfirmDelete(false); onDelete(goal); }} style={styles.confirmYes}>
+            <Check size={14} /> Ta bort
+          </button>
+        </div>
+      )}
 
       {/* Progress bar */}
       <div style={styles.barBg}>
@@ -142,5 +159,59 @@ const styles = {
   remaining: {
     fontSize: F.sizes.xs,
     color: C.textMuted,
+  },
+  deleteBtn: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 6,
+    borderRadius: 8,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginLeft: 4,
+    minWidth: 32,
+    minHeight: 32,
+  },
+  confirmRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '8px 10px',
+    background: C.errorLight,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  confirmText: {
+    flex: 1,
+    fontSize: F.sizes.xs,
+    color: C.error,
+    fontFamily: F.heading,
+    fontWeight: F.weights.semi,
+  },
+  confirmNo: {
+    background: 'none',
+    border: `1px solid ${C.error}`,
+    borderRadius: 6,
+    padding: '4px 8px',
+    cursor: 'pointer',
+    color: C.error,
+    display: 'flex',
+    alignItems: 'center',
+  },
+  confirmYes: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    background: C.error,
+    border: 'none',
+    borderRadius: 6,
+    padding: '4px 10px',
+    cursor: 'pointer',
+    color: '#fff',
+    fontSize: F.sizes.xs,
+    fontWeight: F.weights.bold,
+    fontFamily: F.heading,
   },
 };

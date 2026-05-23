@@ -89,6 +89,17 @@ export function MoneyView({ familyId, member, members }) {
     setLoading(false);
   }
 
+  async function handleDeleteChildGoal(goal) {
+    // Lossa alla transaktioner kopplade till målet → fri sparande
+    await supabase.from('money_transactions')
+      .update({ savings_goal_id: null })
+      .eq('savings_goal_id', goal.id)
+      .eq('family_id', familyId);
+    // Ta bort målet
+    await supabase.from('savings_goals').delete().eq('id', goal.id);
+    loadAll();
+  }
+
   function loadAll() { loadChildData(); loadFamilyGoals(); loadAllChildrenTx(); setRefreshKey(k => k + 1); }
   function getBalance() { return transactions.reduce((s, tx) => s + tx.amount, 0); }
 
@@ -149,8 +160,6 @@ export function MoneyView({ familyId, member, members }) {
 
   return (
     <div style={styles.page}>
-      <BgShapes />
-
       <div style={styles.headerZone}>
         <div style={styles.header}>
           <h1 style={styles.pageTitle}>Pengar</h1>
@@ -319,7 +328,15 @@ export function MoneyView({ familyId, member, members }) {
             {goals.length > 0 && (
               <div style={styles.section}>
                 <p style={S.sectionLabel}>Sparmål</p>
-                {goals.map(g => <SavingsGoal key={g.id} goal={g} saved={g._saved || 0} members={members} />)}
+                {goals.map(g => (
+                  <SavingsGoal
+                    key={g.id}
+                    goal={g}
+                    saved={g._saved || 0}
+                    members={members}
+                    onDelete={isParent ? handleDeleteChildGoal : null}
+                  />
+                ))}
               </div>
             )}
 
