@@ -305,10 +305,12 @@ export function ChildApp({ familyId, member, onLogout }) {
 
       {page === 'calendar' && (
         <ChildCalendar
-          today={today} getMyEvents={getMyEvents}
+          today={today} familyId={familyId} memberId={member.id}
+          getMyEvents={getMyEvents}
           getChoresForDate={getChoresForDate} isCompletedOnDate={isCompletedOnDate}
           schoolSchedule={schoolSchedule} schoolSubjects={schoolSubjects}
           schoolSpecialEvents={schoolSpecialEvents} exams={exams}
+          onReload={() => { loadSchoolData(); reload(); }}
         />
       )}
 
