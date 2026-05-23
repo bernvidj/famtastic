@@ -32,9 +32,9 @@ function BgShapes() {
   return (
     <svg
       style={{
-        position: 'fixed', top: 0, left: 0,
+        position: 'absolute', top: 0, left: 0,
         width: '100%', height: '100%',
-        opacity: 0.07, pointerEvents: 'none', zIndex: 0,
+        opacity: 0.18, pointerEvents: 'none',
       }}
       viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="xMidYMid slice"
@@ -342,7 +342,7 @@ export function Home({ familyId, member, members }) {
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, paddingBottom: 20, position: 'relative' },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, paddingBottom: 20, position: 'relative', overflow: 'hidden' },
   weekHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px 8px', position: 'relative', zIndex: 1 },
   weekBtn: { background: 'none', border: 'none', cursor: 'pointer', padding: 8, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   weekTitle: { display: 'flex', alignItems: 'center', gap: 8 },
