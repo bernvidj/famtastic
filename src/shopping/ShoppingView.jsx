@@ -17,9 +17,9 @@ function BgShapes() {
   return (
     <svg
       style={{
-        position: 'fixed', top: 0, left: 0,
+        position: 'absolute', top: 0, left: 0,
         width: '100%', height: '100%',
-        opacity: 0.10, pointerEvents: 'none', zIndex: 0,
+        opacity: 0.18, pointerEvents: 'none',
       }}
       viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="xMidYMid slice"
@@ -263,6 +263,7 @@ const styles = {
     background: C.bg,
     fontFamily: F.body,
     position: 'relative',
+    overflow: 'hidden',
   },
   header: {
     display: 'flex',
