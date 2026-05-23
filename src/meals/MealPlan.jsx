@@ -32,7 +32,7 @@ function fmtDate(d) {
 }
 
 
-export function MealPlan({ familyId, member, members, onGenerateShopping }) {
+export function MealPlan({ familyId, member, members, onGenerateShopping, stacked }) {
   const [tab, setTab] = useState('plan');
   const [weekOffset, setWeekOffset] = useState(0);
   const [mealPlan, setMealPlan] = useState([]);
@@ -136,7 +136,7 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
   }
 
   return (
-    <div style={styles.page}>
+    <div style={{ ...styles.page, ...(stacked && { minHeight: 'auto', paddingBottom: 0 }) }}>
       <BgShapes variant="meals" />
       <div style={styles.headerZone}>
         {/* Header */}

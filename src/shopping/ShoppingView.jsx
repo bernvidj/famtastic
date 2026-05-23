@@ -15,7 +15,7 @@ import { BgShapes } from '../BgShapes';
 
 
 // ─── Huvud-vy ─────────────────────────────────────────────────────────────────
-export function ShoppingView({ familyId, member, members }) {
+export function ShoppingView({ familyId, member, members, stacked }) {
   const [lists,        setLists]        = useState([]);
   const [selectedList, setSelectedList] = useState(null);
   const [items,        setItems]        = useState([]);
@@ -114,7 +114,7 @@ export function ShoppingView({ familyId, member, members }) {
   }
 
   return (
-    <div style={styles.page}>
+    <div style={{ ...styles.page, ...(stacked && { minHeight: 'auto', paddingBottom: 0 }) }}>
       <BgShapes variant="shopping" />
       <div style={styles.headerZone}>
         {/* ── Header ── */}

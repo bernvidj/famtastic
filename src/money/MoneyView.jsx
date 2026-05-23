@@ -23,7 +23,7 @@ const TX_LABELS = {
 };
 
 
-export function MoneyView({ familyId, member, members }) {
+export function MoneyView({ familyId, member, members, stacked }) {
   const [selectedChild, setSelectedChild] = useState(null);
   const [transactions, setTransactions] = useState([]);
   const [allChildrenTx, setAllChildrenTx] = useState([]);
@@ -147,7 +147,7 @@ export function MoneyView({ familyId, member, members }) {
 
   if (children.length === 0) {
     return (
-      <div style={styles.page}>
+      <div style={{ ...styles.page, ...(stacked && { minHeight: 'auto', paddingBottom: 0 }) }}>
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div style={S.emptyState}>
             <span style={{ fontSize: 48 }}>💰</span>
@@ -160,7 +160,7 @@ export function MoneyView({ familyId, member, members }) {
   }
 
   return (
-    <div style={styles.page}>
+    <div style={{ ...styles.page, ...(stacked && { minHeight: 'auto', paddingBottom: 0 }) }}>
       <BgShapes variant="money" />
       <div style={styles.headerZone}>
         <div style={styles.header}>

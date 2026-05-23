@@ -10,10 +10,8 @@ import { C, F, TOPBAR_H } from './data';
 const PAGE_TITLES = {
   home:     'Hem',
   schedule: 'Schema',
-  chores:   'Sysslor',
-  money:    'Pengar',
-  meals:    'Mat',
-  shopping: 'Handla',
+  chores:   'Sysslor & Pengar',
+  meals:    'Mat & Handla',
   location: 'Plats',
   chat:     'Chatt',
   settings: 'Inställningar',

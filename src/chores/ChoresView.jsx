@@ -14,7 +14,7 @@ import { Plus, List, CalendarDays, Trophy, HandMetal } from 'lucide-react';
 import { BgShapes } from '../BgShapes';
 
 
-export function ChoresView({ familyId, member, members }) {
+export function ChoresView({ familyId, member, members, stacked }) {
   const [tab, setTab] = useState('today');
   const [chores, setChores] = useState([]);
   const [completions, setCompletions] = useState([]);
@@ -199,7 +199,7 @@ export function ChoresView({ familyId, member, members }) {
   const hasPool = poolChores.length > 0 || claimedPoolChores.length > 0;
 
   return (
-    <div style={styles.page}>
+    <div style={{ ...styles.page, ...(stacked && { minHeight: 'auto', paddingBottom: 0 }) }}>
       <BgShapes variant="chores" />
       {toastMsg && <div style={styles.toast}>{toastMsg}</div>}
 

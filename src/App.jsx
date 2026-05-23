@@ -8,10 +8,8 @@ import { Login } from './Login';
 import { FamilySetup } from './FamilySetup';
 import { Nav } from './Nav';
 import { Home } from './Home';
-import { ChoresView } from './chores/ChoresView';
-import { MoneyView } from './money/MoneyView';
-import { MealPlan } from './meals/MealPlan';
-import { ShoppingView } from './shopping/ShoppingView';
+import { ChoresMoneyView } from './ChoresMoneyView';
+import { MealShoppingView } from './MealShoppingView';
 import { ScheduleView } from './ScheduleView';
 import { SettingsView } from './settings/SettingsView';
 import { ChildApp } from './ChildApp';
@@ -246,13 +244,9 @@ export function App() {
       case 'schedule':
         return <ScheduleView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'chores':
-        return <ChoresView familyId={familyId} member={activeMember} members={allMembers} />;
-      case 'money':
-        return <MoneyView familyId={familyId} member={activeMember} members={allMembers} />;
+        return <ChoresMoneyView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'meals':
-        return <MealPlan familyId={familyId} member={activeMember} members={allMembers} onGenerateShopping={() => setPage('shopping')} />;
-      case 'shopping':
-        return <ShoppingView familyId={familyId} member={activeMember} members={allMembers} />;
+        return <MealShoppingView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'chat':
         return <ChatView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'location':
