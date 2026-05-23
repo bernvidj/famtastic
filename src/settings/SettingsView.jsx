@@ -12,35 +12,25 @@ import { Save, UserPlus, LogOut } from 'lucide-react';
 const AVATARS = ['😀','😎','🦊','🐻','🦄','🌟','🎨','⚽','🎵','🌈','🍕','🐱','🐶','🦋','🚀','💪'];
 const MEMBER_COLORS = C.memberColors;
 
-// ── Organiska bakgrundsformer (teal/mint uppe till höger, korall/persika nere till vänster) ──
+// ── Teal/mint former i headern ──
 function BgShapes() {
   return (
-    <svg
-      viewBox="0 0 390 200"
-      xmlns="http://www.w3.org/2000/svg"
-      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 200, pointerEvents: 'none', zIndex: 0 }}
-      preserveAspectRatio="xMidYMid slice"
-    >
-      {/* Teal form uppe till höger */}
-      <path
-        d="M 320 -30 Q 430 -10, 420 80 Q 410 160, 310 140 Q 210 120, 230 40 Q 250 -30, 320 -30 Z"
-        fill="#3CB4A6" opacity="0.18"
-      />
-      {/* Mint form, lite innanför */}
-      <path
-        d="M 350 -10 Q 420 20, 410 100 Q 400 160, 340 145 Q 285 130, 300 70 Q 315 10, 350 -10 Z"
-        fill="#A8E6DF" opacity="0.22"
-      />
-      {/* Persika form nere till vänster */}
-      <path
-        d="M -30 120 Q 30 60, 110 90 Q 175 115, 155 175 Q 135 225, 50 210 Q -20 195, -30 120 Z"
-        fill="#FFA071" opacity="0.18"
-      />
-      {/* Korall, liten accent */}
-      <path
-        d="M -10 150 Q 40 110, 90 135 Q 130 155, 115 195 Q 100 230, 45 220 Q -10 205, -10 150 Z"
-        fill="#FF7A59" opacity="0.15"
-      />
+    <svg viewBox="0 0 390 120" xmlns="http://www.w3.org/2000/svg"
+      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}
+      preserveAspectRatio="xMidYMid slice">
+      <path d="M 298 -22 Q 418 -8, 412 72 Q 406 132, 308 116 Q 208 98, 224 34 Q 244 -18, 298 -22 Z" fill="#3CB4A6" opacity="0.18" />
+      <path d="M 328 -10 Q 424 12, 418 82 Q 410 136, 344 120 Q 280 104, 296 52 Q 314 6, 328 -10 Z" fill="#A8E6DF" opacity="0.22" />
+    </svg>
+  );
+}
+
+// ── Orange/coral former längst ner på sidan ──
+function PageBgShapes() {
+  return (
+    <svg style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: 260, pointerEvents: 'none', zIndex: 0 }}
+      viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <path d="M 180 40 Q 390 0, 440 120 Q 468 205, 310 225 Q 155 242, 125 130 Q 100 45, 180 40 Z" fill="#FF7A59" opacity="0.2" />
+      <path d="M -65 115 Q 55 65, 150 125 Q 215 170, 162 248 Q 82 288, -25 256 Q -105 225, -65 115 Z" fill="#FFA071" opacity="0.2" />
     </svg>
   );
 }
@@ -178,6 +168,7 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout }) 
 
   return (
     <div style={styles.page}>
+      <PageBgShapes />
       {toast && <div style={styles.toast}>{toast}</div>}
 
       {/* Header med organiska former */}
@@ -366,7 +357,7 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout }) 
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', overflow: 'hidden' },
 
   // Header med organiska former
   header: {
