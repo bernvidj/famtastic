@@ -46,6 +46,12 @@ export function SchoolView({ familyId, member, members }) {
 
   const today = todayStr();
   const todayDow = (() => { const d = new Date().getDay(); return d === 0 || d === 6 ? 1 : d; })();
+  const weekStartStr = (() => {
+    const d = new Date();
+    const dow = d.getDay() || 7;
+    d.setDate(d.getDate() - dow + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
   const viewDay = selectedDay || todayDow;
   const children = members.filter(m => m.role === 'child');
 
@@ -56,7 +62,7 @@ export function SchoolView({ familyId, member, members }) {
     const [schRes, subRes, evRes, ruRes, exRes] = await Promise.all([
       supabase.from('school_schedule').select('*').eq('family_id', familyId),
       supabase.from('school_subjects').select('*').or(`is_global.eq.true,family_id.eq.${familyId}`),
-      supabase.from('school_special_events').select('*').eq('family_id', familyId).gte('event_date', today),
+      supabase.from('school_special_events').select('*').eq('family_id', familyId).gte('event_date', weekStartStr),
       supabase.from('school_rules').select('*').eq('family_id', familyId).eq('is_active', true),
       supabase.from('school_exams').select('*').eq('family_id', familyId).gte('exam_date', today).order('exam_date'),
     ]);

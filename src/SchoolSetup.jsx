@@ -444,7 +444,7 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, display: 'flex', flexDirection: 'column', paddingBottom: 70 },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, display: 'flex', flexDirection: 'column', paddingBottom: 160 },
   header: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: C.bgCard, borderBottom: `1px solid ${C.borderLight}` },
   title: { flex: 1, fontFamily: F.heading, fontSize: F.sizes.lg, fontWeight: F.weights.bold, color: C.text, margin: 0 },
   stepLabel: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading, fontWeight: F.weights.semi },
@@ -452,7 +452,7 @@ const styles = {
   body: { flex: 1, padding: '16px', overflowY: 'auto' },
   subtitle: { fontSize: F.sizes.sm, color: C.textMuted, fontFamily: F.heading, margin: '0 0 16px' },
   hint: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading, margin: '-4px 0 8px' },
-  footer: { position: 'fixed', bottom: 60, left: 0, right: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderTop: `1px solid ${C.borderLight}`, background: C.bgCard, zIndex: 50 },
+  footer: { position: 'fixed', bottom: 70, left: 0, right: 0, display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', borderTop: `1px solid ${C.borderLight}`, background: C.bgCard, zIndex: 50 },
   subjectToggle: { display: 'flex', alignItems: 'center', width: '100%', padding: '12px 16px', borderRadius: 14, border: `1.5px solid ${C.borderLight}`, background: C.bgCard, cursor: 'pointer', textAlign: 'left', marginBottom: 8 },
   subjectToggleText: { flex: 1, fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
   subjectSection: { padding: '8px 0 12px', borderBottom: `1px solid ${C.borderLight}`, marginBottom: 8 },

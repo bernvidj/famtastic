@@ -1,56 +1,30 @@
 // ============================================
-// FamTastic — ParentActionItems
-// Pending actions: withdrawals, savings, family goal transfers
+// FamTastic — ParentActionItems (compact)
+// Pending: withdrawals, savings, family goal transfers
 // ============================================
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
-import { C, F, S, formatKr } from './data';
-import { AlertTriangle, CheckCircle, Wallet, PiggyBank, Target } from 'lucide-react';
+import { C, F, formatKr } from './data';
+import { CheckCircle, Wallet, PiggyBank, Target } from 'lucide-react';
 
 const ACTION_CONFIG = {
-  withdrawal: {
-    icon: Wallet,
-    color: C.primary,
-    bg: C.primaryLight,
-    verb: 'betalat ut',
-    pastVerb: 'Utbetald',
-    instruction: 'Swisha eller ge kontant, bekräfta sedan här.',
-  },
-  saving: {
-    icon: PiggyBank,
-    color: C.secondary,
-    bg: C.secondaryLight,
-    verb: 'fört över till sparkonto',
-    pastVerb: 'Överförd',
-    instruction: 'För över till barnets sparkonto, bekräfta sedan här.',
-  },
-  family_goal: {
-    icon: Target,
-    color: C.accent,
-    bg: C.accentLight,
-    verb: 'fört över till familjemålet',
-    pastVerb: 'Överförd',
-    instruction: 'För över till familjens sparkonto, bekräfta sedan här.',
-  },
+  withdrawal: { icon: Wallet,    color: C.primary,   bg: C.primaryLight,   label: 'Utbetalning',  verb: 'betalat ut' },
+  saving:     { icon: PiggyBank, color: C.secondary, bg: C.secondaryLight, label: 'Sparkonto',    verb: 'fört över till sparkonto' },
+  family_goal:{ icon: Target,    color: C.accent,    bg: C.accentLight,    label: 'Familjemål',   verb: 'fört över till familjemålet' },
 };
 
 export function ParentActionItems({ familyId, members, onUpdate }) {
   const [pendingItems, setPendingItems] = useState([]);
-  const [confirming, setConfirming] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [confirming,   setConfirming]   = useState(null);
+  const [loading,      setLoading]      = useState(true);
 
   const children = members.filter(m => m.role === 'child');
 
-  useEffect(() => {
-    loadPending();
-  }, [familyId]);
+  useEffect(() => { loadPending(); }, [familyId]);
 
   async function loadPending() {
     setLoading(true);
-
-    // Get recent withdrawals, savings and family_goal transactions
-    // that haven't been confirmed (no "[BEKRÄFTAD]" in description)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
@@ -62,67 +36,49 @@ export function ParentActionItems({ familyId, members, onUpdate }) {
       .gte('created_at', sevenDaysAgo.toISOString())
       .order('created_at', { ascending: false });
 
-    // Filter out already confirmed ones
-    const pending = (data || []).filter(tx =>
-      !tx.description?.includes('[BEKRÄFTAD]')
-    );
-
-    // Group by type + member for savings/withdrawals, by type for family_goal
+    const pending = (data || []).filter(tx => !tx.description?.includes('[BEKRÄFTAD]'));
     const grouped = [];
 
-    // Group family_goal: sum all unconfirmed
     const fgItems = pending.filter(tx => tx.type === 'family_goal');
     if (fgItems.length > 0) {
-      const totalAmount = fgItems.reduce((s, tx) => s + Math.abs(tx.amount), 0);
-      const contributors = [...new Set(fgItems.map(tx => tx.member_id))];
       grouped.push({
         type: 'family_goal',
         txIds: fgItems.map(tx => tx.id),
-        amount: totalAmount,
-        memberIds: contributors,
-        description: fgItems[0]?.description || 'Familjemål',
-        goalName: fgItems[0]?.description?.replace('Bidrag till ', '') || 'Familjemål',
+        amount: fgItems.reduce((s, tx) => s + Math.abs(tx.amount), 0),
+        memberIds: [...new Set(fgItems.map(tx => tx.member_id))],
+        label: fgItems[0]?.description?.replace('Bidrag till ', '') || 'Familjemål',
       });
     }
 
-    // Group per child for withdrawals and savings
     for (const child of children) {
-      const childWithdrawals = pending.filter(tx =>
-        tx.type === 'withdrawal' && tx.member_id === child.id
-      );
-      if (childWithdrawals.length > 0) {
+      const withdrawals = pending.filter(tx => tx.type === 'withdrawal' && tx.member_id === child.id);
+      if (withdrawals.length > 0) {
         grouped.push({
           type: 'withdrawal',
-          txIds: childWithdrawals.map(tx => tx.id),
-          amount: childWithdrawals.reduce((s, tx) => s + Math.abs(tx.amount), 0),
+          txIds: withdrawals.map(tx => tx.id),
+          amount: withdrawals.reduce((s, tx) => s + Math.abs(tx.amount), 0),
           memberIds: [child.id],
-          description: `${child.name} vill ha pengar utbetalda`,
+          label: `${child.avatar} ${child.name}`,
         });
       }
 
-      const childSavings = pending.filter(tx =>
-        tx.type === 'saving' && tx.member_id === child.id
-      );
-      if (childSavings.length > 0) {
-        // Group by savings_goal_id
-        const byGoal = {};
-        for (const tx of childSavings) {
-          const key = tx.savings_goal_id || 'general';
-          if (!byGoal[key]) byGoal[key] = { txs: [], amount: 0 };
-          byGoal[key].txs.push(tx);
-          byGoal[key].amount += Math.abs(tx.amount);
-        }
-        for (const [goalId, group] of Object.entries(byGoal)) {
-          const goalName = group.txs[0]?.description?.replace('Sparande till ', '') || 'Sparmål';
-          grouped.push({
-            type: 'saving',
-            txIds: group.txs.map(tx => tx.id),
-            amount: group.amount,
-            memberIds: [child.id],
-            description: `${child.name}: ${goalName}`,
-            goalName,
-          });
-        }
+      const savings = pending.filter(tx => tx.type === 'saving' && tx.member_id === child.id);
+      const byGoal = {};
+      for (const tx of savings) {
+        const key = tx.savings_goal_id || 'general';
+        if (!byGoal[key]) byGoal[key] = { txs: [], amount: 0, desc: tx.description };
+        byGoal[key].txs.push(tx);
+        byGoal[key].amount += Math.abs(tx.amount);
+      }
+      for (const group of Object.values(byGoal)) {
+        const goalName = group.desc?.replace('Sparande till ', '') || 'Sparmål';
+        grouped.push({
+          type: 'saving',
+          txIds: group.txs.map(tx => tx.id),
+          amount: group.amount,
+          memberIds: [child.id],
+          label: `${child.avatar} ${child.name} – ${goalName}`,
+        });
       }
     }
 
@@ -132,81 +88,43 @@ export function ParentActionItems({ familyId, members, onUpdate }) {
 
   async function confirmItem(item) {
     setConfirming(item.txIds[0]);
-
-    // Mark all transactions as confirmed by appending [BEKRÄFTAD] to description
     for (const txId of item.txIds) {
-      const { data: tx } = await supabase
-        .from('money_transactions')
-        .select('description')
-        .eq('id', txId)
-        .single();
-
-      const newDesc = (tx?.description || '') + ' [BEKRÄFTAD]';
-      await supabase
-        .from('money_transactions')
-        .update({ description: newDesc })
+      const { data: tx } = await supabase.from('money_transactions').select('description').eq('id', txId).single();
+      await supabase.from('money_transactions')
+        .update({ description: (tx?.description || '') + ' [BEKRÄFTAD]' })
         .eq('id', txId);
     }
-
     setConfirming(null);
     loadPending();
     if (onUpdate) onUpdate();
-  }
-
-  function getMember(id) {
-    return members.find(m => m.id === id);
   }
 
   if (loading || pendingItems.length === 0) return null;
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>
-        <AlertTriangle size={16} color={C.error} />
-        <span style={styles.headerText}>Att göra ({pendingItems.length})</span>
-      </div>
-
+      <p style={styles.sectionLabel}>Att göra ({pendingItems.length})</p>
       {pendingItems.map((item, i) => {
-        const config = ACTION_CONFIG[item.type];
-        const Icon = config.icon;
-        const memberAvatars = item.memberIds
-          .map(id => getMember(id))
-          .filter(Boolean)
-          .map(m => m.avatar)
-          .join(' ');
+        const cfg = ACTION_CONFIG[item.type];
+        const Icon = cfg.icon;
         const isConfirming = confirming === item.txIds[0];
-
         return (
-          <div key={i} style={{ ...styles.card, borderColor: config.color }}>
-            <div style={styles.cardTop}>
-              <div style={{ ...styles.iconWrap, background: config.bg }}>
-                <Icon size={20} color={config.color} />
-              </div>
-              <div style={styles.cardInfo}>
-                <span style={styles.cardTitle}>
-                  {memberAvatars} {item.type === 'family_goal'
-                    ? `Familjemål: ${item.goalName}`
-                    : item.description}
-                </span>
-                <span style={styles.cardAmount}>{formatKr(item.amount)}</span>
-              </div>
+          <div key={i} style={styles.row}>
+            <div style={{ ...styles.iconWrap, background: cfg.bg }}>
+              <Icon size={16} color={cfg.color} />
             </div>
-
-            <p style={styles.instruction}>{config.instruction}</p>
-
+            <div style={styles.rowInfo}>
+              <span style={styles.rowLabel}>{item.label}</span>
+              <span style={{ ...styles.rowType, color: cfg.color }}>{cfg.label}</span>
+            </div>
+            <span style={styles.rowAmount}>{formatKr(item.amount)}</span>
             <button
               onClick={() => confirmItem(item)}
               disabled={isConfirming}
-              style={{
-                ...styles.confirmBtn,
-                background: isConfirming ? C.textMuted : config.color,
-                opacity: isConfirming ? 0.6 : 1,
-              }}
+              style={{ ...styles.checkBtn, background: isConfirming ? C.borderLight : cfg.bg, borderColor: cfg.color }}
+              title={`Bekräfta — jag har ${cfg.verb}`}
             >
-              <CheckCircle size={16} color="#fff" />
-              <span style={styles.confirmText}>
-                {isConfirming ? 'Bekräftar...' : `Bekräfta — jag har ${config.verb}`}
-              </span>
+              <CheckCircle size={20} color={isConfirming ? C.textMuted : cfg.color} />
             </button>
           </div>
         );
@@ -216,87 +134,25 @@ export function ParentActionItems({ familyId, members, onUpdate }) {
 }
 
 const styles = {
-  container: {
-    padding: '0 16px',
-    marginBottom: 12,
+  container: { padding: '0 16px', marginBottom: 16 },
+  sectionLabel: {
+    fontSize: 11, fontWeight: 700, fontFamily: "'Nunito', sans-serif",
+    color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, margin: '0 0 6px',
   },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
+  row: {
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '10px 12px', background: C.bgCard, borderRadius: 12,
+    border: `1.5px solid ${C.borderLight}`, marginBottom: 6,
+    boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
   },
-  headerText: {
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-    color: C.error,
-  },
-  card: {
-    padding: 14,
-    background: C.bgCard,
-    borderRadius: 16,
-    borderLeft: '4px solid',
-    marginBottom: 8,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-  },
-  cardTop: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 6,
-  },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  cardInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  cardTitle: {
-    display: 'block',
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-    color: C.text,
-  },
-  cardAmount: {
-    display: 'block',
-    fontSize: F.sizes.lg,
-    fontWeight: F.weights.extra,
-    fontFamily: F.heading,
-    color: C.primaryDark,
-    marginTop: 2,
-  },
-  instruction: {
-    fontSize: F.sizes.xs,
-    color: C.textMuted,
-    fontFamily: F.heading,
-    margin: '4px 0 10px',
-    lineHeight: 1.4,
-  },
-  confirmBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    width: '100%',
-    padding: '10px 14px',
-    borderRadius: 12,
-    border: 'none',
-    cursor: 'pointer',
-    minHeight: 44,
-  },
-  confirmText: {
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-    color: '#fff',
+  iconWrap: { width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  rowInfo: { flex: 1, minWidth: 0 },
+  rowLabel: { display: 'block', fontSize: 13, fontWeight: 700, fontFamily: "'Nunito', sans-serif", color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  rowType: { display: 'block', fontSize: 11, fontWeight: 600, fontFamily: "'Nunito', sans-serif", marginTop: 1 },
+  rowAmount: { fontSize: 14, fontWeight: 800, fontFamily: "'Nunito', sans-serif", color: C.text, flexShrink: 0 },
+  checkBtn: {
+    width: 36, height: 36, borderRadius: 10, border: '1.5px solid',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', flexShrink: 0, transition: 'background 0.15s',
   },
 };

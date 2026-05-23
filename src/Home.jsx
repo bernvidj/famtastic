@@ -196,10 +196,7 @@ export function Home({ familyId, member, members }) {
             </div>
           </div>
 
-          {/* 2. Action items */}
-          <ParentActionItems familyId={familyId} members={members} onUpdate={loadData} />
-
-          {/* 3. Per child */}
+          {/* 2. Per child */}
           <div style={styles.section}>
             <p style={S.sectionLabel}>Barnens dag</p>
             {children.map(child => {
@@ -235,7 +232,7 @@ export function Home({ familyId, member, members }) {
             })}
           </div>
 
-          {/* 3b. School today */}
+          {/* 3. School today */}
           <HomeSchoolSection
             children={children}
             schoolSchedule={schoolSchedule}
@@ -246,7 +243,7 @@ export function Home({ familyId, member, members }) {
             todayDow={todayDow}
           />
 
-          {/* 4. Pool claims */}
+          {/* 4. Pool claims (pool-uppdateringar) */}
           {claims.length > 0 && (
             <div style={styles.section}>
               <p style={S.sectionLabel}>Pool-uppdateringar</p>
@@ -258,7 +255,10 @@ export function Home({ familyId, member, members }) {
             </div>
           )}
 
-          {/* 5. Weekly chart */}
+          {/* 5. Action items (compact) */}
+          <ParentActionItems familyId={familyId} members={members} onUpdate={loadData} />
+
+          {/* 6. Weekly chart */}
           <HomeWeekChart
             weekDates={weekDates}
             chores={chores}
