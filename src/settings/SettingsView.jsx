@@ -47,7 +47,7 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout }) 
   async function loadSettings() {
     setLoading(true);
     const [famRes, ruleRes] = await Promise.all([
-      supabase.from('families').select('name, settings').eq('id', familyId).single(),
+      supabase.from('families').select('name, settings').eq('id', familyId).maybeSingle(),
       supabase.from('allowance_rules').select('*').eq('family_id', familyId),
     ]);
     if (famRes.data) {

@@ -154,10 +154,13 @@ export function App() {
         .from('families')
         .select('settings')
         .eq('id', fid)
-        .maybeSingle(),   // maybeSingle undviker 406 om ingen rad hittas
+        .maybeSingle(),
     ]);
     setAllMembers(membRes.data || []);
-    setFamilySettings(famRes.data?.settings || {});
+    // Nollställ bara settings om läsningen faktiskt lyckades — annars behåll befintligt värde
+    if (famRes.data) {
+      setFamilySettings(famRes.data.settings || {});
+    }
   }
 
   function handleLogin(member) {
