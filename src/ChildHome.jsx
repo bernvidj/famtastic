@@ -58,8 +58,6 @@ export function ChildHome({
 
   return (
     <div style={styles.wrapper}>
-      <BgShapes />
-
       <div style={styles.headerZone}>
         <h1 style={styles.greeting}>{getGreeting(member.name)}</h1>
         {streak > 0 && (

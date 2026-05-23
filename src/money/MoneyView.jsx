@@ -190,7 +190,7 @@ export function MoneyView({ familyId, member, members }) {
                       {p.base > 0 && `Veckopeng ${formatKr(p.base)}`}
                       {p.base > 0 && p.bonus > 0 && ' + '}
                       {p.bonus > 0 && `Bonus ${formatKr(p.bonus)}`}
-                      {p.withdrawals > 0 && ` · Uttag ${formatKr(p.withdrawals * 100)}`}
+                      {p.withdrawals > 0 && ` · Uttag ${formatKr(p.withdrawals)}`}
                     </span>
                   </div>
                   <span style={{ ...styles.payoutAmount, color: paidOut[key] ? C.textMuted : C.primaryDark }}>

@@ -165,8 +165,6 @@ export function Home({ familyId, member, members }) {
 
   return (
     <div style={styles.page}>
-      <BgShapes />
-
       <div style={styles.headerZone}>
         <div style={styles.weekHeader}>
           <button onClick={() => setWeekOffset(w => w - 1)} style={styles.weekBtn}>

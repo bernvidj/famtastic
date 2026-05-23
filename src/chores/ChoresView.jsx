@@ -199,8 +199,6 @@ export function ChoresView({ familyId, member, members }) {
 
   return (
     <div style={styles.page}>
-      <BgShapes />
-
       {toastMsg && <div style={styles.toast}>{toastMsg}</div>}
 
       <div style={styles.headerZone}>

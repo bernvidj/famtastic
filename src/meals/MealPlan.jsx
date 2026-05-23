@@ -136,8 +136,6 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
 
   return (
     <div style={styles.page}>
-      <BgShapes />
-
       <div style={styles.headerZone}>
         {/* Header */}
         <div style={styles.header}>

@@ -114,8 +114,6 @@ export function ShoppingView({ familyId, member }) {
 
   return (
     <div style={styles.page}>
-      <BgShapes />
-
       <div style={styles.headerZone}>
         {/* ── Header ── */}
         <div style={styles.header}>

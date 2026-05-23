@@ -14,8 +14,6 @@ export function ScheduleView({ familyId, member, members }) {
 
   return (
     <div style={styles.page}>
-      <BgShapes />
-
       <div style={styles.headerZone}>
         <div style={styles.header}>
           <h1 style={styles.pageTitle}>Schema</h1>
