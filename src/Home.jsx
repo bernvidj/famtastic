@@ -27,6 +27,26 @@ function fmtDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// ─── Bakgrundsformer ──────────────────────────────────────────────────────────
+function BgShapes() {
+  return (
+    <svg
+      style={{
+        position: 'fixed', top: 0, left: 0,
+        width: '100%', height: '100%',
+        opacity: 0.07, pointerEvents: 'none', zIndex: 0,
+      }}
+      viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      <path d="M -40 -30 Q 100 -60, 180 80 Q 230 180, 120 240 Q 20 290, -30 180 Q -80 80, -40 -30 Z" fill="#3CB4A6" />
+      <path d="M 300 -20 Q 430 10, 440 140 Q 448 230, 350 260 Q 260 285, 230 190 Q 205 105, 300 -20 Z" fill="#A8E6DF" />
+      <path d="M 220 640 Q 400 600, 440 720 Q 462 800, 320 810 Q 180 818, 160 720 Q 145 640, 220 640 Z" fill="#FF7A59" />
+      <path d="M -50 700 Q 50 650, 130 710 Q 185 755, 140 820 Q 75 855, -15 820 Q -90 790, -50 700 Z" fill="#FFA071" />
+    </svg>
+  );
+}
+
 export function Home({ familyId, member, members }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [chores, setChores] = useState([]);
@@ -51,7 +71,6 @@ export function Home({ familyId, member, members }) {
   const startDate = fmtDate(weekDates[0]);
   const endDate = fmtDate(weekDates[6]);
 
-  // 30 days ago for money overview
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -164,6 +183,8 @@ export function Home({ familyId, member, members }) {
 
   return (
     <div style={styles.page}>
+      <BgShapes />
+
       <div style={styles.weekHeader}>
         <button onClick={() => setWeekOffset(w => w - 1)} style={styles.weekBtn}>
           <ChevronLeft size={20} color={C.text} />
@@ -178,7 +199,7 @@ export function Home({ familyId, member, members }) {
       </div>
 
       {loading ? <p style={styles.loadingText}>Laddar...</p> : (
-        <>
+        <div style={{ position: 'relative', zIndex: 1 }}>
           {/* 1. Metrics */}
           <div style={styles.metricRow}>
             <div style={styles.metricCard}>
@@ -208,7 +229,7 @@ export function Home({ familyId, member, members }) {
               return (
                 <div key={child.id} style={{ ...styles.childCard, borderColor: allDone ? C.success : C.borderLight }}>
                   <div style={styles.childTop}>
-                    <div style={{ ...styles.childAvatar, background: child.color || C.primary }}>
+                    <div style={{ ...styles.childAvatar, background: child.color ? `${child.color}22` : C.primaryLight }}>
                       <span style={{ fontSize: 22 }}>{child.avatar}</span>
                     </div>
                     <div style={styles.childInfo}>
@@ -313,7 +334,7 @@ export function Home({ familyId, member, members }) {
               <div style={styles.infoRow}><span style={{ fontSize: 18 }}>☀️</span><span style={styles.infoText}>Inget planerat idag</span></div>
             )}
           </div>
-        </>
+        </div>
       )}
       <div style={{ height: 80 }} />
     </div>
@@ -321,13 +342,13 @@ export function Home({ familyId, member, members }) {
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, paddingBottom: 20 },
-  weekHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px 8px' },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, paddingBottom: 20, position: 'relative' },
+  weekHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px 8px', position: 'relative', zIndex: 1 },
   weekBtn: { background: 'none', border: 'none', cursor: 'pointer', padding: 8, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   weekTitle: { display: 'flex', alignItems: 'center', gap: 8 },
   weekLabel: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text },
   todayPill: { padding: '4px 12px', borderRadius: 99, border: 'none', background: C.primaryLight, color: C.primary, fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer' },
-  loadingText: { textAlign: 'center', color: C.textMuted, padding: 32, fontFamily: F.heading },
+  loadingText: { textAlign: 'center', color: C.textMuted, padding: 32, fontFamily: F.heading, position: 'relative', zIndex: 1 },
   section: { padding: '0 16px', marginBottom: 16 },
   metricRow: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, padding: '0 16px 8px' },
   metricCard: { background: C.bgCard, borderRadius: 16, padding: '14px 12px', border: `1.5px solid ${C.borderLight}`, textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
@@ -335,7 +356,7 @@ const styles = {
   metricLabel: { display: 'block', fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading, marginTop: 4 },
   childCard: { padding: 14, background: C.bgCard, borderRadius: 16, border: '1.5px solid', marginBottom: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' },
   childTop: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 },
-  childAvatar: { width: 40, height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  childAvatar: { width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   childInfo: { flex: 1, minWidth: 0 },
   childName: { display: 'block', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
   childStats: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading },
