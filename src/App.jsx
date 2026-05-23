@@ -100,7 +100,10 @@ export function App() {
     catch { return null; }
   });
   const [allMembers,     setAllMembers]     = useState([]);
-  const [familySettings, setFamilySettings] = useState({});
+  const [familySettings, setFamilySettings] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('famtastic_settings') || '{}'); }
+    catch { return {}; }
+  });
   const [page,           setPage]           = useState('home');
   const [showSetup,      setShowSetup]      = useState(false);
 
@@ -144,22 +147,20 @@ export function App() {
   }, []);
 
   async function loadAllMembers(fid) {
-    const [membRes, famRes] = await Promise.all([
+    const [membRes, featRes] = await Promise.all([
       supabase
         .from('family_members')
         .select('id, name, role, avatar, color, auth_user_id, pin_hash')
         .eq('family_id', fid)
         .order('created_at'),
-      supabase
-        .from('families')
-        .select('settings')
-        .eq('id', fid)
-        .maybeSingle(),
+      // SECURITY DEFINER RPC — fungerar för alla, även föräldrar vars auth_user_id ej är länkat
+      supabase.rpc('get_family_features', { p_family_id: fid }),
     ]);
     setAllMembers(membRes.data || []);
-    // Nollställ bara settings om läsningen faktiskt lyckades — annars behåll befintligt värde
-    if (famRes.data) {
-      setFamilySettings(famRes.data.settings || {});
+    if (featRes.data) {
+      const settings = { features: featRes.data };
+      setFamilySettings(settings);
+      sessionStorage.setItem('famtastic_settings', JSON.stringify(settings));
     }
   }
 
@@ -176,6 +177,7 @@ export function App() {
     setFamilyId(null);
     setAllMembers([]);
     setFamilySettings({});
+    sessionStorage.removeItem('famtastic_settings');
     setPage('home');
     supabase.auth.signOut();
   }

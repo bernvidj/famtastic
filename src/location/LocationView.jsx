@@ -1,9 +1,10 @@
 // ============================================
 // FamTastic — LocationView
 // "Var är vi?" — karta + memberlista + toggle
+// Använder SECURITY DEFINER RPCs → funkar för barn och föräldrar
 // ============================================
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F } from '../data';
 import { FamilyMap } from './FamilyMap';
@@ -11,24 +12,25 @@ import { MemberLocationCard } from './MemberLocationCard';
 import { PlacesEditor } from './PlacesEditor';
 
 export function LocationView({ familyId, member, members }) {
-  const [locations, setLocations]       = useState([]);
-  const [places, setPlaces]             = useState([]);
-  const [mySharing, setMySharing]       = useState(false);
-  const [showPlaces, setShowPlaces]     = useState(false);
-  const [loading, setLoading]           = useState(true);
-  const [toggling, setToggling]         = useState(false);
+  const [locations, setLocations]   = useState([]);
+  const [places, setPlaces]         = useState([]);
+  const [mySharing, setMySharing]   = useState(false);
+  const [showPlaces, setShowPlaces] = useState(false);
+  const [loading, setLoading]       = useState(true);
+  const [toggling, setToggling]     = useState(false);
+  const pollRef                     = useRef(null);
 
   const isParent = member.role === 'admin' || member.role === 'parent';
 
+  // Läs via SECURITY DEFINER RPCs — fungerar oavsett auth-status
   const load = useCallback(async () => {
     const [locRes, placeRes] = await Promise.all([
-      supabase.from('member_locations').select('*').eq('family_id', familyId),
-      supabase.from('family_places').select('*').eq('family_id', familyId),
+      supabase.rpc('get_family_locations', { p_family_id: familyId }),
+      supabase.rpc('get_family_places',    { p_family_id: familyId }),
     ]);
-    const locs = locRes.data || [];
+    const locs = Array.isArray(locRes.data) ? locRes.data : [];
     setLocations(locs);
-    setPlaces(placeRes.data || []);
-
+    setPlaces(Array.isArray(placeRes.data) ? placeRes.data : []);
     const mine = locs.find((l) => l.member_id === member.id);
     setMySharing(mine?.sharing_enabled ?? false);
     setLoading(false);
@@ -36,26 +38,25 @@ export function LocationView({ familyId, member, members }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // Realtime: lyssna på ändringar i member_locations för familjen
+  // Poll var 30:e sekund (Realtime fungerar inte för barn utan auth-session)
+  useEffect(() => {
+    pollRef.current = setInterval(load, 30_000);
+    return () => clearInterval(pollRef.current);
+  }, [load]);
+
+  // Realtime: funkar för föräldrar med auth-session, tyst miss för barn
   useEffect(() => {
     const channel = supabase
       .channel(`locations:${familyId}`)
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'member_locations',
-          filter: `family_id=eq.${familyId}`,
-        },
+        { event: '*', schema: 'public', table: 'member_locations', filter: `family_id=eq.${familyId}` },
         (payload) => {
           setLocations((prev) => {
-            const idx = prev.findIndex(
-              (l) => l.member_id === payload.new?.member_id
-            );
             if (payload.eventType === 'DELETE') {
               return prev.filter((l) => l.member_id !== payload.old?.member_id);
             }
+            const idx = prev.findIndex((l) => l.member_id === payload.new?.member_id);
             if (idx >= 0) {
               const next = [...prev];
               next[idx] = payload.new;
@@ -63,8 +64,6 @@ export function LocationView({ familyId, member, members }) {
             }
             return [...prev, payload.new];
           });
-
-          // Uppdatera mySharing om det är min rad
           if (payload.new?.member_id === member.id) {
             setMySharing(payload.new.sharing_enabled);
           }
@@ -80,8 +79,8 @@ export function LocationView({ familyId, member, members }) {
     if (mySharing) {
       await supabase.rpc('disable_location_sharing', { p_member_id: member.id });
       setMySharing(false);
+      setToggling(false);
     } else {
-      // Kräver att webbläsaren ger oss position en gång direkt
       if (!navigator.geolocation) {
         alert('Din webbläsare stöder inte platsinformation.');
         setToggling(false);
@@ -99,16 +98,13 @@ export function LocationView({ familyId, member, members }) {
           setMySharing(true);
           setToggling(false);
         },
-        (err) => {
-          console.warn('Geolocation error:', err);
+        () => {
           alert('Kunde inte hämta din position. Kontrollera att du har tillåtit platsbehörighet.');
           setToggling(false);
         },
         { enableHighAccuracy: true, timeout: 15_000 }
       );
-      return;
     }
-    setToggling(false);
   }
 
   const anySharing = locations.some((l) => l.sharing_enabled);
@@ -126,10 +122,7 @@ export function LocationView({ familyId, member, members }) {
       {/* Header */}
       <div style={styles.header}>
         <div style={styles.headerTop}>
-          <div>
-            <h1 style={styles.title}>📍 Var är vi?</h1>
-          </div>
-          {/* Min platsdelning-toggle */}
+          <h1 style={styles.title}>📍 Var är vi?</h1>
           <div style={styles.toggleRow}>
             <span style={styles.toggleLabel}>
               {mySharing ? 'Delar plats' : 'Dela min plats'}
@@ -137,37 +130,25 @@ export function LocationView({ familyId, member, members }) {
             <button
               onClick={toggleMySharing}
               disabled={toggling}
-              style={{
-                ...styles.toggle,
-                background: mySharing ? C.secondary : C.border,
-                opacity: toggling ? 0.6 : 1,
-              }}
+              style={{ ...styles.toggle, background: mySharing ? C.secondary : C.border, opacity: toggling ? 0.6 : 1 }}
             >
-              <div style={{
-                ...styles.toggleKnob,
-                transform: mySharing ? 'translateX(22px)' : 'translateX(2px)',
-              }} />
+              <div style={{ ...styles.toggleKnob, transform: mySharing ? 'translateX(22px)' : 'translateX(2px)' }} />
             </button>
           </div>
         </div>
       </div>
 
       <div style={styles.content}>
-        {/* Karta */}
         <FamilyMap locations={locations} members={members} />
 
-        {/* Empty state */}
         {!anySharing && (
           <div style={styles.emptyState}>
             <div style={styles.emptyEmoji}>🗺️</div>
             <p style={styles.emptyText}>Ingen delar sin plats just nu</p>
-            <p style={styles.emptySubtext}>
-              Slå på "Dela min plats" ovan för att synas på kartan.
-            </p>
+            <p style={styles.emptySubtext}>Slå på "Dela min plats" ovan för att synas på kartan.</p>
           </div>
         )}
 
-        {/* Memberlista */}
         {members.length > 0 && (
           <div style={styles.section}>
             <h2 style={styles.sectionTitle}>Familjen</h2>
@@ -182,12 +163,8 @@ export function LocationView({ familyId, member, members }) {
           </div>
         )}
 
-        {/* Förälder: hantera platser */}
         {isParent && (
-          <button
-            onClick={() => setShowPlaces(true)}
-            style={styles.placesBtn}
-          >
+          <button onClick={() => setShowPlaces(true)} style={styles.placesBtn}>
             🏠 Hantera platser
           </button>
         )}
@@ -208,117 +185,27 @@ export function LocationView({ familyId, member, members }) {
 }
 
 const styles = {
-  page: {
-    minHeight: '100vh',
-    background: C.bg,
-    fontFamily: F.body,
-  },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body },
   header: {
     padding: '20px 16px 12px',
-    background: C.bg,
-    borderBottom: `1px solid ${C.borderLight}`,
-    position: 'sticky',
-    top: 0,
-    zIndex: 10,
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
+    position: 'sticky', top: 0, zIndex: 10,
+    backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
     background: 'rgba(255,251,245,0.92)',
+    borderBottom: `1px solid ${C.borderLight}`,
   },
-  headerTop: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: {
-    fontFamily: F.heading,
-    fontSize: F.sizes.xl,
-    fontWeight: F.weights.extra,
-    color: C.text,
-    margin: 0,
-  },
-  toggleRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-  },
-  toggleLabel: {
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.semi,
-    color: C.textMuted,
-    fontFamily: F.body,
-  },
-  toggle: {
-    width: 48,
-    height: 26,
-    borderRadius: 13,
-    border: 'none',
-    cursor: 'pointer',
-    position: 'relative',
-    flexShrink: 0,
-    transition: 'background 0.2s',
-  },
-  toggleKnob: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    background: '#fff',
-    position: 'absolute',
-    top: 2,
-    transition: 'transform 0.2s',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-  },
-  content: {
-    padding: '14px 16px 0',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 14,
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: '24px 16px',
-    background: '#fff',
-    borderRadius: 16,
-    border: `1.5px solid ${C.borderLight}`,
-  },
+  headerTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  title: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: 0 },
+  toggleRow: { display: 'flex', alignItems: 'center', gap: 8 },
+  toggleLabel: { fontSize: F.sizes.sm, fontWeight: F.weights.semi, color: C.textMuted, fontFamily: F.body },
+  toggle: { width: 48, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background 0.2s' },
+  toggleKnob: { width: 22, height: 22, borderRadius: 11, background: '#fff', position: 'absolute', top: 2, transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' },
+  content: { padding: '14px 16px 0', display: 'flex', flexDirection: 'column', gap: 14 },
+  emptyState: { textAlign: 'center', padding: '24px 16px', background: '#fff', borderRadius: 16, border: `1.5px solid ${C.borderLight}` },
   emptyEmoji: { fontSize: 40, marginBottom: 8 },
-  emptyText: {
-    fontFamily: F.heading,
-    fontWeight: F.weights.bold,
-    fontSize: F.sizes.md,
-    color: C.text,
-    margin: '0 0 4px',
-  },
-  emptySubtext: {
-    fontSize: F.sizes.sm,
-    color: C.textMuted,
-    margin: 0,
-  },
+  emptyText: { fontFamily: F.heading, fontWeight: F.weights.bold, fontSize: F.sizes.md, color: C.text, margin: '0 0 4px' },
+  emptySubtext: { fontSize: F.sizes.sm, color: C.textMuted, margin: 0 },
   section: { display: 'flex', flexDirection: 'column' },
-  sectionTitle: {
-    fontFamily: F.heading,
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.bold,
-    color: C.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    margin: '0 0 8px',
-  },
-  placesBtn: {
-    width: '100%',
-    padding: '14px 20px',
-    borderRadius: 12,
-    border: `1.5px dashed ${C.secondary}`,
-    background: C.secondaryLight,
-    color: C.secondaryDark,
-    fontSize: F.sizes.md,
-    fontWeight: F.weights.bold,
-    fontFamily: F.heading,
-    cursor: 'pointer',
-    textAlign: 'center',
-  },
-  loadingText: {
-    textAlign: 'center',
-    color: C.textMuted,
-    padding: 40,
-  },
+  sectionTitle: { fontFamily: F.heading, fontSize: F.sizes.sm, fontWeight: F.weights.bold, color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, margin: '0 0 8px' },
+  placesBtn: { width: '100%', padding: '14px 20px', borderRadius: 12, border: `1.5px dashed ${C.secondary}`, background: C.secondaryLight, color: C.secondaryDark, fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', textAlign: 'center' },
+  loadingText: { textAlign: 'center', color: C.textMuted, padding: 40 },
 };

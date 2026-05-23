@@ -13,9 +13,10 @@ import { ChildCalendar } from './ChildCalendar';
 import { ChildMoneyView } from './money/ChildMoneyView';
 import { Celebration } from './Celebrations';
 import { useLocationSharing } from './location/useLocationSharing';
+import { LocationView } from './location/LocationView';
 import { Home, Calendar, CheckSquare, PiggyBank, LogOut } from 'lucide-react';
 
-const NAV = [
+const BASE_NAV = [
   { id: 'home',     label: 'Hem',      icon: Home },
   { id: 'chores',   label: 'Sysslor',  icon: CheckSquare },
   { id: 'money',    label: 'Pengar',   icon: PiggyBank },
@@ -52,6 +53,11 @@ export function ChildApp({ familyId, member, onLogout }) {
 
   // GPS: hook alltid på toppnivå — watchPosition startar när båda flaggor är true
   useLocationSharing(member.id, locationFeatureOn && childSharingEnabled);
+
+  // Dynamisk nav — lägg till Plats-flik när GPS-feature är på
+  const NAV = locationFeatureOn
+    ? [...BASE_NAV, { id: 'location', label: 'Plats', emoji: '📍' }]
+    : BASE_NAV;
 
   const [schoolSchedule,     setSchoolSchedule]     = useState([]);
   const [schoolSubjects,     setSchoolSubjects]      = useState([]);
@@ -359,6 +365,14 @@ export function ChildApp({ familyId, member, onLogout }) {
         />
       )}
 
+      {page === 'location' && (
+        <LocationView
+          familyId={familyId}
+          member={member}
+          members={members}
+        />
+      )}
+
       <Celebration type={celebrationType} active={celebrationActive} onDone={() => setCelebrationActive(false)} />
 
       {/* Bottom nav — pill-stil som Nav.jsx */}
@@ -375,7 +389,10 @@ export function ChildApp({ familyId, member, onLogout }) {
                 padding:      isActive ? '5px 14px' : '5px 6px',
                 transition:   'all 0.18s ease',
               }}>
-                <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#fff' : C.textMuted} />
+                {Icon
+                  ? <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#fff' : C.textMuted} />
+                  : <span style={{ fontSize: 20, lineHeight: 1 }}>{item.emoji}</span>
+                }
               </div>
               <span style={{
                 ...styles.navLabel,
