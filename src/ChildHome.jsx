@@ -22,9 +22,9 @@ function BgShapes() {
   return (
     <svg
       style={{
-        position: 'fixed', top: 0, left: 0,
+        position: 'absolute', top: 0, left: 0,
         width: '100%', height: '100%',
-        opacity: 0.09, pointerEvents: 'none', zIndex: 0,
+        opacity: 0.18, pointerEvents: 'none',
       }}
       viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="xMidYMid slice"
@@ -252,7 +252,7 @@ export function ChildHome({
 }
 
 const styles = {
-  wrapper: { position: 'relative' },
+  wrapper: { position: 'relative', overflow: 'hidden' },
   content: { padding: '12px 16px', position: 'relative', zIndex: 1 },
   greeting: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: '0 0 8px' },
   streakPill: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 99, background: C.primaryLight, border: `1.5px solid ${C.primary}`, marginBottom: 12 },
