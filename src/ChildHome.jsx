@@ -6,6 +6,7 @@
 import React from 'react';
 import { C, F, S, formatKr, getGreeting, streakEmoji, safeArray } from './data';
 import { CheckCircle, Star, Flame, Zap } from 'lucide-react';
+import { BgShapes } from './BgShapes';
 
 function fmtTime(t) { return t ? t.slice(0, 5) : ''; }
 
@@ -58,6 +59,8 @@ export function ChildHome({
 
   return (
     <div style={styles.wrapper}>
+      <BgShapes variant="home" />
+      <div style={{ position: 'relative', zIndex: 1 }}>
       <div style={styles.headerZone}>
         <h1 style={styles.greeting}>{getGreeting(member.name)}</h1>
         {streak > 0 && (
@@ -227,18 +230,14 @@ export function ChildHome({
           </div>
         ))}
       </div>
+      </div>
     </div>
   );
 }
 
 const styles = {
-  wrapper: { position: 'relative', overflow: 'hidden' },
+  wrapper: { position: 'relative' },
   headerZone: {
-    position: 'relative',
-    zIndex: 1,
-    background: C.bg,
-    borderRadius: '0 0 24px 24px',
-    borderBottom: '1px solid rgba(60,180,166,0.12)',
     padding: '16px 16px 20px',
   },
   content: { padding: '12px 16px', position: 'relative', zIndex: 1 },

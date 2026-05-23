@@ -9,6 +9,7 @@ import { MealBank } from './MealBank';
 import { MealEditor } from './MealEditor';
 import { generateShoppingList } from './generateShoppingList';
 import { ChevronLeft, ChevronRight, Plus, X, Shuffle, BookOpen, CalendarDays, ShoppingCart } from 'lucide-react';
+import { BgShapes } from '../BgShapes';
 
 const WEEKDAYS = ['Måndag', 'Tisdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lördag', 'Söndag'];
 
@@ -136,6 +137,7 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
 
   return (
     <div style={styles.page}>
+      <BgShapes variant="meals" />
       <div style={styles.headerZone}>
         {/* Header */}
         <div style={styles.header}>
@@ -267,13 +269,15 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', overflow: 'hidden' },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', paddingBottom: 'calc(90px + env(safe-area-inset-bottom, 0px))' },
   headerZone: {
-    position: 'relative',
-    zIndex: 1,
-    background: C.bg,
-    borderRadius: '0 0 24px 24px',
-    borderBottom: '1px solid rgba(60,180,166,0.12)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+    background: 'rgba(255,251,245,0.88)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    borderBottom: '1px solid rgba(255,255,255,0.5)',
     paddingBottom: 4,
   },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 16px 8px' },

@@ -11,6 +11,8 @@ import { HomeWeekChart } from './HomeWeekChart';
 import { HomeMoneyOverview } from './HomeMoneyOverview';
 import { ChevronLeft, ChevronRight, Flame } from 'lucide-react';
 import { ParentNotes } from './ParentNotes';
+import { AppIcon } from './AppIcon';
+import { BgShapes } from './BgShapes';
 
 function getWeekDates(offset) {
   const now = new Date();
@@ -165,19 +167,23 @@ export function Home({ familyId, member, members }) {
 
   return (
     <div style={styles.page}>
-      <div style={styles.headerZone}>
-        <div style={styles.weekHeader}>
-          <button onClick={() => setWeekOffset(w => w - 1)} style={styles.weekBtn}>
-            <ChevronLeft size={20} color={C.text} />
-          </button>
-          <div style={styles.weekTitle}>
-            <span style={styles.weekLabel}>Vecka {weekNum}</span>
-            {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={styles.todayPill}>Idag</button>}
-          </div>
-          <button onClick={() => setWeekOffset(w => w + 1)} style={styles.weekBtn}>
-            <ChevronRight size={20} color={C.text} />
-          </button>
+      <BgShapes variant="home" />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+      <div style={styles.appHeader}>
+        <AppIcon size={32} />
+        <span style={styles.appTitle}>FamTastic</span>
+      </div>
+      <div style={styles.weekHeader}>
+        <button onClick={() => setWeekOffset(w => w - 1)} style={styles.weekBtn}>
+          <ChevronLeft size={20} color={C.text} />
+        </button>
+        <div style={styles.weekTitle}>
+          <span style={styles.weekLabel}>Vecka {weekNum}</span>
+          {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={styles.todayPill}>Idag</button>}
         </div>
+        <button onClick={() => setWeekOffset(w => w + 1)} style={styles.weekBtn}>
+          <ChevronRight size={20} color={C.text} />
+        </button>
       </div>
 
       {loading ? <p style={styles.loadingText}>Laddar...</p> : (
@@ -321,22 +327,16 @@ export function Home({ familyId, member, members }) {
 
         </div>
       )}
-      <div style={{ height: 80 }} />
+    </div>
     </div>
   );
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, paddingBottom: 20, position: 'relative', overflow: 'hidden' },
-  headerZone: {
-    position: 'relative',
-    zIndex: 1,
-    background: C.bg,
-    borderRadius: '0 0 24px 24px',
-    borderBottom: '1px solid rgba(60,180,166,0.12)',
-    paddingBottom: 4,
-  },
-  weekHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px 12px' },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, paddingBottom: 'calc(90px + env(safe-area-inset-bottom, 0px))' },
+  appHeader: { display: 'flex', alignItems: 'center', gap: 10, padding: '16px 16px 4px' },
+  appTitle: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text },
+  weekHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 16px 12px' },
   weekBtn: { background: 'none', border: 'none', cursor: 'pointer', padding: 8, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   weekTitle: { display: 'flex', alignItems: 'center', gap: 8 },
   weekLabel: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text },

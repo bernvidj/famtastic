@@ -11,6 +11,7 @@ import { formatPrice, estimateListCost } from '../priceDb';
 import { ShoppingAddItem } from './ShoppingAddItem';
 import { ShoppingItemList } from './ShoppingItemList';
 import { Plus, Trash2 } from 'lucide-react';
+import { BgShapes } from '../BgShapes';
 
 
 // ─── Huvud-vy ─────────────────────────────────────────────────────────────────
@@ -114,6 +115,7 @@ export function ShoppingView({ familyId, member }) {
 
   return (
     <div style={styles.page}>
+      <BgShapes variant="shopping" />
       <div style={styles.headerZone}>
         {/* ── Header ── */}
         <div style={styles.header}>
@@ -244,14 +246,16 @@ const styles = {
     background: C.bg,
     fontFamily: F.body,
     position: 'relative',
-    overflow: 'hidden',
+    paddingBottom: 'calc(90px + env(safe-area-inset-bottom, 0px))',
   },
   headerZone: {
-    position: 'relative',
-    zIndex: 1,
-    background: C.bg,
-    borderRadius: '0 0 24px 24px',
-    borderBottom: '1px solid rgba(60,180,166,0.12)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+    background: 'rgba(255,251,245,0.88)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    borderBottom: '1px solid rgba(255,255,255,0.5)',
     paddingBottom: 8,
   },
   header: {

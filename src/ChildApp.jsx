@@ -348,7 +348,7 @@ export function ChildApp({ familyId, member, onLogout }) {
 }
 
 const styles = {
-  appPage: { minHeight: '100vh', background: C.bg, fontFamily: F.body, paddingBottom: 80 },
+  appPage: { minHeight: '100vh', background: C.bg, fontFamily: F.body, paddingBottom: 'calc(90px + env(safe-area-inset-bottom, 0px))' },
   loading: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bg, position: 'relative', overflow: 'hidden' },
   loadingAvatar: { width: 80, height: 80, borderRadius: '50%', background: C.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   loadingText: { fontSize: F.sizes.md, color: C.textMuted, fontFamily: F.heading, margin: 0 },
@@ -356,7 +356,7 @@ const styles = {
   topAvatar: { width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   topName: { flex: 1, fontFamily: F.heading, fontSize: F.sizes.md, fontWeight: F.weights.bold, color: C.text },
   topLogout: { background: 'none', border: 'none', cursor: 'pointer', padding: 8, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  nav: { position: 'fixed', bottom: 0, left: 0, right: 0, display: 'flex', justifyContent: 'space-around', alignItems: 'center', background: C.bgCard, borderTop: `1.5px solid ${C.borderLight}`, padding: '4px 0 env(safe-area-inset-bottom, 8px)', zIndex: 100, boxShadow: '0 -2px 12px rgba(0,0,0,0.06)' },
+  nav: { position: 'fixed', bottom: 12, left: 16, right: 16, display: 'flex', justifyContent: 'space-around', alignItems: 'center', background: 'rgba(255,251,245,0.88)', borderRadius: 24, backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', paddingTop: 6, paddingLeft: 4, paddingRight: 4, paddingBottom: 'max(6px, env(safe-area-inset-bottom, 6px))', zIndex: 100, boxShadow: '0 4px 24px rgba(0,0,0,0.12), 0 1px 0 rgba(255,255,255,0.6) inset, 0 0 0 1px rgba(0,0,0,0.04)' },
   navBtn: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 2px', minWidth: 44, fontFamily: F.heading },
   iconWrap: { display: 'flex', alignItems: 'center', justifyContent: 'center' },
   navLabel: { fontSize: F.sizes.xs, fontFamily: F.heading },

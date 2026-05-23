@@ -10,6 +10,7 @@ import { AllocateMoney } from './AllocateMoney';
 import { FamilyGoalCard } from './FamilyGoalCard';
 import { CreateFamilyGoal } from './CreateFamilyGoal';
 import { PiggyBank, Plus, ChevronDown, ChevronUp, Wallet, Target, CreditCard, CheckCircle, Circle } from 'lucide-react';
+import { BgShapes } from '../BgShapes';
 
 const TX_LABELS = {
   base_allowance: { icon: '💰', label: 'Veckopeng' },
@@ -160,6 +161,7 @@ export function MoneyView({ familyId, member, members }) {
 
   return (
     <div style={styles.page}>
+      <BgShapes variant="money" />
       <div style={styles.headerZone}>
         <div style={styles.header}>
           <h1 style={styles.pageTitle}>Pengar</h1>
@@ -388,13 +390,15 @@ export function MoneyView({ familyId, member, members }) {
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', overflow: 'hidden' },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', paddingBottom: 'calc(90px + env(safe-area-inset-bottom, 0px))' },
   headerZone: {
-    position: 'relative',
-    zIndex: 1,
-    background: C.bg,
-    borderRadius: '0 0 24px 24px',
-    borderBottom: '1px solid rgba(60,180,166,0.12)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
+    background: 'rgba(255,251,245,0.88)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    borderBottom: '1px solid rgba(255,255,255,0.5)',
     paddingBottom: 8,
   },
   header: { padding: '16px 16px 8px' },
