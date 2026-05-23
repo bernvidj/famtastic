@@ -164,10 +164,13 @@ export function MoneyView({ familyId, member, members }) {
     <div style={styles.page}>
       <BgShapes />
 
-      <div style={{ position: 'relative', zIndex: 1 }}>
+      <div style={styles.headerZone}>
         <div style={styles.header}>
           <h1 style={styles.pageTitle}>Pengar</h1>
         </div>
+      </div>
+
+      <div style={{ position: 'relative', zIndex: 1 }}>
 
         {/* === PAYOUT OVERVIEW (parent only) === */}
         {isParent && payoutData.some(p => p.total > 0 || p.withdrawals > 0) && (
@@ -382,6 +385,13 @@ export function MoneyView({ familyId, member, members }) {
 
 const styles = {
   page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', overflow: 'hidden' },
+  headerZone: {
+    position: 'relative',
+    zIndex: 1,
+    background: `linear-gradient(135deg, ${C.primaryLight}, ${C.secondaryLight})`,
+    borderRadius: '0 0 24px 24px',
+    paddingBottom: 8,
+  },
   header: { padding: '16px 16px 8px' },
   pageTitle: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: 0 },
   section: { padding: '4px 16px 8px' },

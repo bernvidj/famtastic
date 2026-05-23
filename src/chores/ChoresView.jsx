@@ -222,60 +222,62 @@ export function ChoresView({ familyId, member, members }) {
 
       {toastMsg && <div style={styles.toast}>{toastMsg}</div>}
 
-      <div style={{ ...styles.header, position: 'relative', zIndex: 1 }}>
-        <h1 style={styles.pageTitle}>Sysslor</h1>
-        {isParent && (
-          <button onClick={() => setEditing('new')} style={styles.addBtn}>
-            <Plus size={20} /> Ny
-          </button>
-        )}
-      </div>
+      <div style={styles.headerZone}>
+        <div style={styles.header}>
+          <h1 style={styles.pageTitle}>Sysslor</h1>
+          {isParent && (
+            <button onClick={() => setEditing('new')} style={styles.addBtn}>
+              <Plus size={20} /> Ny
+            </button>
+          )}
+        </div>
 
-      <div style={{ ...styles.tabRow, position: 'relative', zIndex: 1 }}>
-        {[
-          { key: 'today', label: 'Idag', icon: CalendarDays },
-          ...(hasPool ? [{ key: 'pool', label: 'Plocka', icon: HandMetal }] : []),
-          { key: 'all', label: 'Alla', icon: List },
-        ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              ...styles.tabBtn,
-              background: tab === t.key ? C.primary : C.bgCard,
-              color: tab === t.key ? '#fff' : C.textMuted,
-              borderColor: tab === t.key ? C.primary : C.border,
-            }}
-          >
-            <t.icon size={16} /> {t.label}
-            {t.key === 'pool' && poolChores.length > 0 && (
-              <span style={styles.poolCount}>{poolChores.length}</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'today' && members.filter(m => m.role === 'child').length > 1 && (
-        <div style={{ ...styles.filterRow, position: 'relative', zIndex: 1 }}>
-          <button
-            onClick={() => setFilterMember(null)}
-            style={{
-              ...styles.filterPill,
-              background: !filterMember ? C.text : C.bgCard,
-              color: !filterMember ? '#fff' : C.text,
-              borderColor: !filterMember ? C.text : C.border,
-            }}
-          >Alla</button>
-          {members.filter(m => m.role === 'child').map(m => (
-            <button key={m.id} onClick={() => setFilterMember(m.id)} style={{
-              ...styles.filterPill,
-              background: filterMember === m.id ? (m.color || C.primary) : C.bgCard,
-              color: filterMember === m.id ? '#fff' : C.text,
-              borderColor: filterMember === m.id ? (m.color || C.primary) : C.border,
-            }}>{m.avatar} {m.name}</button>
+        <div style={styles.tabRow}>
+          {[
+            { key: 'today', label: 'Idag', icon: CalendarDays },
+            ...(hasPool ? [{ key: 'pool', label: 'Plocka', icon: HandMetal }] : []),
+            { key: 'all', label: 'Alla', icon: List },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              style={{
+                ...styles.tabBtn,
+                background: tab === t.key ? C.primary : C.bgCard,
+                color: tab === t.key ? '#fff' : C.textMuted,
+                borderColor: tab === t.key ? C.primary : C.border,
+              }}
+            >
+              <t.icon size={16} /> {t.label}
+              {t.key === 'pool' && poolChores.length > 0 && (
+                <span style={styles.poolCount}>{poolChores.length}</span>
+              )}
+            </button>
           ))}
         </div>
-      )}
+
+        {tab === 'today' && members.filter(m => m.role === 'child').length > 1 && (
+          <div style={styles.filterRow}>
+            <button
+              onClick={() => setFilterMember(null)}
+              style={{
+                ...styles.filterPill,
+                background: !filterMember ? C.text : C.bgCard,
+                color: !filterMember ? '#fff' : C.text,
+                borderColor: !filterMember ? C.text : C.border,
+              }}
+            >Alla</button>
+            {members.filter(m => m.role === 'child').map(m => (
+              <button key={m.id} onClick={() => setFilterMember(m.id)} style={{
+                ...styles.filterPill,
+                background: filterMember === m.id ? (m.color || C.primary) : C.bgCard,
+                color: filterMember === m.id ? '#fff' : C.text,
+                borderColor: filterMember === m.id ? (m.color || C.primary) : C.border,
+              }}>{m.avatar} {m.name}</button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <p style={{ ...styles.loadingText, position: 'relative', zIndex: 1 }}>Laddar sysslor...</p>
@@ -448,6 +450,13 @@ export function ChoresView({ familyId, member, members }) {
 
 const styles = {
   page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', overflow: 'hidden' },
+  headerZone: {
+    position: 'relative',
+    zIndex: 1,
+    background: `linear-gradient(135deg, ${C.primaryLight}, ${C.secondaryLight})`,
+    borderRadius: '0 0 24px 24px',
+    paddingBottom: 8,
+  },
   toast: {
     position: 'fixed', top: 16, left: '50%', transform: 'translateX(-50%)',
     background: C.text, color: '#fff', padding: '12px 24px', borderRadius: 99,

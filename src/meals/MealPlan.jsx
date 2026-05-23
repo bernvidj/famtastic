@@ -150,7 +150,7 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
     <div style={styles.page}>
       <BgShapes />
 
-      <div style={{ position: 'relative', zIndex: 1 }}>
+      <div style={styles.headerZone}>
         {/* Header */}
         <div style={styles.header}>
           <h1 style={styles.pageTitle}>Mat</h1>
@@ -174,7 +174,9 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
             <BookOpen size={16} /> Receptbank
           </button>
         </div>
+      </div>
 
+      <div style={{ position: 'relative', zIndex: 1 }}>
         {loading ? (
           <p style={styles.loadingText}>Laddar...</p>
         ) : tab === 'plan' ? (
@@ -280,9 +282,16 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
 
 const styles = {
   page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', overflow: 'hidden' },
+  headerZone: {
+    position: 'relative',
+    zIndex: 1,
+    background: `linear-gradient(135deg, ${C.primaryLight}, ${C.secondaryLight})`,
+    borderRadius: '0 0 24px 24px',
+    paddingBottom: 4,
+  },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 16px 8px' },
   pageTitle: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: 0 },
-  tabs: { display: 'flex', padding: '0 16px', borderBottom: `1px solid ${C.borderLight}` },
+  tabs: { display: 'flex', padding: '0 16px', borderBottom: '1px solid rgba(0,0,0,0.08)' },
   tab: { display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading },
   content: { padding: '12px 16px' },
   loadingText: { textAlign: 'center', color: C.textMuted, padding: 32 },

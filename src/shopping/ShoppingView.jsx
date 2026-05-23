@@ -135,81 +135,83 @@ export function ShoppingView({ familyId, member }) {
     <div style={styles.page}>
       <BgShapes />
 
-      {/* ── Header ── */}
-      <div style={styles.header}>
-        <div>
-          <h1 style={styles.pageTitle}>🛒 Handla</h1>
-          {hasUnchecked && costEstimate && (
-            <p style={styles.costSummary}>
-              Uppskattad kostnad:{' '}
-              <strong style={{ color: C.secondary }}>
-                {formatPrice(costEstimate.min, costEstimate.max)}
-              </strong>
-            </p>
-          )}
-        </div>
-        <button
-          onClick={() => setShowNewList(s => !s)}
-          style={{ ...S.button, ...S.buttonSecondary, padding: '8px 14px', position: 'relative', zIndex: 1 }}
-        >
-          <Plus size={16} /> Ny lista
-        </button>
-      </div>
-
-      {/* ── Ny lista-formulär ── */}
-      {showNewList && (
-        <div style={{ ...styles.newListForm, position: 'relative', zIndex: 1 }}>
-          <input
-            type="text"
-            placeholder="Listnamn, t.ex. IKEA"
-            value={newListName}
-            onChange={e => setNewListName(e.target.value)}
-            style={{ ...S.input, flex: 1 }}
-            autoFocus
-            onKeyDown={e => e.key === 'Enter' && createList()}
-          />
+      <div style={styles.headerZone}>
+        {/* ── Header ── */}
+        <div style={styles.header}>
+          <div>
+            <h1 style={styles.pageTitle}>🛒 Handla</h1>
+            {hasUnchecked && costEstimate && (
+              <p style={styles.costSummary}>
+                Uppskattad kostnad:{' '}
+                <strong style={{ color: C.secondary }}>
+                  {formatPrice(costEstimate.min, costEstimate.max)}
+                </strong>
+              </p>
+            )}
+          </div>
           <button
-            onClick={createList}
-            disabled={!newListName.trim()}
-            style={{ ...S.button, ...S.buttonPrimary, padding: '10px 14px', opacity: newListName.trim() ? 1 : 0.5 }}
+            onClick={() => setShowNewList(s => !s)}
+            style={{ ...S.button, ...S.buttonSecondary, padding: '8px 14px' }}
           >
-            Skapa
+            <Plus size={16} /> Ny lista
           </button>
         </div>
-      )}
 
-      {/* ── Listflikar ── */}
-      {lists.length > 0 && (
-        <div style={styles.listTabs}>
-          {lists.map(list => {
-            const badge    = getListBadge(list);
-            const isActive = selectedList === list.id;
-            return (
-              <button
-                key={list.id}
-                onClick={() => setSelectedList(list.id)}
-                style={{
-                  ...styles.listTab,
-                  background: isActive ? C.primary : C.bgCard,
-                  color:      isActive ? '#fff'    : C.text,
-                  border:     isActive ? `2px solid ${C.primary}` : `2px solid ${C.border}`,
-                }}
-              >
-                {list.name}
-                {badge && (
-                  <span style={{
-                    ...styles.badge,
-                    background: isActive ? 'rgba(255,255,255,0.3)' : C.primaryLight,
-                    color:      isActive ? '#fff' : C.primary,
-                  }}>
-                    {badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+        {/* ── Ny lista-formulär ── */}
+        {showNewList && (
+          <div style={styles.newListForm}>
+            <input
+              type="text"
+              placeholder="Listnamn, t.ex. IKEA"
+              value={newListName}
+              onChange={e => setNewListName(e.target.value)}
+              style={{ ...S.input, flex: 1 }}
+              autoFocus
+              onKeyDown={e => e.key === 'Enter' && createList()}
+            />
+            <button
+              onClick={createList}
+              disabled={!newListName.trim()}
+              style={{ ...S.button, ...S.buttonPrimary, padding: '10px 14px', opacity: newListName.trim() ? 1 : 0.5 }}
+            >
+              Skapa
+            </button>
+          </div>
+        )}
+
+        {/* ── Listflikar ── */}
+        {lists.length > 0 && (
+          <div style={styles.listTabs}>
+            {lists.map(list => {
+              const badge    = getListBadge(list);
+              const isActive = selectedList === list.id;
+              return (
+                <button
+                  key={list.id}
+                  onClick={() => setSelectedList(list.id)}
+                  style={{
+                    ...styles.listTab,
+                    background: isActive ? C.primary : C.bgCard,
+                    color:      isActive ? '#fff'    : C.text,
+                    border:     isActive ? `2px solid ${C.primary}` : `2px solid ${C.border}`,
+                  }}
+                >
+                  {list.name}
+                  {badge && (
+                    <span style={{
+                      ...styles.badge,
+                      background: isActive ? 'rgba(255,255,255,0.3)' : C.primaryLight,
+                      color:      isActive ? '#fff' : C.primary,
+                    }}>
+                      {badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* ── Innehåll ── */}
       {loading ? (
@@ -264,6 +266,13 @@ const styles = {
     fontFamily: F.body,
     position: 'relative',
     overflow: 'hidden',
+  },
+  headerZone: {
+    position: 'relative',
+    zIndex: 1,
+    background: `linear-gradient(135deg, ${C.primaryLight}, ${C.secondaryLight})`,
+    borderRadius: '0 0 24px 24px',
+    paddingBottom: 8,
   },
   header: {
     display: 'flex',

@@ -79,8 +79,7 @@ export function ChildHome({
     <div style={styles.wrapper}>
       <BgShapes />
 
-      <div style={styles.content}>
-        {/* Greeting + streak */}
+      <div style={styles.headerZone}>
         <h1 style={styles.greeting}>{getGreeting(member.name)}</h1>
         {streak > 0 && (
           <div style={styles.streakPill}>
@@ -89,7 +88,9 @@ export function ChildHome({
             <span style={styles.streakLabel}>{streak === 1 ? 'dag' : 'dagar'} i rad {streakEmoji(streak)}</span>
           </div>
         )}
+      </div>
 
+      <div style={styles.content}>
         {/* Progress card */}
         {todayChores.length > 0 && (
           <div style={{
@@ -253,9 +254,16 @@ export function ChildHome({
 
 const styles = {
   wrapper: { position: 'relative', overflow: 'hidden' },
+  headerZone: {
+    position: 'relative',
+    zIndex: 1,
+    background: `linear-gradient(135deg, ${C.primaryLight}, ${C.secondaryLight})`,
+    borderRadius: '0 0 24px 24px',
+    padding: '16px 16px 20px',
+  },
   content: { padding: '12px 16px', position: 'relative', zIndex: 1 },
   greeting: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: '0 0 8px' },
-  streakPill: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 99, background: C.primaryLight, border: `1.5px solid ${C.primary}`, marginBottom: 12 },
+  streakPill: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 99, background: 'rgba(255,255,255,0.7)', border: `1.5px solid ${C.primary}`, marginBottom: 0 },
   streakNum: { fontSize: F.sizes.lg, fontWeight: F.weights.extra, fontFamily: F.heading, color: C.primaryDark },
   streakLabel: { fontSize: F.sizes.sm, fontWeight: F.weights.semi, fontFamily: F.heading, color: C.primaryDark },
   progressCard: { display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 16, border: '1.5px solid', marginBottom: 12 },
