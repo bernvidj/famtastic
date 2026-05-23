@@ -30,6 +30,19 @@ function fmtDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// ─── Bakgrundsformer ──────────────────────────────────────────────────────────
+function BgShapes() {
+  return (
+    <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0.18, pointerEvents: 'none' }}
+      viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice">
+      <path d="M -40 -30 Q 100 -60, 180 80 Q 230 180, 120 240 Q 20 290, -30 180 Q -80 80, -40 -30 Z" fill="#3CB4A6" />
+      <path d="M 300 -20 Q 430 10, 440 140 Q 448 230, 350 260 Q 260 285, 230 190 Q 205 105, 300 -20 Z" fill="#A8E6DF" />
+      <path d="M 220 640 Q 400 600, 440 720 Q 462 800, 320 810 Q 180 818, 160 720 Q 145 640, 220 640 Z" fill="#FF7A59" />
+      <path d="M -50 700 Q 50 650, 130 710 Q 185 755, 140 820 Q 75 855, -15 820 Q -90 790, -50 700 Z" fill="#FFA071" />
+    </svg>
+  );
+}
+
 export function MealPlan({ familyId, member, members, onGenerateShopping }) {
   const [tab, setTab] = useState('plan');
   const [weekOffset, setWeekOffset] = useState(0);
@@ -133,101 +146,104 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
     if (onGenerateShopping) onGenerateShopping();
   }
 
-  // --- RENDER ---
   return (
     <div style={styles.page}>
-      {/* Header */}
-      <div style={styles.header}>
-        <h1 style={styles.pageTitle}>Mat</h1>
-        <button onClick={() => setEditingMeal('new')} style={{ ...S.button, ...S.buttonPrimary, padding: '8px 16px' }}>
-          <Plus size={18} /> Nytt recept
-        </button>
-      </div>
+      <BgShapes />
 
-      {/* Tabs */}
-      <div style={styles.tabs}>
-        <button onClick={() => setTab('plan')} style={{
-          ...styles.tab, borderBottom: tab === 'plan' ? `3px solid ${C.primary}` : '3px solid transparent',
-          color: tab === 'plan' ? C.primary : C.textMuted,
-        }}>
-          <CalendarDays size={16} /> Veckomeny
-        </button>
-        <button onClick={() => setTab('bank')} style={{
-          ...styles.tab, borderBottom: tab === 'bank' ? `3px solid ${C.primary}` : '3px solid transparent',
-          color: tab === 'bank' ? C.primary : C.textMuted,
-        }}>
-          <BookOpen size={16} /> Receptbank
-        </button>
-      </div>
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        {/* Header */}
+        <div style={styles.header}>
+          <h1 style={styles.pageTitle}>Mat</h1>
+          <button onClick={() => setEditingMeal('new')} style={{ ...S.button, ...S.buttonPrimary, padding: '8px 16px' }}>
+            <Plus size={18} /> Nytt recept
+          </button>
+        </div>
 
-      {loading ? (
-        <p style={styles.loadingText}>Laddar...</p>
-      ) : tab === 'plan' ? (
-        <div style={styles.content}>
-          {/* Week nav */}
-          <div style={styles.weekNav}>
-            <button onClick={() => setWeekOffset(w => w - 1)} style={styles.weekBtn}>
-              <ChevronLeft size={20} color={C.text} />
-            </button>
-            <div style={styles.weekTitle}>
-              <span style={styles.weekLabel}>Vecka {weekNum}</span>
-              {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={styles.todayBtn}>Idag</button>}
-            </div>
-            <button onClick={() => setWeekOffset(w => w + 1)} style={styles.weekBtn}>
-              <ChevronRight size={20} color={C.text} />
-            </button>
-          </div>
+        {/* Tabs */}
+        <div style={styles.tabs}>
+          <button onClick={() => setTab('plan')} style={{
+            ...styles.tab, borderBottom: tab === 'plan' ? `3px solid ${C.primary}` : '3px solid transparent',
+            color: tab === 'plan' ? C.primary : C.textMuted,
+          }}>
+            <CalendarDays size={16} /> Veckomeny
+          </button>
+          <button onClick={() => setTab('bank')} style={{
+            ...styles.tab, borderBottom: tab === 'bank' ? `3px solid ${C.primary}` : '3px solid transparent',
+            color: tab === 'bank' ? C.primary : C.textMuted,
+          }}>
+            <BookOpen size={16} /> Receptbank
+          </button>
+        </div>
 
-          {/* Day grid */}
-          {weekDates.map((d, i) => {
-            const dateStr = fmtDate(d);
-            const plan = getPlanForDate(dateStr);
-            const isToday = dateStr === today;
-            const mealTitle = plan?.meals?.title || plan?.free_text || null;
-            return (
-              <div key={i} style={{
-                ...styles.dayRow, background: isToday ? C.primaryLight : C.bgCard,
-                borderLeft: isToday ? `4px solid ${C.primary}` : '4px solid transparent',
-              }}>
-                <div style={styles.dayHeader}>
-                  <span style={{ ...styles.dayName, color: isToday ? C.primary : C.text, fontWeight: isToday ? F.weights.extra : F.weights.semi }}>
-                    {WEEKDAYS[i]}
-                  </span>
-                  <span style={styles.dayDate}>{d.getDate()}/{d.getMonth() + 1}</span>
-                </div>
-                {mealTitle ? (
-                  <div style={styles.mealAssigned}>
-                    <span style={styles.mealName}>{mealTitle}</span>
-                    <div style={styles.mealActions}>
-                      <button onClick={() => setPickingDay(dateStr)} style={styles.mealActionBtn}>Byt</button>
-                      <button onClick={() => removePlan(dateStr)} style={styles.mealActionBtn}><X size={14} /></button>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={styles.mealEmpty}>
-                    <button onClick={() => setPickingDay(dateStr)} style={styles.addMealBtn}><Plus size={14} /> Välj måltid</button>
-                    <button onClick={() => randomMeal(dateStr)} style={styles.randomBtn}><Shuffle size={14} /></button>
-                  </div>
-                )}
+        {loading ? (
+          <p style={styles.loadingText}>Laddar...</p>
+        ) : tab === 'plan' ? (
+          <div style={styles.content}>
+            {/* Week nav */}
+            <div style={styles.weekNav}>
+              <button onClick={() => setWeekOffset(w => w - 1)} style={styles.weekBtn}>
+                <ChevronLeft size={20} color={C.text} />
+              </button>
+              <div style={styles.weekTitle}>
+                <span style={styles.weekLabel}>Vecka {weekNum}</span>
+                {weekOffset !== 0 && <button onClick={() => setWeekOffset(0)} style={styles.todayBtn}>Idag</button>}
               </div>
-            );
-          })}
+              <button onClick={() => setWeekOffset(w => w + 1)} style={styles.weekBtn}>
+                <ChevronRight size={20} color={C.text} />
+              </button>
+            </div>
 
-          {/* Generate shopping button */}
-          {mealPlan.some(p => p.meal_id) && (
-            <button onClick={handleGenerateShopping} style={{ ...S.button, ...S.buttonSecondary, width: '100%', marginTop: 12 }}>
-              <ShoppingCart size={16} /> Generera handlingslista
-            </button>
-          )}
-        </div>
-      ) : (
-        <div style={styles.content}>
-          <MealBank meals={meals} familyId={familyId} memberId={member.id}
-            onSelect={null} onEdit={meal => setEditingMeal(meal)} onAddFromTemplate={handleAddFromTemplate} />
-        </div>
-      )}
+            {/* Day grid */}
+            {weekDates.map((d, i) => {
+              const dateStr = fmtDate(d);
+              const plan = getPlanForDate(dateStr);
+              const isToday = dateStr === today;
+              const mealTitle = plan?.meals?.title || plan?.free_text || null;
+              return (
+                <div key={i} style={{
+                  ...styles.dayRow, background: isToday ? C.primaryLight : C.bgCard,
+                  borderLeft: isToday ? `4px solid ${C.primary}` : '4px solid transparent',
+                }}>
+                  <div style={styles.dayHeader}>
+                    <span style={{ ...styles.dayName, color: isToday ? C.primary : C.text, fontWeight: isToday ? F.weights.extra : F.weights.semi }}>
+                      {WEEKDAYS[i]}
+                    </span>
+                    <span style={styles.dayDate}>{d.getDate()}/{d.getMonth() + 1}</span>
+                  </div>
+                  {mealTitle ? (
+                    <div style={styles.mealAssigned}>
+                      <span style={styles.mealName}>{mealTitle}</span>
+                      <div style={styles.mealActions}>
+                        <button onClick={() => setPickingDay(dateStr)} style={styles.mealActionBtn}>Byt</button>
+                        <button onClick={() => removePlan(dateStr)} style={styles.mealActionBtn}><X size={14} /></button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={styles.mealEmpty}>
+                      <button onClick={() => setPickingDay(dateStr)} style={styles.addMealBtn}><Plus size={14} /> Välj måltid</button>
+                      <button onClick={() => randomMeal(dateStr)} style={styles.randomBtn}><Shuffle size={14} /></button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
-      <div style={{ height: 80 }} />
+            {/* Generate shopping button */}
+            {mealPlan.some(p => p.meal_id) && (
+              <button onClick={handleGenerateShopping} style={{ ...S.button, ...S.buttonSecondary, width: '100%', marginTop: 12 }}>
+                <ShoppingCart size={16} /> Generera handlingslista
+              </button>
+            )}
+          </div>
+        ) : (
+          <div style={styles.content}>
+            <MealBank meals={meals} familyId={familyId} memberId={member.id}
+              onSelect={null} onEdit={meal => setEditingMeal(meal)} onAddFromTemplate={handleAddFromTemplate} />
+          </div>
+        )}
+
+        <div style={{ height: 80 }} />
+      </div>
 
       {/* Meal picker modal */}
       {pickingDay && (
@@ -263,7 +279,7 @@ export function MealPlan({ familyId, member, members, onGenerateShopping }) {
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', overflow: 'hidden' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 16px 8px' },
   pageTitle: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: 0 },
   tabs: { display: 'flex', padding: '0 16px', borderBottom: `1px solid ${C.borderLight}` },
