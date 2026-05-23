@@ -28,7 +28,7 @@ function BgShapes() {
       style={{
         position: 'absolute', top: 0, left: 0,
         width: '100%', height: '100%',
-        opacity: 0.12, pointerEvents: 'none',
+        opacity: 0.18, pointerEvents: 'none',
       }}
       viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="xMidYMid slice"
