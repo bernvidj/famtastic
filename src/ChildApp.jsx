@@ -54,6 +54,7 @@ export function ChildApp({ familyId, member, onLogout }) {
   const [defaultListId, setDefaultListId] = useState(null);
   const [chatEnabled, setChatEnabled] = useState(false);
   const [moodEnabled, setMoodEnabled] = useState(false);
+  const [pollEnabled, setPollEnabled] = useState(false);
   const { data, loading, reload } = useChildData(familyId, member.id, true);
 
   // GPS: hook alltid på toppnivå — watchPosition startar när båda flaggor är true
@@ -87,6 +88,7 @@ export function ChildApp({ familyId, member, onLogout }) {
           setKidsShoppingEnabled(!!features.kids_shopping);
           setChatEnabled(!!features.chat);
           setMoodEnabled(!!features.mood);
+          setPollEnabled(!!features.poll);
         }
       });
   }, [familyId]);
@@ -413,6 +415,7 @@ export function ChildApp({ familyId, member, onLogout }) {
           member={member}
           members={members}
           moodEnabled={moodEnabled}
+          pollEnabled={pollEnabled}
         />
       )}
 

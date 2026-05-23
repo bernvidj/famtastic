@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F, TOPBAR_H } from '../data';
 import { MoodCard } from './MoodCard';
+import { PollCard } from './PollCard';
 
 function formatMsgTime(ts) {
   if (!ts) return '';
@@ -72,7 +73,7 @@ function MessageBubble({ msg, sender, isMe }) {
   );
 }
 
-export function ChatView({ familyId, member, members, moodEnabled }) {
+export function ChatView({ familyId, member, members, moodEnabled, pollEnabled }) {
   const [messages, setMessages] = useState([]);
   const [text,     setText]     = useState('');
   const [sending,  setSending]  = useState(false);
@@ -140,6 +141,11 @@ export function ChatView({ familyId, member, members, moodEnabled }) {
       {/* Familjestämning */}
       {moodEnabled && (
         <MoodCard familyId={familyId} member={member} members={members} />
+      )}
+
+      {/* Familjeomröstning */}
+      {pollEnabled && (
+        <PollCard familyId={familyId} member={member} members={members} />
       )}
 
       {/* Innehåll */}
