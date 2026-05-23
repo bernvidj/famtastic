@@ -3,7 +3,7 @@
 // School + exams + separated chore sections
 // ============================================
 
-import React from 'react';
+import React, { useState } from 'react';
 import { C, F, S, formatKr, getGreeting, streakEmoji, safeArray } from './data';
 import { CheckCircle, Star, Flame, Zap } from 'lucide-react';
 import { BgShapes } from './BgShapes';
@@ -24,7 +24,22 @@ export function ChildHome({
   balance, todayEvents, meal, poolCount, familyGoals, onGoToChores,
   todayLessons, schoolSpecial, morningSpecial, afternoonSpecial, exams,
   locationFeatureEnabled, locationSharing, onToggleLocationSharing,
+  kidsShoppingEnabled, shoppingListReady, onAddShoppingItem,
 }) {
+  const [shopInput,   setShopInput]   = useState('');
+  const [shopAdding,  setShopAdding]  = useState(false);
+  const [shopSuccess, setShopSuccess] = useState(false);
+
+  async function handleShopAdd() {
+    if (!shopInput.trim() || shopAdding) return;
+    setShopAdding(true);
+    await onAddShoppingItem(shopInput.trim());
+    setShopInput('');
+    setShopAdding(false);
+    setShopSuccess(true);
+    setTimeout(() => setShopSuccess(false), 2000);
+  }
+
   const schoolChores  = todayChores.filter(c => c.reference_id);
   const regularChores = todayChores.filter(c => !c.reference_id);
 
@@ -217,6 +232,37 @@ export function ChildHome({
           </div>
         )}
 
+        {/* Handlingslista — snabb-lägg till */}
+        {kidsShoppingEnabled && (
+          <div style={styles.section}>
+            <p style={S.sectionLabel}>🛒 Handlingslistan</p>
+            {shoppingListReady ? (
+              <div style={styles.shopCard}>
+                <input
+                  type="text"
+                  placeholder="Lägg till vara..."
+                  value={shopInput}
+                  onChange={e => setShopInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleShopAdd()}
+                  style={styles.shopInput}
+                />
+                <button
+                  onClick={handleShopAdd}
+                  disabled={!shopInput.trim() || shopAdding}
+                  style={{ ...styles.shopBtn, opacity: shopInput.trim() && !shopAdding ? 1 : 0.5 }}
+                >
+                  {shopAdding ? '⏳' : '➕'}
+                </button>
+                {shopSuccess && (
+                  <span style={styles.shopSuccess}>✅ Tillagt!</span>
+                )}
+              </div>
+            ) : (
+              <p style={styles.shopEmpty}>Be mamma eller pappa skapa en handlingslista först!</p>
+            )}
+          </div>
+        )}
+
         {/* Platsdelning-toggle */}
         {locationFeatureEnabled && (
           <div style={styles.section}>
@@ -315,4 +361,9 @@ const styles = {
   locationCard: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: C.bgCard, borderRadius: 14, border: `1.5px solid ${C.borderLight}` },
   locationLabel: { display: 'block', fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text },
   locationDesc: { display: 'block', fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.body, marginTop: 2 },
+  shopCard: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  shopInput: { flex: 1, minWidth: 120, padding: '12px 14px', borderRadius: 12, border: `2px solid ${C.borderLight}`, fontSize: F.sizes.md, fontFamily: F.body, background: C.bgCard, boxSizing: 'border-box', outline: 'none' },
+  shopBtn: { width: 44, height: 44, borderRadius: 12, border: 'none', background: C.secondary, color: '#fff', fontSize: 20, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'opacity 0.15s' },
+  shopSuccess: { fontSize: F.sizes.xs, fontWeight: F.weights.bold, color: C.success, fontFamily: F.heading },
+  shopEmpty: { fontSize: F.sizes.sm, color: C.textMuted, fontFamily: F.body, margin: 0 },
 };

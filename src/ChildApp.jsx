@@ -49,6 +49,8 @@ export function ChildApp({ familyId, member, onLogout }) {
   const [celebrationActive, setCelebrationActive] = useState(false);
   const [locationFeatureOn, setLocationFeatureOn] = useState(false);
   const [childSharingEnabled, setChildSharingEnabled] = useState(false);
+  const [kidsShoppingEnabled, setKidsShoppingEnabled] = useState(false);
+  const [defaultListId, setDefaultListId] = useState(null);
   const { data, loading, reload } = useChildData(familyId, member.id, true);
 
   // GPS: hook alltid på toppnivå — watchPosition startar när båda flaggor är true
@@ -74,9 +76,21 @@ export function ChildApp({ familyId, member, onLogout }) {
     if (!familyId) return;
     supabase.rpc('get_family_features', { p_family_id: familyId })
       .then(({ data: features }) => {
-        if (features) setLocationFeatureOn(!!features.location_sharing);
+        if (features) {
+          setLocationFeatureOn(!!features.location_sharing);
+          setKidsShoppingEnabled(!!features.kids_shopping);
+        }
       });
   }, [familyId]);
+
+  // Ladda default-lista när kids_shopping är aktiverat
+  useEffect(() => {
+    if (!kidsShoppingEnabled || !familyId) return;
+    supabase.rpc('get_default_shopping_list', { p_family_id: familyId })
+      .then(({ data }) => {
+        if (Array.isArray(data) && data.length > 0) setDefaultListId(data[0].id);
+      });
+  }, [kidsShoppingEnabled, familyId]);
 
   async function loadSchoolData() {
     const [schedRes, subjRes, specRes, examRes] = await Promise.all([
@@ -237,6 +251,17 @@ export function ChildApp({ familyId, member, onLogout }) {
     return streak;
   }
 
+  // --- Shopping ---
+  async function handleAddShoppingItem(name) {
+    if (!defaultListId) return;
+    await supabase.rpc('child_add_shopping_item', {
+      p_family_id: familyId,
+      p_member_id: member.id,
+      p_list_id:   defaultListId,
+      p_name:      name,
+    });
+  }
+
   // --- GPS toggle ---
   async function handleLocationToggle() {
     if (childSharingEnabled) {
@@ -329,6 +354,9 @@ export function ChildApp({ familyId, member, onLogout }) {
           locationFeatureEnabled={locationFeatureOn}
           locationSharing={childSharingEnabled}
           onToggleLocationSharing={handleLocationToggle}
+          kidsShoppingEnabled={kidsShoppingEnabled}
+          shoppingListReady={!!defaultListId}
+          onAddShoppingItem={handleAddShoppingItem}
         />
       )}
 

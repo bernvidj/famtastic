@@ -26,7 +26,7 @@ function PriceChip({ min, max }) {
   );
 }
 
-export function ShoppingItemList({ items, onToggle, onRemove, onClearChecked }) {
+export function ShoppingItemList({ items, members, onToggle, onRemove, onClearChecked }) {
   const [showChecked, setShowChecked] = useState(false);
 
   const uncheckedItems = items.filter(i => !i.checked);
@@ -59,6 +59,8 @@ export function ShoppingItemList({ items, onToggle, onRemove, onClearChecked }) 
           <h3 style={styles.catTitle}>{cat}</h3>
           {catItems.map(item => {
             const itemPrice = costEstimate.perItem[item.id];
+            const addedBy   = members && item.added_by ? members.find(m => m.id === item.added_by) : null;
+            const byChild   = addedBy && addedBy.role === 'child';
             return (
               <div key={item.id} style={styles.itemRow}>
                 <button onClick={() => onToggle(item)} style={styles.itemCheck}>
@@ -71,6 +73,19 @@ export function ShoppingItemList({ items, onToggle, onRemove, onClearChecked }) 
                   )}
                   {item.from_meal_plan && <span style={{ fontSize: 12 }}>🍽️</span>}
                 </div>
+                {byChild && (
+                  <span
+                    title={`Föreslagen av ${addedBy.name}`}
+                    style={{
+                      width: 24, height: 24, borderRadius: 12,
+                      background: addedBy.color || C.primaryLight,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 13, flexShrink: 0,
+                    }}
+                  >
+                    {addedBy.avatar}
+                  </span>
+                )}
                 {itemPrice && <PriceChip min={itemPrice[0]} max={itemPrice[1]} />}
                 <button onClick={() => onRemove(item.id)} style={styles.removeBtn}>
                   <X size={14} color={C.textMuted} />

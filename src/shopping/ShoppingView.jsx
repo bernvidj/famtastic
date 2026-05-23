@@ -15,7 +15,7 @@ import { BgShapes } from '../BgShapes';
 
 
 // ─── Huvud-vy ─────────────────────────────────────────────────────────────────
-export function ShoppingView({ familyId, member }) {
+export function ShoppingView({ familyId, member, members }) {
   const [lists,        setLists]        = useState([]);
   const [selectedList, setSelectedList] = useState(null);
   const [items,        setItems]        = useState([]);
@@ -221,6 +221,7 @@ export function ShoppingView({ familyId, member }) {
           {/* ── Varulista ── */}
           <ShoppingItemList
             items={items}
+            members={members}
             onToggle={handleToggle}
             onRemove={handleRemove}
             onClearChecked={handleClearChecked}
