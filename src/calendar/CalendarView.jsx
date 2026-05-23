@@ -57,9 +57,9 @@ function BgShapes() {
   return (
     <svg
       style={{
-        position: 'fixed', top: 0, left: 0,
+        position: 'absolute', top: 0, left: 0,
         width: '100%', height: '100%',
-        opacity: 0.07, pointerEvents: 'none', zIndex: 0,
+        opacity: 0.18, pointerEvents: 'none',
       }}
       viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="xMidYMid slice"
@@ -471,7 +471,7 @@ export function CalendarView({ familyId, member, members }) {
 }
 
 const styles = {
-  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative' },
+  page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', overflow: 'hidden' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 16px 8px', position: 'relative', zIndex: 1 },
   pageTitle: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: 0 },
   weekNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 16px', position: 'relative', zIndex: 1 },
