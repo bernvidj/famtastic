@@ -78,6 +78,22 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout }) 
     showToast('Inställning sparad!');
   }
 
+  async function toggleFeature(key) {
+    const features = familySettings.features || {};
+    const updated = {
+      ...familySettings,
+      features: { ...features, [key]: !features[key] },
+    };
+    setFamilySettings(updated);
+    await supabase.from('families').update({ settings: updated }).eq('id', familyId);
+    showToast('Inställning sparad!');
+    if (onUpdate) onUpdate();
+  }
+
+  function getFeature(key) {
+    return !!(familySettings.features || {})[key];
+  }
+
   async function saveMember(m) {
     setSaving(true);
     await supabase.from('family_members')
@@ -319,6 +335,32 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout }) 
                 rule={allowanceRules.find(r => r.member_id === child.id)}
                 onSave={saveAllowance} saving={saving} />
             ))}
+          </div>
+        )}
+
+        {/* Funktioner */}
+        {isParent && (
+          <div style={styles.card}>
+            <h2 style={styles.cardTitle}>
+              <span style={styles.cardIcon}>🧩</span> Funktioner
+            </h2>
+
+            <div style={styles.settingRow}>
+              <div style={{ flex: 1 }}>
+                <span style={styles.settingLabel}>📍 Familje-GPS</span>
+                <span style={styles.settingDesc}>
+                  {getFeature('location_sharing')
+                    ? 'Aktiverad — "Var är vi?"-fliken visas'
+                    : 'Inaktiverad'}
+                </span>
+              </div>
+              <button
+                onClick={() => toggleFeature('location_sharing')}
+                style={{ ...styles.toggleSwitch, background: getFeature('location_sharing') ? C.secondary : C.border }}
+              >
+                <div style={{ ...styles.toggleKnob, transform: getFeature('location_sharing') ? 'translateX(22px)' : 'translateX(2px)' }} />
+              </button>
+            </div>
           </div>
         )}
 

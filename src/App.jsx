@@ -15,6 +15,8 @@ import { ShoppingView } from './shopping/ShoppingView';
 import { ScheduleView } from './ScheduleView';
 import { SettingsView } from './settings/SettingsView';
 import { ChildApp } from './ChildApp';
+import { LocationView } from './location/LocationView';
+import { useLocationSharing } from './location/useLocationSharing';
 import { C } from './data';
 import { Home as HomeIcon } from 'lucide-react';
 
@@ -100,9 +102,10 @@ export function App() {
     try { return JSON.parse(sessionStorage.getItem('famtastic_active') || '{}').family_id || null; }
     catch { return null; }
   });
-  const [allMembers, setAllMembers] = useState([]);
-  const [page,       setPage]       = useState('home');
-  const [showSetup,  setShowSetup]  = useState(false);
+  const [allMembers,     setAllMembers]     = useState([]);
+  const [familySettings, setFamilySettings] = useState({});
+  const [page,           setPage]           = useState('home');
+  const [showSetup,      setShowSetup]      = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -134,12 +137,20 @@ export function App() {
   }, []);
 
   async function loadAllMembers(fid) {
-    const { data } = await supabase
-      .from('family_members')
-      .select('id, name, role, avatar, color, auth_user_id, pin_hash')
-      .eq('family_id', fid)
-      .order('created_at');
-    setAllMembers(data || []);
+    const [membRes, famRes] = await Promise.all([
+      supabase
+        .from('family_members')
+        .select('id, name, role, avatar, color, auth_user_id, pin_hash')
+        .eq('family_id', fid)
+        .order('created_at'),
+      supabase
+        .from('families')
+        .select('settings')
+        .eq('id', fid)
+        .single(),
+    ]);
+    setAllMembers(membRes.data || []);
+    setFamilySettings(famRes.data?.settings || {});
   }
 
   function handleLogin(member) {
@@ -227,6 +238,18 @@ export function App() {
     );
   }
 
+  // --- GPS-feature flags ---
+  const locationFeatureEnabled = !!((familySettings.features || {}).location_sharing);
+  // memberSharing-state läses från Supabase i LocationView — här startar vi bara watchPosition
+  // när feature är på. Sharing_enabled per-member styrs av toggle i LocationView.
+  // Vi skickar enabled=false här; LocationView sköter sin egen toggle och kallar RPCn direkt.
+  // Hook sitter i App för att överleva navigering.
+  const [memberSharingEnabled, setMemberSharingEnabled] = React.useState(false);
+  useLocationSharing(
+    activeMember?.id ?? null,
+    locationFeatureEnabled && memberSharingEnabled
+  );
+
   // --- Föräldravy ---
   function renderPage() {
     switch (page) {
@@ -242,6 +265,14 @@ export function App() {
         return <MealPlan familyId={familyId} member={activeMember} members={allMembers} onGenerateShopping={() => setPage('shopping')} />;
       case 'shopping':
         return <ShoppingView familyId={familyId} member={activeMember} members={allMembers} />;
+      case 'location':
+        return (
+          <LocationView
+            familyId={familyId}
+            member={activeMember}
+            members={allMembers}
+          />
+        );
       case 'settings':
         return (
           <SettingsView
@@ -261,7 +292,7 @@ export function App() {
   return (
     <div>
       {renderPage()}
-      <Nav active={page} onNavigate={setPage} />
+      <Nav active={page} onNavigate={setPage} locationEnabled={locationFeatureEnabled} />
     </div>
   );
 }

@@ -16,10 +16,14 @@ const NAV_ITEMS = [
   { id: 'settings', label: 'Mer',     icon: Settings },
 ];
 
-export function Nav({ active, onNavigate }) {
+export function Nav({ active, onNavigate, locationEnabled }) {
+  const items = locationEnabled
+    ? [...NAV_ITEMS, { id: 'location', label: 'Plats', emoji: '📍' }]
+    : NAV_ITEMS;
+
   return (
     <nav style={styles.nav}>
-      {NAV_ITEMS.map(item => {
+      {items.map(item => {
         const Icon     = item.icon;
         const isActive = active === item.id;
         return (
@@ -35,11 +39,15 @@ export function Nav({ active, onNavigate }) {
               padding:       isActive ? '5px 14px' : '5px 6px',
               transition:    'all 0.18s ease',
             }}>
-              <Icon
-                size={22}
-                strokeWidth={isActive ? 2.5 : 2}
-                color={isActive ? '#fff' : C.textMuted}
-              />
+              {Icon ? (
+                <Icon
+                  size={22}
+                  strokeWidth={isActive ? 2.5 : 2}
+                  color={isActive ? '#fff' : C.textMuted}
+                />
+              ) : (
+                <span style={{ fontSize: 20, lineHeight: 1 }}>{item.emoji}</span>
+              )}
             </div>
             <span style={{
               ...styles.navLabel,
