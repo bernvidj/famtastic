@@ -10,6 +10,7 @@ import { HomeSchoolSection } from './HomeSchoolSection';
 import { HomeWeekChart } from './HomeWeekChart';
 import { HomeMoneyOverview } from './HomeMoneyOverview';
 import { ChevronLeft, ChevronRight, Flame } from 'lucide-react';
+import { ParentNotes } from './ParentNotes';
 
 function getWeekDates(offset) {
   const now = new Date();
@@ -336,6 +337,9 @@ export function Home({ familyId, member, members }) {
               <div style={styles.infoRow}><span style={{ fontSize: 18 }}>☀️</span><span style={styles.infoText}>Inget planerat idag</span></div>
             )}
           </div>
+          {/* 9. Parent notes */}
+          <ParentNotes familyId={familyId} member={member} members={members} />
+
         </div>
       )}
       <div style={{ height: 80 }} />

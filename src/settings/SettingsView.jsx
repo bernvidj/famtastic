@@ -207,7 +207,7 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout }) 
           </div>
         </div>
 
-        {/* Approval toggle */}
+        {/* Regler + Familjeinställningar */}
         {isParent && (
           <div style={styles.card}>
             <h2 style={styles.cardTitle}>
@@ -225,6 +225,50 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout }) 
                 style={{ ...styles.toggleSwitch, background: familySettings.require_approval ? C.primary : C.border }}
               >
                 <div style={{ ...styles.toggleKnob, transform: familySettings.require_approval ? 'translateX(22px)' : 'translateX(2px)' }} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isParent && (
+          <div style={styles.card}>
+            <h2 style={styles.cardTitle}>
+              <span style={styles.cardIcon}>👨‍👩‍👧</span> Familjeinställningar
+            </h2>
+
+            <div style={styles.settingRow}>
+              <div style={{ flex: 1 }}>
+                <span style={styles.settingLabel}>Veckoöverlämning</span>
+                <span style={styles.settingDesc}>
+                  {familySettings.weekly_handover
+                    ? 'Aktiverad — veckosummering vid byte'
+                    : 'Inaktiverad'}
+                </span>
+              </div>
+              <button
+                onClick={() => toggleSetting('weekly_handover')}
+                style={{ ...styles.toggleSwitch, background: familySettings.weekly_handover ? C.primary : C.border }}
+              >
+                <div style={{ ...styles.toggleKnob, transform: familySettings.weekly_handover ? 'translateX(22px)' : 'translateX(2px)' }} />
+              </button>
+            </div>
+
+            <div style={{ height: 1, background: C.borderLight, margin: '10px 0' }} />
+
+            <div style={styles.settingRow}>
+              <div style={{ flex: 1 }}>
+                <span style={styles.settingLabel}>Delad ekonomi</span>
+                <span style={styles.settingDesc}>
+                  {familySettings.shared_economy
+                    ? 'Aktiverad — båda föräldrar godkänner utbetalningar'
+                    : 'Inaktiverad — en förälder hanterar ekonomin'}
+                </span>
+              </div>
+              <button
+                onClick={() => toggleSetting('shared_economy')}
+                style={{ ...styles.toggleSwitch, background: familySettings.shared_economy ? C.primary : C.border }}
+              >
+                <div style={{ ...styles.toggleKnob, transform: familySettings.shared_economy ? 'translateX(22px)' : 'translateX(2px)' }} />
               </button>
             </div>
           </div>
