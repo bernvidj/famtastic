@@ -17,28 +17,46 @@ function daysUntil(dateStr) {
   return Math.round((target - today) / 86400000);
 }
 
+// ─── Bakgrundsformer ──────────────────────────────────────────────────────────
+function BgShapes() {
+  return (
+    <svg
+      style={{
+        position: 'fixed', top: 0, left: 0,
+        width: '100%', height: '100%',
+        opacity: 0.09, pointerEvents: 'none', zIndex: 0,
+      }}
+      viewBox="0 0 400 800" xmlns="http://www.w3.org/2000/svg"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      <path d="M -40 -30 Q 100 -60, 180 80 Q 230 180, 120 240 Q 20 290, -30 180 Q -80 80, -40 -30 Z" fill="#3CB4A6" />
+      <path d="M 300 -20 Q 430 10, 440 140 Q 448 230, 350 260 Q 260 285, 230 190 Q 205 105, 300 -20 Z" fill="#A8E6DF" />
+      <path d="M 220 640 Q 400 600, 440 720 Q 462 800, 320 810 Q 180 818, 160 720 Q 145 640, 220 640 Z" fill="#FF7A59" />
+      <path d="M -50 700 Q 50 650, 130 710 Q 185 755, 140 820 Q 75 855, -15 820 Q -90 790, -50 700 Z" fill="#FFA071" />
+    </svg>
+  );
+}
+
 export function ChildHome({
   member, todayChores, isCompleted, toggleChore, streak,
   balance, todayEvents, meal, poolCount, familyGoals, onGoToChores,
   todayLessons, schoolSpecial, morningSpecial, afternoonSpecial, exams,
 }) {
-  // Split chores: school-linked (reference_id) vs regular
-  const schoolChores = todayChores.filter(c => c.reference_id);
+  const schoolChores  = todayChores.filter(c => c.reference_id);
   const regularChores = todayChores.filter(c => !c.reference_id);
 
-  const doneCount = todayChores.filter(c => isCompleted(c.id)).length;
-  const allDone = todayChores.length > 0 && doneCount >= todayChores.length;
-  const lessons = safeArray(todayLessons);
+  const doneCount  = todayChores.filter(c => isCompleted(c.id)).length;
+  const allDone    = todayChores.length > 0 && doneCount >= todayChores.length;
+  const lessons    = safeArray(todayLessons);
   const upcomingExams = safeArray(exams).filter(e => daysUntil(e.exam_date) >= 0).slice(0, 3);
-  const hasSchool = lessons.length > 0 || schoolSpecial || morningSpecial || afternoonSpecial;
+  const hasSchool  = lessons.length > 0 || schoolSpecial || morningSpecial || afternoonSpecial;
 
-  // Shared chore row renderer
   function renderChoreRow(chore) {
     const done = isCompleted(chore.id);
     return (
       <button key={chore.id} onClick={() => toggleChore(chore.id)} style={{
         ...styles.choreRow,
-        background: done ? C.successLight : C.bgCard,
+        background:  done ? C.successLight : C.bgCard,
         borderColor: done ? C.success : C.borderLight,
       }}>
         <div style={{ ...styles.choreEmoji, background: done ? C.successLight : C.primaryLight }}>
@@ -58,179 +76,184 @@ export function ChildHome({
   }
 
   return (
-    <div style={styles.content}>
-      {/* Greeting + streak */}
-      <h1 style={styles.greeting}>{getGreeting(member.name)}</h1>
-      {streak > 0 && (
-        <div style={styles.streakPill}>
-          <Flame size={18} color={C.primary} />
-          <span style={styles.streakNum}>{streak}</span>
-          <span style={styles.streakLabel}>{streak === 1 ? 'dag' : 'dagar'} i rad {streakEmoji(streak)}</span>
-        </div>
-      )}
+    <div style={styles.wrapper}>
+      <BgShapes />
 
-      {/* Progress card — all chores combined */}
-      {todayChores.length > 0 && (
-        <div style={{
-          ...styles.progressCard,
-          background: allDone ? `linear-gradient(135deg, ${C.successLight}, #ECFDF5)` : `linear-gradient(135deg, ${C.primaryLight}, ${C.accentLight})`,
-          borderColor: allDone ? C.success : C.primary,
-        }}>
-          <span style={{ fontSize: allDone ? 32 : 28 }}>{allDone ? '🏆' : '💪'}</span>
-          <div style={styles.progressInfo}>
-            <span style={{ ...styles.progressTitle, color: allDone ? C.successDark : C.primaryDark }}>
-              {allDone ? 'Alla klara idag!' : `${doneCount} av ${todayChores.length} klara`}
-            </span>
-            <div style={styles.progressBarBg}>
-              <div style={{
-                ...styles.progressBarFill,
-                width: `${(doneCount / todayChores.length) * 100}%`,
-                background: allDone ? C.success : `linear-gradient(90deg, ${C.primary}, ${C.accent})`,
-              }} />
-            </div>
+      <div style={styles.content}>
+        {/* Greeting + streak */}
+        <h1 style={styles.greeting}>{getGreeting(member.name)}</h1>
+        {streak > 0 && (
+          <div style={styles.streakPill}>
+            <Flame size={18} color={C.primary} />
+            <span style={styles.streakNum}>{streak}</span>
+            <span style={styles.streakLabel}>{streak === 1 ? 'dag' : 'dagar'} i rad {streakEmoji(streak)}</span>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Balance pill */}
-      <div style={styles.balancePill}>
-        <span style={{ fontSize: 20 }}>💰</span>
-        <span style={styles.balancePillLabel}>Mitt saldo</span>
-        <span style={styles.balancePillAmount}>{formatKr(balance)}</span>
-      </div>
-
-      {/* School today */}
-      {hasSchool && (
-        <div style={styles.section}>
-          <p style={S.sectionLabel}>🎒 Skola idag</p>
-          {schoolSpecial && (
-            <div style={styles.specialBanner}>
-              <span style={{ fontSize: 16 }}>{schoolSpecial.icon || '🎉'}</span>
-              <span style={styles.specialText}>{schoolSpecial.title}</span>
-            </div>
-          )}
-          {morningSpecial && (
-            <div style={styles.specialBanner}>
-              <span style={{ fontSize: 16 }}>{morningSpecial.icon || '🎉'}</span>
-              <span style={styles.specialText}>{morningSpecial.title} (fm)</span>
-            </div>
-          )}
-          {afternoonSpecial && (
-            <div style={styles.specialBanner}>
-              <span style={{ fontSize: 16 }}>{afternoonSpecial.icon || '🎉'}</span>
-              <span style={styles.specialText}>{afternoonSpecial.title} (em)</span>
-            </div>
-          )}
-          {lessons.length > 0 && (
-            <div style={styles.lessonList}>
-              {lessons.map((l, i) => (
-                <div key={i} style={{ ...styles.lessonRow, borderLeftColor: l.color || C.secondary }}>
-                  <span style={{ fontSize: 14 }}>{l.icon}</span>
-                  <span style={styles.lessonTime}>{fmtTime(l.startTime)}{l.endTime ? `–${fmtTime(l.endTime)}` : ''}</span>
-                  <span style={styles.lessonTitle}>{l.title}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Upcoming exams */}
-      {upcomingExams.length > 0 && (
-        <div style={styles.section}>
-          <p style={S.sectionLabel}>📝 Kommande prov</p>
-          {upcomingExams.map(exam => {
-            const days = daysUntil(exam.exam_date);
-            const urgent = days <= 2;
-            return (
-              <div key={exam.id} style={{
-                ...styles.examCard,
-                borderColor: urgent ? C.primary : C.borderLight,
-                background: urgent ? C.primaryLight : C.bgCard,
-              }}>
-                <span style={{ fontSize: 20 }}>{exam.icon || '📝'}</span>
-                <div style={{ flex: 1 }}>
-                  <span style={styles.examTitle}>{exam.title}</span>
-                  <span style={styles.examDate}>
-                    {days === 0 ? 'Idag!' : days === 1 ? 'Imorgon' : `Om ${days} dagar`}
-                  </span>
-                </div>
-                {urgent && <span style={{ fontSize: 16 }}>⚠️</span>}
+        {/* Progress card */}
+        {todayChores.length > 0 && (
+          <div style={{
+            ...styles.progressCard,
+            background:  allDone ? `linear-gradient(135deg, ${C.successLight}, #ECFDF5)` : `linear-gradient(135deg, ${C.primaryLight}, ${C.accentLight})`,
+            borderColor: allDone ? C.success : C.primary,
+          }}>
+            <span style={{ fontSize: allDone ? 32 : 28 }}>{allDone ? '🏆' : '💪'}</span>
+            <div style={styles.progressInfo}>
+              <span style={{ ...styles.progressTitle, color: allDone ? C.successDark : C.primaryDark }}>
+                {allDone ? 'Alla klara idag!' : `${doneCount} av ${todayChores.length} klara`}
+              </span>
+              <div style={styles.progressBarBg}>
+                <div style={{
+                  ...styles.progressBarFill,
+                  width: `${(doneCount / todayChores.length) * 100}%`,
+                  background: allDone ? C.success : `linear-gradient(90deg, ${C.primary}, ${C.accent})`,
+                }} />
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* School-linked chores (homework, bring items, study) */}
-      {schoolChores.length > 0 && (
-        <div style={styles.section}>
-          <p style={S.sectionLabel}>📖 Skoluppgifter</p>
-          {schoolChores.map(renderChoreRow)}
-        </div>
-      )}
-
-      {/* Regular chores */}
-      {regularChores.length > 0 && (
-        <div style={styles.section}>
-          <p style={S.sectionLabel}>🧹 Sysslor</p>
-          {regularChores.map(renderChoreRow)}
-        </div>
-      )}
-
-      {/* Pool chores teaser */}
-      {poolCount > 0 && (
-        <button onClick={onGoToChores} style={styles.poolTeaser}>
-          <span style={{ fontSize: 20 }}>🤲</span>
-          <span style={styles.poolTeaserText}>{poolCount} öppna sysslor att plocka!</span>
-          <Zap size={16} color={C.accent} />
-        </button>
-      )}
-
-      {/* Today's events */}
-      {todayEvents.length > 0 && (
-        <div style={styles.section}>
-          <p style={S.sectionLabel}>Idag</p>
-          {todayEvents.map(ev => (
-            <div key={ev.id} style={styles.eventRow}>
-              <span>📅</span>
-              <span style={styles.eventTitle}>{ev.title}</span>
-              {ev.start_time && <span style={styles.eventTime}>{ev.start_time.slice(0, 5)}</span>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Meal */}
-      {meal && (
-        <div style={styles.section}>
-          <p style={S.sectionLabel}>Middag</p>
-          <div style={styles.mealCard}>
-            <span style={{ fontSize: 24 }}>🍽️</span>
-            <span style={styles.mealText}>{meal}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Family goal */}
-      {familyGoals.map(fg => (
-        <div key={fg.id} style={styles.section}>
-          <p style={S.sectionLabel}>Familjemål</p>
-          <div style={styles.familyGoalCard}>
-            <span style={{ fontSize: 24 }}>{fg.icon || '🎯'}</span>
-            <div style={{ flex: 1 }}>
-              <span style={styles.fgTitle}>{fg.title}</span>
-              <span style={styles.fgTarget}>{formatKr(fg.target_amount)}</span>
             </div>
           </div>
+        )}
+
+        {/* Balance pill */}
+        <div style={styles.balancePill}>
+          <span style={{ fontSize: 20 }}>💰</span>
+          <span style={styles.balancePillLabel}>Mitt saldo</span>
+          <span style={styles.balancePillAmount}>{formatKr(balance)}</span>
         </div>
-      ))}
+
+        {/* School today */}
+        {hasSchool && (
+          <div style={styles.section}>
+            <p style={S.sectionLabel}>🎒 Skola idag</p>
+            {schoolSpecial && (
+              <div style={styles.specialBanner}>
+                <span style={{ fontSize: 16 }}>{schoolSpecial.icon || '🎉'}</span>
+                <span style={styles.specialText}>{schoolSpecial.title}</span>
+              </div>
+            )}
+            {morningSpecial && (
+              <div style={styles.specialBanner}>
+                <span style={{ fontSize: 16 }}>{morningSpecial.icon || '🎉'}</span>
+                <span style={styles.specialText}>{morningSpecial.title} (fm)</span>
+              </div>
+            )}
+            {afternoonSpecial && (
+              <div style={styles.specialBanner}>
+                <span style={{ fontSize: 16 }}>{afternoonSpecial.icon || '🎉'}</span>
+                <span style={styles.specialText}>{afternoonSpecial.title} (em)</span>
+              </div>
+            )}
+            {lessons.length > 0 && (
+              <div style={styles.lessonList}>
+                {lessons.map((l, i) => (
+                  <div key={i} style={{ ...styles.lessonRow, borderLeftColor: l.color || C.secondary }}>
+                    <span style={{ fontSize: 14 }}>{l.icon}</span>
+                    <span style={styles.lessonTime}>{fmtTime(l.startTime)}{l.endTime ? `–${fmtTime(l.endTime)}` : ''}</span>
+                    <span style={styles.lessonTitle}>{l.title}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Upcoming exams */}
+        {upcomingExams.length > 0 && (
+          <div style={styles.section}>
+            <p style={S.sectionLabel}>📝 Kommande prov</p>
+            {upcomingExams.map(exam => {
+              const days   = daysUntil(exam.exam_date);
+              const urgent = days <= 2;
+              return (
+                <div key={exam.id} style={{
+                  ...styles.examCard,
+                  borderColor: urgent ? C.primary : C.borderLight,
+                  background:  urgent ? C.primaryLight : C.bgCard,
+                }}>
+                  <span style={{ fontSize: 20 }}>{exam.icon || '📝'}</span>
+                  <div style={{ flex: 1 }}>
+                    <span style={styles.examTitle}>{exam.title}</span>
+                    <span style={styles.examDate}>
+                      {days === 0 ? 'Idag!' : days === 1 ? 'Imorgon' : `Om ${days} dagar`}
+                    </span>
+                  </div>
+                  {urgent && <span style={{ fontSize: 16 }}>⚠️</span>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* School-linked chores */}
+        {schoolChores.length > 0 && (
+          <div style={styles.section}>
+            <p style={S.sectionLabel}>📖 Skoluppgifter</p>
+            {schoolChores.map(renderChoreRow)}
+          </div>
+        )}
+
+        {/* Regular chores */}
+        {regularChores.length > 0 && (
+          <div style={styles.section}>
+            <p style={S.sectionLabel}>🧹 Sysslor</p>
+            {regularChores.map(renderChoreRow)}
+          </div>
+        )}
+
+        {/* Pool chores teaser */}
+        {poolCount > 0 && (
+          <button onClick={onGoToChores} style={styles.poolTeaser}>
+            <span style={{ fontSize: 20 }}>🤲</span>
+            <span style={styles.poolTeaserText}>{poolCount} öppna sysslor att plocka!</span>
+            <Zap size={16} color={C.accent} />
+          </button>
+        )}
+
+        {/* Today's events */}
+        {todayEvents.length > 0 && (
+          <div style={styles.section}>
+            <p style={S.sectionLabel}>Idag</p>
+            {todayEvents.map(ev => (
+              <div key={ev.id} style={styles.eventRow}>
+                <span>📅</span>
+                <span style={styles.eventTitle}>{ev.title}</span>
+                {ev.start_time && <span style={styles.eventTime}>{ev.start_time.slice(0, 5)}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Meal */}
+        {meal && (
+          <div style={styles.section}>
+            <p style={S.sectionLabel}>Middag</p>
+            <div style={styles.mealCard}>
+              <span style={{ fontSize: 24 }}>🍽️</span>
+              <span style={styles.mealText}>{meal}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Family goal */}
+        {familyGoals.map(fg => (
+          <div key={fg.id} style={styles.section}>
+            <p style={S.sectionLabel}>Familjemål</p>
+            <div style={styles.familyGoalCard}>
+              <span style={{ fontSize: 24 }}>{fg.icon || '🎯'}</span>
+              <div style={{ flex: 1 }}>
+                <span style={styles.fgTitle}>{fg.title}</span>
+                <span style={styles.fgTarget}>{formatKr(fg.target_amount)}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 const styles = {
-  content: { padding: '12px 16px' },
+  wrapper: { position: 'relative' },
+  content: { padding: '12px 16px', position: 'relative', zIndex: 1 },
   greeting: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: '0 0 8px' },
   streakPill: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 99, background: C.primaryLight, border: `1.5px solid ${C.primary}`, marginBottom: 12 },
   streakNum: { fontSize: F.sizes.lg, fontWeight: F.weights.extra, fontFamily: F.heading, color: C.primaryDark },
