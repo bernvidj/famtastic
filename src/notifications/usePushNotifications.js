@@ -67,13 +67,24 @@ export function usePushNotifications(familyId, memberId) {
     setLoading(false);
   }
 
-  // Check current subscription status on mount
+  // Check current subscription status on mount and re-sync to DB.
+  // iOS can silently rotate the push token (reinstall, Safari cache clear) so the DB
+  // endpoint may differ from what the browser has. Always upsert on load to keep them in sync.
   useEffect(() => {
-    if (!supported || !memberId) return;
+    if (!supported || !memberId || !familyId) return;
     navigator.serviceWorker.ready.then(reg =>
-      reg.pushManager.getSubscription().then(sub => setSubscribed(!!sub))
+      reg.pushManager.getSubscription().then(sub => {
+        setSubscribed(!!sub);
+        if (sub) {
+          supabase.rpc('upsert_push_subscription', {
+            p_member_id:    memberId,
+            p_family_id:    familyId,
+            p_subscription: JSON.stringify(sub),
+          }).catch(err => console.warn('Push re-sync failed:', err));
+        }
+      })
     );
-  }, [supported, memberId]);
+  }, [supported, memberId, familyId]);
 
   return { supported, subscribed, permission, loading, subscribe, unsubscribe };
 }

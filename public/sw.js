@@ -1,4 +1,4 @@
-const CACHE = 'famtastic-v5';
+const CACHE = 'famtastic-v6';
 
 // Only pre-cache immutable assets (not index.html — it changes on every deploy)
 const STATIC = [
@@ -34,8 +34,10 @@ self.addEventListener('push', e => {
     vibrate:            [200, 100, 200],
     requireInteraction: false,
   };
+  // allSettled: a failed showNotification (e.g. iOS suppressed banner) must not
+  // prevent the postMessage that drives the in-app toast.
   e.waitUntil(
-    Promise.all([
+    Promise.allSettled([
       self.registration.showNotification(title, options),
       self.clients.matchAll({ type: 'window', includeUncontrolled: true })
         .then(cs => cs.forEach(c => c.postMessage({ type: 'PUSH_RECEIVED', title, body }))),

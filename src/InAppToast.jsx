@@ -8,17 +8,25 @@ export function InAppToast() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 
+    let hideTimer = null;
+    let clearTimer = null;
+
     function handler(event) {
       if (event.data?.type !== 'PUSH_RECEIVED') return;
+      clearTimeout(hideTimer);
+      clearTimeout(clearTimer);
       setToast({ title: event.data.title, body: event.data.body });
       setVisible(true);
-      const hide = setTimeout(() => setVisible(false), 4000);
-      const clear = setTimeout(() => setToast(null), 4400);
-      return () => { clearTimeout(hide); clearTimeout(clear); };
+      hideTimer  = setTimeout(() => setVisible(false), 4000);
+      clearTimer = setTimeout(() => setToast(null), 4400);
     }
 
     navigator.serviceWorker.addEventListener('message', handler);
-    return () => navigator.serviceWorker.removeEventListener('message', handler);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handler);
+      clearTimeout(hideTimer);
+      clearTimeout(clearTimer);
+    };
   }, []);
 
   if (!toast) return null;
