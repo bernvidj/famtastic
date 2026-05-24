@@ -202,7 +202,34 @@ export function Home({ familyId, member, members }) {
             </div>
           </div>
 
-          {/* 2. Per child */}
+          {/* 2. Weekly summary (current week only) */}
+          {weekOffset === 0 && children.length > 0 && (
+            <div style={styles.section}>
+              <p style={S.sectionLabel}>Veckans sammanfattning</p>
+              <div style={styles.weekSummaryRow}>
+                {children.map(child => {
+                  const weekDone   = completions.filter(c => c.member_id === child.id).length;
+                  const bonus      = childWeekBonus(child.id);
+                  const streak     = childStreak(child.id);
+                  return (
+                    <div key={child.id} style={styles.weekSummaryCard}>
+                      <div style={{ ...styles.wsSummaryAvatar, background: child.color ? `${child.color}22` : C.primaryLight }}>
+                        <span style={{ fontSize: 20 }}>{child.avatar}</span>
+                      </div>
+                      <span style={styles.wsName}>{child.name}</span>
+                      <div style={styles.wsStats}>
+                        <span style={styles.wsStat}>✅ {weekDone}</span>
+                        {bonus > 0 && <span style={styles.wsStat}>💰 {formatKr(bonus)}</span>}
+                        {streak > 0 && <span style={styles.wsStat}>🔥 {streak}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 3. Per child */}
           <div style={styles.section}>
             <p style={S.sectionLabel}>Barnens dag</p>
             {children.map(child => {
@@ -238,7 +265,7 @@ export function Home({ familyId, member, members }) {
             })}
           </div>
 
-          {/* 3. School today */}
+          {/* 4. School today */}
           <HomeSchoolSection
             children={children}
             schoolSchedule={schoolSchedule}
@@ -249,7 +276,7 @@ export function Home({ familyId, member, members }) {
             todayDow={todayDow}
           />
 
-          {/* 4. Pool claims (pool-uppdateringar) */}
+          {/* 5. Pool claims (pool-uppdateringar) */}
           {claims.length > 0 && (
             <div style={styles.section}>
               <p style={S.sectionLabel}>Pool-uppdateringar</p>
@@ -261,10 +288,10 @@ export function Home({ familyId, member, members }) {
             </div>
           )}
 
-          {/* 5. Action items (compact) */}
+          {/* 6. Action items (compact) */}
           <ParentActionItems familyId={familyId} members={members} onUpdate={loadData} />
 
-          {/* 6. Weekly chart */}
+          {/* 7. Weekly chart */}
           <HomeWeekChart
             weekDates={weekDates}
             chores={chores}
@@ -274,7 +301,7 @@ export function Home({ familyId, member, members }) {
             fmtDate={fmtDate}
           />
 
-          {/* 6. Family goal */}
+          {/* 8. Family goal */}
           {savingsGoals.length > 0 && (
             <div style={styles.section}>
               <p style={S.sectionLabel}>Familjemål</p>
@@ -300,10 +327,10 @@ export function Home({ familyId, member, members }) {
             </div>
           )}
 
-          {/* 7. Money overview (30 days) */}
+          {/* 9. Money overview (30 days) */}
           <HomeMoneyOverview children={children} monthTx={monthTx} />
 
-          {/* 8. Meal + events */}
+          {/* 10. Meal + events */}
           <div style={styles.section}>
             <p style={S.sectionLabel}>Idag</p>
             {todayMeal() && (
@@ -366,4 +393,10 @@ const styles = {
   goalBarFill: { height: '100%', borderRadius: 99, transition: 'width 0.4s ease' },
   infoRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: C.bgCard, borderRadius: 14, border: `1.5px solid ${C.borderLight}`, marginBottom: 6 },
   infoText: { flex: 1, fontSize: F.sizes.sm, fontWeight: F.weights.semi, fontFamily: F.heading, color: C.text },
+  weekSummaryRow: { display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 },
+  weekSummaryCard: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '12px 14px', background: C.bgCard, borderRadius: 16, border: `1.5px solid ${C.borderLight}`, boxShadow: '0 2px 8px rgba(0,0,0,0.04)', minWidth: 90, flexShrink: 0 },
+  wsSummaryAvatar: { width: 38, height: 38, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  wsName: { fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text, textAlign: 'center' },
+  wsStats: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 },
+  wsStat: { fontSize: F.sizes.xs, fontFamily: F.heading, color: C.textMuted, whiteSpace: 'nowrap' },
 };

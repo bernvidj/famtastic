@@ -147,6 +147,15 @@ export function ChildApp({ familyId, member, onLogout }) {
 
   const { chores, completions, events, transactions, goals, members, meal_plan } = data;
   const balance      = transactions.reduce((sum, tx) => sum + tx.amount, 0);
+
+  // Weekly stats for summary card
+  const weekChoresDone = completions.length; // completions is already week-scoped
+  const weekMonday = (() => {
+    const d = new Date(); d.setDate(d.getDate() - (d.getDay() || 7) + 1); d.setHours(0,0,0,0); return d;
+  })();
+  const weekEarned = transactions
+    .filter(tx => tx.type === 'chore_bonus' && new Date(tx.created_at) >= weekMonday)
+    .reduce((s, tx) => s + tx.amount, 0);
   const personalGoals = goals.filter(g => !g.is_family_goal);
   const familyGoals   = goals.filter(g => g.is_family_goal);
 
@@ -433,6 +442,8 @@ export function ChildApp({ familyId, member, onLogout }) {
           kidsShoppingEnabled={kidsShoppingEnabled}
           shoppingListReady={!!defaultListId}
           onAddShoppingItem={handleAddShoppingItem}
+          weekChoresDone={weekChoresDone}
+          weekEarned={weekEarned}
         />
       )}
 

@@ -25,6 +25,7 @@ export function ChildHome({
   todayLessons, schoolSpecial, morningSpecial, afternoonSpecial, exams,
   locationFeatureEnabled, locationSharing, onToggleLocationSharing,
   kidsShoppingEnabled, shoppingListReady, onAddShoppingItem,
+  weekChoresDone, weekEarned,
 }) {
   const [shopInput,   setShopInput]   = useState('');
   const [shopAdding,  setShopAdding]  = useState(false);
@@ -118,6 +119,37 @@ export function ChildHome({
           <span style={styles.balancePillLabel}>Mitt saldo</span>
           <span style={styles.balancePillAmount}>{formatKr(balance)}</span>
         </div>
+
+        {/* Weekly summary */}
+        {(weekChoresDone > 0 || weekEarned > 0) && (
+          <div style={styles.weekCard}>
+            <span style={styles.weekCardTitle}>Din vecka</span>
+            <div style={styles.weekCardStats}>
+              <div style={styles.weekStatItem}>
+                <span style={styles.weekStatVal}>{weekChoresDone}</span>
+                <span style={styles.weekStatLabel}>sysslor</span>
+              </div>
+              {weekEarned > 0 && (
+                <div style={styles.weekStatDivider} />
+              )}
+              {weekEarned > 0 && (
+                <div style={styles.weekStatItem}>
+                  <span style={{ ...styles.weekStatVal, color: C.primaryDark }}>{formatKr(weekEarned)}</span>
+                  <span style={styles.weekStatLabel}>intjänat</span>
+                </div>
+              )}
+              {streak > 0 && (
+                <div style={styles.weekStatDivider} />
+              )}
+              {streak > 0 && (
+                <div style={styles.weekStatItem}>
+                  <span style={{ ...styles.weekStatVal, color: C.primary }}>🔥 {streak}</span>
+                  <span style={styles.weekStatLabel}>{streak === 1 ? 'dag i rad' : 'dagar i rad'}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* School today */}
         {hasSchool && (
@@ -366,4 +398,11 @@ const styles = {
   shopBtn: { width: 44, height: 44, borderRadius: 12, border: 'none', background: C.secondary, color: '#fff', fontSize: 20, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'opacity 0.15s' },
   shopSuccess: { fontSize: F.sizes.xs, fontWeight: F.weights.bold, color: C.success, fontFamily: F.heading },
   shopEmpty: { fontSize: F.sizes.sm, color: C.textMuted, fontFamily: F.body, margin: 0 },
+  weekCard: { padding: '14px 16px', background: `linear-gradient(135deg, ${C.primaryLight}, ${C.accentLight})`, borderRadius: 16, border: `1.5px solid ${C.primary}`, marginBottom: 16 },
+  weekCardTitle: { display: 'block', fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.primaryDark, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
+  weekCardStats: { display: 'flex', alignItems: 'center', gap: 0 },
+  weekStatItem: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 },
+  weekStatVal: { fontSize: F.sizes.lg, fontWeight: F.weights.extra, fontFamily: F.heading, color: C.text },
+  weekStatLabel: { fontSize: F.sizes.xs, color: C.textMuted, fontFamily: F.heading },
+  weekStatDivider: { width: 1, height: 32, background: C.border, flexShrink: 0 },
 };
