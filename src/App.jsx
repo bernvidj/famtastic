@@ -17,6 +17,9 @@ import { LocationView } from './location/LocationView';
 import { useLocationSharing } from './location/useLocationSharing';
 import { ChatView } from './chat/ChatView';
 import { AppTopBar } from './AppTopBar';
+import { AchievementsView } from './achievements/AchievementsView';
+import { useAchievements } from './achievements/useAchievements';
+import { unlockAchievement } from './achievements/unlock';
 import { C, TOPBAR_H } from './data';
 import { Home as HomeIcon } from 'lucide-react';
 
@@ -105,6 +108,14 @@ export function App() {
     catch { return {}; }
   });
   const [page,           setPage]           = useState('home');
+
+  function navigateTo(newPage) {
+    setPage(newPage);
+    // Exploration achievements
+    if (newPage === 'schedule') unlockAchievement(familyId, activeMember?.id, 'explore_schedule');
+    if (newPage === 'meals')    unlockAchievement(familyId, activeMember?.id, 'explore_meals');
+    if (newPage === 'chores')   unlockAchievement(familyId, activeMember?.id, 'explore_chores');
+  }
   const [showSetup,      setShowSetup]      = useState(false);
 
   // locationFeatureEnabled baseras på familySettings — alltid beräknat, inte konditionellt
@@ -112,6 +123,9 @@ export function App() {
   const chatEnabled            = !!((familySettings.features || {}).chat);
   const moodEnabled            = !!((familySettings.features || {}).mood);
   const pollEnabled            = !!((familySettings.features || {}).poll);
+
+  const { unlocked: achievementsUnlocked, newCount: achievementsNew, markVisited: markAchievementsVisited, reload: reloadAchievements } =
+    useAchievements(familyId, activeMember?.id);
   const isParent = !!(activeMember && (activeMember.role === 'admin' || activeMember.role === 'parent'));
 
   // useLocationSharing anropas alltid på toppnivå — enabled=false om villkor ej uppfyllt
@@ -172,6 +186,8 @@ export function App() {
     setActiveMember(member);
     setFamilyId(member.family_id);
     loadAllMembers(member.family_id);
+    // Fire first_login — idempotent, safe to call every login
+    unlockAchievement(member.family_id, member.id, 'first_login');
   }
 
   function handleLogout() {
@@ -250,9 +266,16 @@ export function App() {
       case 'meals':
         return <MealShoppingView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'chat':
-        return <ChatView familyId={familyId} member={activeMember} members={allMembers} moodEnabled={moodEnabled} pollEnabled={pollEnabled} />;
+        return <ChatView familyId={familyId} member={activeMember} members={allMembers} moodEnabled={moodEnabled} pollEnabled={pollEnabled} onAchievement={reloadAchievements} />;
       case 'location':
         return <LocationView familyId={familyId} member={activeMember} members={allMembers} />;
+      case 'achievements':
+        return (
+          <AchievementsView
+            unlocked={achievementsUnlocked}
+            onMount={markAchievementsVisited}
+          />
+        );
       case 'settings':
         return (
           <SettingsView
@@ -271,11 +294,11 @@ export function App() {
 
   return (
     <div>
-      <AppTopBar page={page} onNavigate={setPage} />
+      <AppTopBar page={page} onNavigate={navigateTo} newAchievementsCount={achievementsNew} />
       <div style={{ paddingTop: TOPBAR_H }}>
         {renderPage()}
       </div>
-      <Nav active={page} onNavigate={setPage} locationEnabled={locationFeatureEnabled} chatEnabled={chatEnabled} />
+      <Nav active={page} onNavigate={navigateTo} locationEnabled={locationFeatureEnabled} chatEnabled={chatEnabled} />
     </div>
   );
 }

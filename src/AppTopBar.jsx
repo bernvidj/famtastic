@@ -4,17 +4,18 @@
 // ============================================
 
 import React from 'react';
-import { Home, CalendarDays, Settings } from 'lucide-react';
+import { Home, CalendarDays, Settings, Trophy } from 'lucide-react';
 import { C, F, TOPBAR_H } from './data';
 
 const PAGE_TITLES = {
-  home:     'Hem',
-  schedule: 'Schema',
-  chores:   'Sysslor & Pengar',
-  meals:    'Mat & Handla',
-  location: 'Plats',
-  chat:     'Chatt',
-  settings: 'Inställningar',
+  home:         'Hem',
+  schedule:     'Schema',
+  chores:       'Sysslor & Pengar',
+  meals:        'Mat & Handla',
+  location:     'Plats',
+  chat:         'Chatt',
+  settings:     'Inställningar',
+  achievements: 'Achievements',
 };
 
 const TOP_NAV = [
@@ -23,11 +24,32 @@ const TOP_NAV = [
   { id: 'settings', Icon: Settings },
 ];
 
-export function AppTopBar({ page, onNavigate }) {
+export function AppTopBar({ page, onNavigate, newAchievementsCount = 0 }) {
+  const hasNew = newAchievementsCount > 0;
   return (
     <div style={{ ...styles.bar, height: TOPBAR_H }}>
       <span style={styles.title}>{PAGE_TITLES[page] || ''}</span>
       <div style={styles.icons}>
+        {/* Trophy — always first, turns gold on new achievements */}
+        <button
+          onClick={() => onNavigate('achievements')}
+          style={{
+            ...styles.iconBtn,
+            background: page === 'achievements' ? C.primaryLight : 'transparent',
+            position: 'relative',
+          }}
+        >
+          <Trophy
+            size={20}
+            color={hasNew ? '#F59E0B' : page === 'achievements' ? C.primary : C.textMuted}
+            strokeWidth={hasNew || page === 'achievements' ? 2.5 : 2}
+            style={{ transform: hasNew ? 'scale(1.15)' : 'scale(1)', transition: 'transform 0.2s' }}
+          />
+          {hasNew && (
+            <span style={styles.badge}>{newAchievementsCount > 9 ? '9+' : newAchievementsCount}</span>
+          )}
+        </button>
+
         {TOP_NAV.map(({ id, Icon }) => {
           const active = page === id;
           return (
@@ -46,6 +68,14 @@ export function AppTopBar({ page, onNavigate }) {
 }
 
 const styles = {
+  badge: {
+    position: 'absolute', top: 2, right: 2,
+    background: '#F59E0B', color: '#fff',
+    fontSize: 9, fontWeight: 800, fontFamily: F.heading,
+    width: 14, height: 14, borderRadius: 7,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    lineHeight: 1,
+  },
   bar: {
     position: 'fixed',
     top: 0, left: 0, right: 0,

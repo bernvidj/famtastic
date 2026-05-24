@@ -7,8 +7,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F } from '../data';
+import { unlockAchievement } from '../achievements/unlock';
 
-export function PollCard({ familyId, member, members }) {
+export function PollCard({ familyId, member, members, onAchievement }) {
   const [poll,     setPoll]     = useState(null);
   const [votes,    setVotes]    = useState([]);
   const [creating, setCreating] = useState(false);
@@ -44,6 +45,8 @@ export function PollCard({ familyId, member, members }) {
       p_poll_id:      poll.id,
       p_option_index: optionIndex,
     });
+    const isNew = await unlockAchievement(familyId, member.id, 'voted_poll');
+    if (isNew && onAchievement) onAchievement();
     setSaving(false);
     load();
   }
@@ -62,6 +65,8 @@ export function PollCard({ familyId, member, members }) {
     setOptions(['', '']);
     setCreating(false);
     setSaving(false);
+    const isNew = await unlockAchievement(familyId, member.id, 'created_poll');
+    if (isNew && onAchievement) onAchievement();
     load();
   }
 

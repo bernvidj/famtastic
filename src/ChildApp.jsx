@@ -15,8 +15,11 @@ import { Celebration } from './Celebrations';
 import { useLocationSharing } from './location/useLocationSharing';
 import { LocationView } from './location/LocationView';
 import { ChatView } from './chat/ChatView';
-import { Home, Calendar, CheckSquare, PiggyBank, LogOut } from 'lucide-react';
+import { Home, Calendar, CheckSquare, PiggyBank, LogOut, Trophy } from 'lucide-react';
 import { TOPBAR_H } from './data';
+import { useAchievements } from './achievements/useAchievements';
+import { unlockAchievement } from './achievements/unlock';
+import { AchievementsView } from './achievements/AchievementsView';
 
 const BASE_NAV = [
   { id: 'chores',   label: 'Sysslor',  icon: CheckSquare },
@@ -55,6 +58,10 @@ export function ChildApp({ familyId, member, onLogout }) {
   const [chatEnabled, setChatEnabled] = useState(false);
   const [moodEnabled, setMoodEnabled] = useState(false);
   const [pollEnabled, setPollEnabled] = useState(false);
+
+  const { unlocked: achievementsUnlocked, newCount: achievementsNew,
+          markVisited: markAchievementsVisited, reload: reloadAchievements } =
+    useAchievements(familyId, member.id);
   const { data, loading, reload } = useChildData(familyId, member.id, true);
 
   // GPS: hook alltid på toppnivå — watchPosition startar när båda flaggor är true
@@ -270,6 +277,8 @@ export function ChildApp({ familyId, member, onLogout }) {
       p_list_id:   defaultListId,
       p_name:      name,
     });
+    await unlockAchievement(familyId, member.id, 'shopping_added');
+    reloadAchievements();
   }
 
   // --- GPS toggle ---
@@ -292,6 +301,8 @@ export function ChildApp({ familyId, member, onLogout }) {
             p_battery:   null,
           });
           setChildSharingEnabled(true);
+          await unlockAchievement(familyId, member.id, 'location_shared');
+          reloadAchievements();
         },
         () => alert('Kunde inte hämta din position. Kontrollera att du tillåtit platsbehörighet.'),
         { enableHighAccuracy: true, timeout: 15_000 }
@@ -318,6 +329,21 @@ export function ChildApp({ familyId, member, onLogout }) {
       if (nowDone >= todayList.length) { triggerCelebration('fireworks'); }
       else if (result?.points_earned > 0) { triggerCelebration('sparkle'); }
       else { triggerCelebration('confetti'); }
+
+      // Achievement triggers
+      await unlockAchievement(familyId, member.id, 'first_chore');
+      await unlockAchievement(familyId, member.id, 'explore_chores');
+      const totalDone = completions.length + 1;
+      if (totalDone >= 10)  await unlockAchievement(familyId, member.id, 'chores_10');
+      if (totalDone >= 50)  await unlockAchievement(familyId, member.id, 'chores_50');
+      if (totalDone >= 100) await unlockAchievement(familyId, member.id, 'chores_100');
+      const hour = new Date().getHours();
+      if (hour < 7) await unlockAchievement(familyId, member.id, 'early_bird');
+      const dow = new Date().getDay();
+      if (dow === 0 || dow === 6) await unlockAchievement(familyId, member.id, 'weekend_warrior');
+      if (nowDone >= todayList.length && todayList.length > 0)
+        await unlockAchievement(familyId, member.id, 'all_today_chores');
+      reloadAchievements();
     }
     reload();
   }
@@ -325,6 +351,8 @@ export function ChildApp({ familyId, member, onLogout }) {
   async function claimPoolChore(choreId) {
     await supabase.rpc('child_claim_pool_chore', { p_family_id: familyId, p_member_id: member.id, p_chore_id: choreId });
     triggerCelebration('sparkle');
+    await unlockAchievement(familyId, member.id, 'pool_chore');
+    reloadAchievements();
     reload();
   }
 
@@ -342,6 +370,18 @@ export function ChildApp({ familyId, member, onLogout }) {
             <Home size={18} color={C.textMuted} />
           </button>
         )}
+        {/* Trophy */}
+        <button onClick={() => setPage('achievements')} style={{ ...styles.topIconBtn, position: 'relative' }}>
+          <Trophy
+            size={18}
+            color={achievementsNew > 0 ? '#F59E0B' : page === 'achievements' ? C.primary : C.textMuted}
+            strokeWidth={achievementsNew > 0 ? 2.5 : 2}
+            style={{ transform: achievementsNew > 0 ? 'scale(1.15)' : 'scale(1)', transition: 'transform 0.2s' }}
+          />
+          {achievementsNew > 0 && (
+            <span style={styles.achieveBadge}>{achievementsNew > 9 ? '9+' : achievementsNew}</span>
+          )}
+        </button>
         <button onClick={onLogout} style={styles.topLogout}>
           <LogOut size={16} color={C.textMuted} />
         </button>
@@ -416,6 +456,14 @@ export function ChildApp({ familyId, member, onLogout }) {
           members={members}
           moodEnabled={moodEnabled}
           pollEnabled={pollEnabled}
+          onAchievement={reloadAchievements}
+        />
+      )}
+
+      {page === 'achievements' && (
+        <AchievementsView
+          unlocked={achievementsUnlocked}
+          onMount={markAchievementsVisited}
         />
       )}
 
@@ -472,6 +520,7 @@ const styles = {
   loadingText: { fontSize: F.sizes.md, color: C.textMuted, fontFamily: F.heading, margin: 0 },
   topBar: { position: 'fixed', top: 0, left: 0, right: 0, height: TOPBAR_H, display: 'flex', alignItems: 'center', gap: 10, padding: '0 12px 0 16px', background: 'rgba(255,251,245,0.94)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: `1px solid ${C.borderLight}`, zIndex: 150 },
   topIconBtn: { background: 'none', border: 'none', cursor: 'pointer', padding: 8, minHeight: 36, minWidth: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  achieveBadge: { position: 'absolute', top: 2, right: 2, background: '#F59E0B', color: '#fff', fontSize: 9, fontWeight: 800, fontFamily: F.heading, width: 14, height: 14, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 },
   topAvatar: { width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   topName: { flex: 1, fontFamily: F.heading, fontSize: F.sizes.md, fontWeight: F.weights.bold, color: C.text },
   topLogout: { background: 'none', border: 'none', cursor: 'pointer', padding: 8, minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' },

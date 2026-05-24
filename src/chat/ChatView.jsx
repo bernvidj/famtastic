@@ -9,6 +9,7 @@ import { supabase } from '../supabaseClient';
 import { C, F, TOPBAR_H } from '../data';
 import { MoodCard } from './MoodCard';
 import { PollCard } from './PollCard';
+import { unlockAchievement } from '../achievements/unlock';
 
 function formatMsgTime(ts) {
   if (!ts) return '';
@@ -73,7 +74,7 @@ function MessageBubble({ msg, sender, isMe }) {
   );
 }
 
-export function ChatView({ familyId, member, members, moodEnabled, pollEnabled }) {
+export function ChatView({ familyId, member, members, moodEnabled, pollEnabled, onAchievement }) {
   const [messages, setMessages] = useState([]);
   const [text,     setText]     = useState('');
   const [sending,  setSending]  = useState(false);
@@ -128,6 +129,11 @@ export function ChatView({ familyId, member, members, moodEnabled, pollEnabled }
     });
     setText('');
     setSending(false);
+    // Achievement triggers
+    const isNew1 = await unlockAchievement(familyId, member.id, 'first_message');
+    const isNew2 = await unlockAchievement(familyId, member.id, 'explore_chat');
+    if ((isNew1 || isNew2) && onAchievement) onAchievement();
+    // messages_10 / messages_50 require a count — checked via useAchievements meta pass
     load();
   }
 
@@ -140,12 +146,12 @@ export function ChatView({ familyId, member, members, moodEnabled, pollEnabled }
 
       {/* Familjestämning */}
       {moodEnabled && (
-        <MoodCard familyId={familyId} member={member} members={members} />
+        <MoodCard familyId={familyId} member={member} members={members} onAchievement={onAchievement} />
       )}
 
       {/* Familjeomröstning */}
       {pollEnabled && (
-        <PollCard familyId={familyId} member={member} members={members} />
+        <PollCard familyId={familyId} member={member} members={members} onAchievement={onAchievement} />
       )}
 
       {/* Innehåll */}

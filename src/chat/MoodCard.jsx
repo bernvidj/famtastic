@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F } from '../data';
+import { unlockAchievement } from '../achievements/unlock';
 
 const MOODS = [
   { value: 1, emoji: '😢', label: 'Ledsen' },
@@ -14,7 +15,7 @@ const MOODS = [
   { value: 4, emoji: '🤩', label: 'Toppen!' },
 ];
 
-export function MoodCard({ familyId, member, members }) {
+export function MoodCard({ familyId, member, members, onAchievement }) {
   const [moods,   setMoods]   = useState({});
   const [picking, setPicking] = useState(false);
   const [saving,  setSaving]  = useState(false);
@@ -42,6 +43,11 @@ export function MoodCard({ familyId, member, members }) {
     });
     setPicking(false);
     setSaving(false);
+    // Achievement triggers
+    const n1 = await unlockAchievement(familyId, member.id, 'set_mood');
+    const hour = new Date().getHours();
+    const n2 = hour >= 22 ? await unlockAchievement(familyId, member.id, 'night_owl') : false;
+    if ((n1 || n2) && onAchievement) onAchievement();
     load();
   }
 
