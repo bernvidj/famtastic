@@ -8,6 +8,7 @@ import { C, F, S } from '../data';
 import { MemberRow } from './MemberRow';
 import { AllowanceRow } from './AllowanceRow';
 import { Save, UserPlus, LogOut } from 'lucide-react';
+import { usePushNotifications } from '../notifications/usePushNotifications';
 
 const AVATARS = ['😀','😎','🦊','🐻','🦄','🌟','🎨','⚽','🎵','🌈','🍕','🐱','🐶','🦋','🚀','💪'];
 const MEMBER_COLORS = C.memberColors;
@@ -27,7 +28,7 @@ function AppIcon({ size = 44 }) {
   );
 }
 
-export function SettingsView({ familyId, member, members, onUpdate, onLogout }) {
+export function SettingsView({ familyId, member, members, onUpdate, onLogout, onSwitchMember }) {
   const [familyName, setFamilyName] = useState('');
   const [editMembers, setEditMembers] = useState([]);
   const [allowanceRules, setAllowanceRules] = useState([]);
@@ -41,6 +42,10 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout }) 
 
   const isAdmin = member.role === 'admin';
   const isParent = member.role === 'admin' || member.role === 'parent';
+
+  const { supported: pushSupported, subscribed: pushSubscribed, permission: pushPermission,
+          loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } =
+    usePushNotifications(familyId, member.id);
 
   useEffect(() => { loadSettings(); }, [familyId]);
 
@@ -435,6 +440,38 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout }) 
                 style={{ ...styles.toggleSwitch, background: getFeature('mood') ? C.secondary : C.border }}
               >
                 <div style={{ ...styles.toggleKnob, transform: getFeature('mood') ? 'translateX(22px)' : 'translateX(2px)' }} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Notiser */}
+        {pushSupported && (
+          <div style={styles.card}>
+            <h2 style={styles.cardTitle}>
+              <span style={styles.cardIcon}>🔔</span> Notiser
+            </h2>
+            <div style={styles.settingRow}>
+              <div style={{ flex: 1 }}>
+                <span style={styles.settingLabel}>Push-notiser</span>
+                <span style={styles.settingDesc}>
+                  {pushPermission === 'denied'
+                    ? 'Blockerad i webbläsaren — ändra i webbläsarinställningarna'
+                    : pushSubscribed
+                      ? 'Aktiverade — du får notiser på den här enheten'
+                      : 'Inaktiverade — tryck för att aktivera'}
+                </span>
+              </div>
+              <button
+                onClick={pushSubscribed ? pushUnsubscribe : pushSubscribe}
+                disabled={pushLoading || pushPermission === 'denied'}
+                style={{
+                  ...styles.toggleSwitch,
+                  background: pushSubscribed ? C.primary : C.border,
+                  opacity: pushPermission === 'denied' ? 0.5 : 1,
+                }}
+              >
+                <div style={{ ...styles.toggleKnob, transform: pushSubscribed ? 'translateX(22px)' : 'translateX(2px)' }} />
               </button>
             </div>
           </div>

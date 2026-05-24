@@ -10,6 +10,7 @@ import { C, F, TOPBAR_H } from '../data';
 import { MoodCard } from './MoodCard';
 import { PollCard } from './PollCard';
 import { unlockAchievement } from '../achievements/unlock';
+import { sendPushToFamily } from '../notifications/sendPush';
 
 function formatMsgTime(ts) {
   if (!ts) return '';
@@ -129,6 +130,13 @@ export function ChatView({ familyId, member, members, moodEnabled, pollEnabled, 
     });
     setText('');
     setSending(false);
+    // Push notification to other family members
+    sendPushToFamily({
+      familyId,
+      excludeMemberId: member.id,
+      title: `${member.name} i FamTastic`,
+      body:  text.trim().slice(0, 100),
+    });
     // Achievement triggers
     const isNew1 = await unlockAchievement(familyId, member.id, 'first_message');
     const isNew2 = await unlockAchievement(familyId, member.id, 'explore_chat');

@@ -15,11 +15,12 @@ import { Celebration } from './Celebrations';
 import { useLocationSharing } from './location/useLocationSharing';
 import { LocationView } from './location/LocationView';
 import { ChatView } from './chat/ChatView';
-import { Home, Calendar, CheckSquare, PiggyBank, LogOut, Trophy } from 'lucide-react';
+import { Home, Calendar, CheckSquare, PiggyBank, LogOut, Trophy, Bell, BellOff } from 'lucide-react';
 import { TOPBAR_H } from './data';
 import { useAchievements } from './achievements/useAchievements';
 import { unlockAchievement } from './achievements/unlock';
 import { AchievementsView } from './achievements/AchievementsView';
+import { usePushNotifications } from './notifications/usePushNotifications';
 
 const BASE_NAV = [
   { id: 'chores',   label: 'Sysslor',  icon: CheckSquare },
@@ -58,6 +59,10 @@ export function ChildApp({ familyId, member, onLogout }) {
   const [chatEnabled, setChatEnabled] = useState(false);
   const [moodEnabled, setMoodEnabled] = useState(false);
   const [pollEnabled, setPollEnabled] = useState(false);
+
+  const { supported: pushSupported, subscribed: pushSubscribed,
+          loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } =
+    usePushNotifications(familyId, member.id);
 
   const { unlocked: achievementsUnlocked, newCount: achievementsNew,
           markVisited: markAchievementsVisited, reload: reloadAchievements } =
@@ -383,6 +388,20 @@ export function ChildApp({ familyId, member, onLogout }) {
             <span style={styles.achieveBadge}>{achievementsNew > 9 ? '9+' : achievementsNew}</span>
           )}
         </button>
+        {/* Notiser-klocka */}
+        {pushSupported && (
+          <button
+            onClick={pushSubscribed ? pushUnsubscribe : pushSubscribe}
+            disabled={pushLoading}
+            style={styles.topIconBtn}
+            title={pushSubscribed ? 'Stäng av notiser' : 'Aktivera notiser'}
+          >
+            {pushSubscribed
+              ? <Bell size={18} color={C.primary} strokeWidth={2.5} />
+              : <BellOff size={18} color={C.textMuted} strokeWidth={2} />
+            }
+          </button>
+        )}
         <button onClick={onLogout} style={styles.topLogout}>
           <LogOut size={16} color={C.textMuted} />
         </button>
