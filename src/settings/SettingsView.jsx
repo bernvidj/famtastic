@@ -474,6 +474,17 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout, on
                 <div style={{ ...styles.toggleKnob, transform: pushSubscribed ? 'translateX(22px)' : 'translateX(2px)' }} />
               </button>
             </div>
+            {pushSubscribed && (
+              <button
+                onClick={async () => {
+                  const reg = await navigator.serviceWorker.ready;
+                  await reg.showNotification('FamTastic test 🔔', { body: 'Lokal notis fungerar!', icon: '/icon-192.png' });
+                }}
+                style={{ marginTop: 10, width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: C.secondary, color: '#fff', fontFamily: 'Nunito, sans-serif', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+              >
+                Testa lokal notis
+              </button>
+            )}
           </div>
         )}
 
