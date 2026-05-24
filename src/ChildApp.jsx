@@ -53,7 +53,10 @@ export function ChildApp({ familyId, member, onLogout }) {
   const [celebrationType, setCelebrationType] = useState(null);
   const [celebrationActive, setCelebrationActive] = useState(false);
   const [locationFeatureOn, setLocationFeatureOn] = useState(false);
-  const [childSharingEnabled, setChildSharingEnabled] = useState(false);
+  const locationKey = `famtastic_location_${member.id}`;
+  const [childSharingEnabled, setChildSharingEnabled] = useState(() => {
+    try { return localStorage.getItem(`famtastic_location_${member.id}`) === 'true'; } catch { return false; }
+  });
   const [kidsShoppingEnabled, setKidsShoppingEnabled] = useState(false);
   const [defaultListId, setDefaultListId] = useState(null);
   const [chatEnabled, setChatEnabled] = useState(false);
@@ -299,7 +302,7 @@ export function ChildApp({ familyId, member, onLogout }) {
   async function handleLocationToggle() {
     if (childSharingEnabled) {
       setChildSharingEnabled(false);
-      // useLocationSharing-hooken anropar disable_location_sharing automatiskt
+      try { localStorage.setItem(locationKey, 'false'); } catch {}
     } else {
       if (!navigator.geolocation) {
         alert('Din webbläsare stöder inte platsinformation.');
@@ -315,6 +318,7 @@ export function ChildApp({ familyId, member, onLogout }) {
             p_battery:   null,
           });
           setChildSharingEnabled(true);
+          try { localStorage.setItem(locationKey, 'true'); } catch {}
           await unlockAchievement(familyId, member.id, 'location_shared');
           reloadAchievements();
         },
