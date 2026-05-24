@@ -74,6 +74,46 @@ export function LocationView({ familyId, member, members }) {
     return () => { supabase.removeChannel(channel); };
   }, [familyId, member.id]);
 
+  // Auto-uppdatera min position när delning är på:
+  // - watchPosition: triggar direkt vid GPS-rörelse
+  // - setInterval 30 s: backup när appen är i bakgrunden (iOS throttlar watchPosition)
+  // - visibilitychange: uppdaterar direkt när användaren byter tillbaka till appen
+  useEffect(() => {
+    if (!mySharing || !navigator.geolocation) return;
+
+    function savePos(pos) {
+      supabase.rpc('upsert_member_location', {
+        p_member_id: member.id,
+        p_latitude:  pos.coords.latitude,
+        p_longitude: pos.coords.longitude,
+        p_accuracy:  Math.round(pos.coords.accuracy),
+        p_battery:   null,
+      }).catch(() => {});
+    }
+
+    function fetchPos(highAccuracy) {
+      navigator.geolocation.getCurrentPosition(savePos, () => {},
+        { enableHighAccuracy: highAccuracy, maximumAge: 30_000, timeout: 12_000 });
+    }
+
+    const watchId   = navigator.geolocation.watchPosition(savePos,
+      (err) => console.warn('[GPS] watch error:', err.message),
+      { enableHighAccuracy: true, maximumAge: 10_000, timeout: 15_000 });
+
+    const intervalId = setInterval(() => fetchPos(false), 30_000);
+
+    function handleVisible() {
+      if (document.visibilityState === 'visible') fetchPos(true);
+    }
+    document.addEventListener('visibilitychange', handleVisible);
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisible);
+    };
+  }, [mySharing, member.id]);
+
   async function toggleMySharing() {
     setToggling(true);
     if (mySharing) {
@@ -95,7 +135,7 @@ export function LocationView({ familyId, member, members }) {
             p_accuracy:  Math.round(pos.coords.accuracy),
             p_battery:   null,
           });
-          setMySharing(true);
+          setMySharing(true); // triggar useEffect ovan → startar watchPosition + interval
           setToggling(false);
         },
         () => {
