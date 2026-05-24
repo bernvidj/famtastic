@@ -475,28 +475,15 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout, on
               </button>
             </div>
             {pushSubscribed && (
-              <>
-                <button
-                  onClick={async () => {
-                    const reg = await navigator.serviceWorker.ready;
-                    await reg.showNotification('FamTastic test 🔔', { body: 'Lokal notis fungerar!', icon: '/icon-192.png' });
-                  }}
-                  style={{ marginTop: 10, width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: C.secondary, color: '#fff', fontFamily: 'Nunito, sans-serif', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
-                >
-                  Testa lokal notis
-                </button>
-                <button
-                  onClick={async () => {
-                    const { error } = await supabase.functions.invoke('send-push', {
-                      body: { family_id: familyId, title: 'Push test', body: 'tom payload', test_empty: true },
-                    });
-                    alert(error ? 'Fel: ' + error.message : 'Skickat! Fick du en notis på låsskärmen eller in-app banner?');
-                  }}
-                  style={{ marginTop: 8, width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: '#555', color: '#fff', fontFamily: 'Nunito, sans-serif', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
-                >
-                  Testa push (tom payload)
-                </button>
-              </>
+              <button
+                onClick={async () => {
+                  const reg = await navigator.serviceWorker.ready;
+                  await reg.showNotification('FamTastic test 🔔', { body: 'Lokal notis fungerar!', icon: '/icon-192.png' });
+                }}
+                style={{ marginTop: 10, width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: C.secondary, color: '#fff', fontFamily: 'Nunito, sans-serif', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
+              >
+                Testa lokal notis
+              </button>
             )}
           </div>
         )}
