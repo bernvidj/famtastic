@@ -365,11 +365,12 @@ export function ChildApp({ familyId, member, onLogout }) {
           <span style={{ fontSize: 22 }}>{member.avatar}</span>
         </div>
         <span style={styles.topName}>{member.name}</span>
-        {page !== 'home' && (
-          <button onClick={() => setPage('home')} style={styles.topIconBtn}>
-            <Home size={18} color={C.textMuted} />
-          </button>
-        )}
+        <button
+          onClick={() => setPage('home')}
+          style={{ ...styles.topIconBtn, background: page === 'home' ? C.primaryLight : 'transparent' }}
+        >
+          <Home size={18} color={page === 'home' ? C.primary : C.textMuted} strokeWidth={page === 'home' ? 2.5 : 2} />
+        </button>
         {/* Trophy */}
         <button onClick={() => setPage('achievements')} style={{ ...styles.topIconBtn, position: 'relative' }}>
           <Trophy
