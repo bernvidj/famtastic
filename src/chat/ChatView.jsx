@@ -146,44 +146,44 @@ export function ChatView({ familyId, member, members, moodEnabled, pollEnabled, 
   }
 
   return (
-    <div style={styles.page}>
-      {/* Header */}
-      <div style={styles.header}>
-        <h1 style={styles.title}>💬 Familjechatten</h1>
+    <div style={styles.outer}>
+      {/* Alltid synlig topp-zon: rubrik + kort */}
+      <div style={styles.topZone}>
+        <div style={styles.header}>
+          <h1 style={styles.title}>💬 Familjechatten</h1>
+        </div>
+        {moodEnabled && (
+          <MoodCard familyId={familyId} member={member} members={members} onAchievement={onAchievement} />
+        )}
+        {pollEnabled && (
+          <PollCard familyId={familyId} member={member} members={members} onAchievement={onAchievement} />
+        )}
       </div>
 
-      {/* Familjestämning */}
-      {moodEnabled && (
-        <MoodCard familyId={familyId} member={member} members={members} onAchievement={onAchievement} />
-      )}
-
-      {/* Familjeomröstning */}
-      {pollEnabled && (
-        <PollCard familyId={familyId} member={member} members={members} onAchievement={onAchievement} />
-      )}
-
-      {/* Innehåll */}
-      {loading ? (
-        <p style={styles.loadingText}>Laddar...</p>
-      ) : messages.length === 0 ? (
-        <div style={styles.emptyState}>
-          <div style={{ fontSize: 52, marginBottom: 12 }}>💬</div>
-          <p style={styles.emptyTitle}>Inga meddelanden ännu</p>
-          <p style={styles.emptyText}>Säg hej till familjen!</p>
-        </div>
-      ) : (
-        <div style={styles.messages}>
-          {messages.map(msg => (
-            <MessageBubble
-              key={msg.id}
-              msg={msg}
-              sender={memberMap[msg.member_id]}
-              isMe={msg.member_id === member.id}
-            />
-          ))}
-          <div ref={bottomRef} />
-        </div>
-      )}
+      {/* Scrollbart meddelandeområde */}
+      <div style={styles.messagesArea}>
+        {loading ? (
+          <p style={styles.loadingText}>Laddar...</p>
+        ) : messages.length === 0 ? (
+          <div style={styles.emptyState}>
+            <div style={{ fontSize: 52, marginBottom: 12 }}>💬</div>
+            <p style={styles.emptyTitle}>Inga meddelanden ännu</p>
+            <p style={styles.emptyText}>Säg hej till familjen!</p>
+          </div>
+        ) : (
+          <>
+            {messages.map(msg => (
+              <MessageBubble
+                key={msg.id}
+                msg={msg}
+                sender={memberMap[msg.member_id]}
+                isMe={msg.member_id === member.id}
+              />
+            ))}
+            <div ref={bottomRef} />
+          </>
+        )}
+      </div>
 
       {/* Input-fält */}
       <div style={styles.inputBar}>
@@ -208,15 +208,22 @@ export function ChatView({ familyId, member, members, moodEnabled, pollEnabled, 
 }
 
 const styles = {
-  page: {
-    minHeight: '100vh',
+  // Fast flex-kolumn: topp-zon syns alltid, meddelanden scrollar i mitten
+  outer: {
+    position: 'fixed',
+    top: TOPBAR_H,
+    left: 0, right: 0,
+    bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))',
+    display: 'flex',
+    flexDirection: 'column',
     background: C.bg,
     fontFamily: F.body,
-    paddingBottom: 'calc(160px + env(safe-area-inset-bottom, 0px))',
+  },
+  topZone: {
+    flexShrink: 0,
   },
   header: {
-    padding: '20px 16px 12px',
-    position: 'sticky', top: TOPBAR_H, zIndex: 10,
+    padding: '16px 16px 12px',
     backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
     background: 'rgba(255,251,245,0.92)',
     borderBottom: `1px solid ${C.borderLight}`,
@@ -225,8 +232,10 @@ const styles = {
     fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: 800,
     color: C.text, margin: 0,
   },
-  messages: {
-    padding: '14px 16px 0',
+  messagesArea: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '14px 16px 8px',
   },
   loadingText: { textAlign: 'center', color: C.textMuted, padding: 40 },
   emptyState: { textAlign: 'center', padding: '60px 20px' },
@@ -236,17 +245,12 @@ const styles = {
   },
   emptyText: { fontSize: F.sizes.sm, color: C.textMuted, margin: 0 },
   inputBar: {
-    position: 'fixed',
-    bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))',
-    left: 16, right: 16,
+    flexShrink: 0,
     display: 'flex', gap: 8, alignItems: 'center',
     background: 'rgba(255,251,245,0.96)',
-    borderRadius: 18,
-    padding: '8px 8px 8px 14px',
-    boxShadow: '0 2px 16px rgba(0,0,0,0.12)',
+    padding: '8px',
     backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-    border: `1.5px solid ${C.borderLight}`,
-    zIndex: 50,
+    borderTop: `1px solid ${C.borderLight}`,
   },
   input: {
     flex: 1,
@@ -256,7 +260,7 @@ const styles = {
     fontFamily: F.body,
     color: C.text,
     outline: 'none',
-    padding: '6px 0',
+    padding: '6px 8px',
   },
   sendBtn: {
     width: 44, height: 44, borderRadius: 14,
