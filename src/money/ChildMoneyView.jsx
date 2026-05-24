@@ -522,7 +522,7 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
         </div>
       )}
 
-      <div style={{ height: 80 }} />
+      <div style={{ height: 'calc(90px + env(safe-area-inset-bottom, 0px))' }} />
     </div>
   );
 }
