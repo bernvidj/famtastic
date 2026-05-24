@@ -21,6 +21,7 @@ import { AchievementsView } from './achievements/AchievementsView';
 import { useAchievements } from './achievements/useAchievements';
 import { unlockAchievement } from './achievements/unlock';
 import { C, TOPBAR_H } from './data';
+import { InAppToast } from './InAppToast';
 import { Home as HomeIcon } from 'lucide-react';
 
 // ── Lösenordsåterställning (visas när användaren klickar reset-länk i mail) ──
@@ -295,6 +296,7 @@ export function App() {
   return (
     <div>
       <AppTopBar page={page} onNavigate={navigateTo} newAchievementsCount={achievementsNew} />
+      <InAppToast />
       <div style={{ paddingTop: TOPBAR_H }}>
         {renderPage()}
       </div>

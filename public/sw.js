@@ -1,4 +1,4 @@
-const CACHE = 'famtastic-v4';
+const CACHE = 'famtastic-v5';
 
 // Only pre-cache immutable assets (not index.html — it changes on every deploy)
 const STATIC = [
@@ -23,17 +23,24 @@ self.addEventListener('activate', e => {
 
 // ── Push notifications ──────────────────────────────────────────────────────
 self.addEventListener('push', e => {
-  const data = e.data?.json() ?? {};
+  const data  = e.data?.json() ?? {};
   const title = data.title || 'FamTastic';
+  const body  = data.body  || '';
   const options = {
-    body:              data.body  || '',
-    icon:              data.icon  || '/icon-192.png',
-    badge:             '/icon-192.png',
-    data:              { url: data.url || '/' },
-    vibrate:           [200, 100, 200],
+    body,
+    icon:               data.icon || '/icon-192.png',
+    badge:              '/icon-192.png',
+    data:               { url: data.url || '/' },
+    vibrate:            [200, 100, 200],
     requireInteraction: false,
   };
-  e.waitUntil(self.registration.showNotification(title, options));
+  e.waitUntil(
+    Promise.all([
+      self.registration.showNotification(title, options),
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+        .then(cs => cs.forEach(c => c.postMessage({ type: 'PUSH_RECEIVED', title, body }))),
+    ])
+  );
 });
 
 self.addEventListener('notificationclick', e => {

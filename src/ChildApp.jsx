@@ -21,6 +21,7 @@ import { useAchievements } from './achievements/useAchievements';
 import { unlockAchievement } from './achievements/unlock';
 import { AchievementsView } from './achievements/AchievementsView';
 import { usePushNotifications } from './notifications/usePushNotifications';
+import { InAppToast } from './InAppToast';
 
 const BASE_NAV = [
   { id: 'chores',   label: 'Sysslor',  icon: CheckSquare },
@@ -512,6 +513,7 @@ export function ChildApp({ familyId, member, onLogout }) {
 
       </div>{/* /paddingTop wrapper */}
 
+      <InAppToast />
       <Celebration type={celebrationType} active={celebrationActive} onDone={() => setCelebrationActive(false)} />
 
       {/* Bottom nav — pill-stil som Nav.jsx */}
