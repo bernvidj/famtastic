@@ -1,4 +1,4 @@
-const CACHE = 'famtastic-v6';
+const CACHE = 'famtastic-v7';
 
 // Only pre-cache immutable assets (not index.html — it changes on every deploy)
 const STATIC = [
@@ -23,7 +23,8 @@ self.addEventListener('activate', e => {
 
 // ── Push notifications ──────────────────────────────────────────────────────
 self.addEventListener('push', e => {
-  const data  = e.data?.json() ?? {};
+  let data = {};
+  try { data = e.data?.json() ?? {}; } catch (_) { /* decryption/parse error — use fallback */ }
   const title = data.title || 'FamTastic';
   const body  = data.body  || '';
   const options = {
