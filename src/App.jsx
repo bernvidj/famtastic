@@ -111,6 +111,7 @@ export function App() {
   });
   const [page,           setPage]           = useState('home');
   const [onboardingDone, setOnboardingDone] = useState(false);
+  const [previewingChild, setPreviewingChild] = useState(null);
 
   function navigateTo(newPage) {
     setPage(newPage);
@@ -257,6 +258,37 @@ export function App() {
     );
   }
 
+  // ── Förhandsgranskning av barns vy ────────────────────────────────────────
+  if (previewingChild && isParent) {
+    return (
+      <div>
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 300,
+          background: '#1C1917',
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: 'max(12px, env(safe-area-inset-top, 12px)) 16px 12px',
+        }}>
+          <button
+            onClick={() => setPreviewingChild(null)}
+            style={{ color: '#fff', background: 'none', border: 'none', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito, sans-serif', padding: 0, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center' }}
+          >
+            ← Tillbaka
+          </button>
+          <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, fontFamily: 'Nunito, sans-serif' }}>
+            {previewingChild.avatar} {previewingChild.name}s vy
+          </span>
+        </div>
+        <div style={{ paddingTop: 52 }}>
+          <ChildApp
+            familyId={familyId}
+            member={{ ...previewingChild, family_id: familyId }}
+            onLogout={() => setPreviewingChild(null)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   // ── Onboarding för ny familj (inga barn ännu) ──────────────────────────────
   const hasChildren = allMembers.some(m => m.role === 'child');
   if (isParent && !hasChildren && !onboardingDone && allMembers.length > 0) {
@@ -276,7 +308,7 @@ export function App() {
   function renderPage() {
     switch (page) {
       case 'home':
-        return <Home familyId={familyId} member={activeMember} members={allMembers} />;
+        return <Home familyId={familyId} member={activeMember} members={allMembers} onNavigate={navigateTo} onViewChild={setPreviewingChild} />;
       case 'schedule':
         return <ScheduleView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'chores':

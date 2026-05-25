@@ -32,7 +32,7 @@ function fmtDate(d) {
 }
 
 
-export function Home({ familyId, member, members }) {
+export function Home({ familyId, member, members, onNavigate, onViewChild }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [chores, setChores] = useState([]);
   const [completions, setCompletions] = useState([]);
@@ -246,7 +246,11 @@ export function Home({ familyId, member, members }) {
               const streak = childStreak(child.id);
               const bonus = childWeekBonus(child.id);
               return (
-                <div key={child.id} style={{ ...styles.childCard, borderColor: allDone ? C.success : C.borderLight }}>
+                <div
+                  key={child.id}
+                  style={{ ...styles.childCard, borderColor: allDone ? C.success : C.borderLight, cursor: 'pointer' }}
+                  onClick={() => onNavigate?.('chores')}
+                >
                   <div style={styles.childTop}>
                     <div style={{ ...styles.childAvatar, background: child.color ? `${child.color}22` : C.primaryLight }}>
                       <span style={{ fontSize: 22 }}>{child.avatar}</span>
@@ -259,6 +263,17 @@ export function Home({ familyId, member, members }) {
                       </span>
                       {streak > 0 && (
                         <span style={styles.streakInline}><Flame size={12} color={C.primary} /> {streak} dagar</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+                      <ChevronRight size={16} color={C.textMuted} />
+                      {onViewChild && (
+                        <button
+                          onClick={e => { e.stopPropagation(); onViewChild(child); }}
+                          style={styles.viewChildBtn}
+                        >
+                          Visa vy
+                        </button>
                       )}
                     </div>
                   </div>
@@ -280,7 +295,7 @@ export function Home({ familyId, member, members }) {
                 {achievementsSummary.map(child => {
                   const pct = Math.min(100, Math.round((child.count / TOTAL_ACHIEVEMENTS) * 100));
                   return (
-                    <div key={child.member_id} style={styles.achSummaryCard}>
+                    <div key={child.member_id} style={{ ...styles.achSummaryCard, cursor: 'pointer' }} onClick={() => onNavigate?.('achievements')}>
                       <div style={{ ...styles.achChildAvatar, background: child.member_color ? `${child.member_color}22` : C.primaryLight }}>
                         <span style={{ fontSize: 18 }}>{child.member_avatar}</span>
                       </div>
@@ -340,7 +355,7 @@ export function Home({ familyId, member, members }) {
                 const saved = goalProgress[goal.id] || 0;
                 const pct = Math.min(100, (saved / goal.target_amount) * 100);
                 return (
-                  <div key={goal.id} style={styles.goalCard}>
+                  <div key={goal.id} style={{ ...styles.goalCard, cursor: 'pointer' }} onClick={() => onNavigate?.('chores')}>
                     <div style={styles.goalTop}>
                       <span style={{ fontSize: 24 }}>{goal.icon || '🎯'}</span>
                       <div style={{ flex: 1 }}>
@@ -445,4 +460,16 @@ const styles = {
     borderRadius: 99, transition: 'width 0.4s ease' },
   achCount: { fontSize: F.sizes.md, fontWeight: F.weights.extra, fontFamily: F.heading, color: '#7C3AED' },
   achTotal: { fontSize: F.sizes.xs, color: C.textMuted },
+  viewChildBtn: {
+    padding: '3px 10px',
+    borderRadius: 99,
+    border: 'none',
+    background: C.secondaryLight,
+    color: C.secondary,
+    fontSize: F.sizes.xs,
+    fontWeight: F.weights.bold,
+    fontFamily: F.heading,
+    cursor: 'pointer',
+    WebkitTapHighlightColor: 'transparent',
+  },
 };
