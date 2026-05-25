@@ -4,13 +4,14 @@
 // ============================================
 
 import React from 'react';
-import { Home, CalendarDays, Settings, Trophy } from 'lucide-react';
+import { Home, Wallet, Settings, Trophy } from 'lucide-react';
 import { C, F, TOPBAR_H } from './data';
 
 const PAGE_TITLES = {
   home:         'Hem',
   schedule:     'Schema',
-  chores:       'Sysslor & Pengar',
+  chores:       'Sysslor',
+  money:        'Pengar',
   meals:        'Mat & Handla',
   location:     'Plats',
   chat:         'Chatt',
@@ -20,7 +21,7 @@ const PAGE_TITLES = {
 
 const TOP_NAV = [
   { id: 'home',     Icon: Home },
-  { id: 'schedule', Icon: CalendarDays },
+  { id: 'money',    Icon: Wallet },
   { id: 'settings', Icon: Settings },
 ];
 

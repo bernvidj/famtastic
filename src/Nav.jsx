@@ -4,12 +4,13 @@
 // ============================================
 
 import React, { useState } from 'react';
-import { CheckSquare, UtensilsCrossed, MoreHorizontal } from 'lucide-react';
+import { CheckSquare, UtensilsCrossed, CalendarDays, MoreHorizontal } from 'lucide-react';
 import { C, F } from './data';
 
 const BASE_ITEMS = [
-  { id: 'chores', label: 'Sysslor', icon: CheckSquare },
-  { id: 'meals',  label: 'Mat',     icon: UtensilsCrossed },
+  { id: 'chores',   label: 'Sysslor', icon: CheckSquare },
+  { id: 'schedule', label: 'Schema',  icon: CalendarDays },
+  { id: 'meals',    label: 'Mat',     icon: UtensilsCrossed },
 ];
 
 const MAX_VISIBLE = 5;

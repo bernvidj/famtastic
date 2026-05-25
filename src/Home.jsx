@@ -355,7 +355,7 @@ export function Home({ familyId, member, members, onNavigate, onViewChild }) {
                 const saved = goalProgress[goal.id] || 0;
                 const pct = Math.min(100, (saved / goal.target_amount) * 100);
                 return (
-                  <div key={goal.id} style={{ ...styles.goalCard, cursor: 'pointer' }} onClick={() => onNavigate?.('chores')}>
+                  <div key={goal.id} style={{ ...styles.goalCard, cursor: 'pointer' }} onClick={() => onNavigate?.('money')}>
                     <div style={styles.goalTop}>
                       <span style={{ fontSize: 24 }}>{goal.icon || '🎯'}</span>
                       <div style={{ flex: 1 }}>

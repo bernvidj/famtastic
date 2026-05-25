@@ -8,7 +8,8 @@ import { Login } from './Login';
 import { FamilySetup } from './FamilySetup';
 import { Nav } from './Nav';
 import { Home } from './Home';
-import { ChoresMoneyView } from './ChoresMoneyView';
+import { ChoresView } from './chores/ChoresView';
+import { MoneyView } from './money/MoneyView';
 import { MealShoppingView } from './MealShoppingView';
 import { ScheduleView } from './ScheduleView';
 import { SettingsView } from './settings/SettingsView';
@@ -312,7 +313,9 @@ export function App() {
       case 'schedule':
         return <ScheduleView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'chores':
-        return <ChoresMoneyView familyId={familyId} member={activeMember} members={allMembers} />;
+        return <ChoresView familyId={familyId} member={activeMember} members={allMembers} />;
+      case 'money':
+        return <MoneyView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'meals':
         return <MealShoppingView familyId={familyId} member={activeMember} members={allMembers} />;
       case 'chat':
