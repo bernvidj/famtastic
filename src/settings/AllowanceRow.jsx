@@ -21,6 +21,13 @@ export function AllowanceRow({ child, rule, onSave, saving }) {
     }
   }, [rule]);
 
+  // Toggle sparas direkt — konsekvent med alla andra toggles i appen
+  function handleToggleAuto() {
+    const next = !autoAllowance;
+    setAutoAllowance(next);
+    onSave(child.id, amount, payday, next);
+  }
+
   return (
     <div style={styles.card}>
       <style>{`
@@ -60,25 +67,25 @@ export function AllowanceRow({ child, rule, onSave, saving }) {
         </div>
       </div>
 
-      {/* Automatisk utbetalning */}
+      {/* Auto-utbetalning toggle */}
       <div style={styles.autoRow}>
-        <div style={{ flex: 1 }}>
-          <span style={styles.autoLabel}>
-            {autoAllowance ? '⚡ Automatisk utbetalning' : '🖐️ Manuell utbetalning'}
-          </span>
+        <div style={styles.autoText}>
+          <span style={styles.autoLabel}>Utbetalning</span>
           <span style={styles.autoDesc}>
             {autoAllowance
-              ? `Betalas ut automatiskt varje ${WEEKDAY_LABELS[payday].toLowerCase()}`
-              : 'Du betalar ut manuellt från startsidan'}
+              ? `⚡ Automatisk varje ${WEEKDAY_LABELS[payday].toLowerCase()}`
+              : '🖐️ Manuell — du betalar från startsidan'}
           </span>
         </div>
         <button
-          onClick={() => setAutoAllowance(v => !v)}
+          onClick={handleToggleAuto}
+          disabled={saving}
           style={{
             width: 48, height: 26, borderRadius: 13, border: 'none',
             background: autoAllowance ? C.secondary : C.border,
             cursor: 'pointer', position: 'relative', flexShrink: 0,
             transition: 'background 0.2s', WebkitTapHighlightColor: 'transparent',
+            opacity: saving ? 0.6 : 1,
           }}
         >
           <div style={{
@@ -142,5 +149,29 @@ const styles = {
     fontFamily: F.body,
     background: C.bgCard,
     boxSizing: 'border-box',
+  },
+  autoRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTop: `1px solid ${C.borderLight}`,
+  },
+  autoText: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+  },
+  autoLabel: {
+    fontSize: F.sizes.xs,
+    fontWeight: F.weights.semi,
+    color: C.textMuted,
+  },
+  autoDesc: {
+    fontSize: F.sizes.sm,
+    fontWeight: F.weights.semi,
+    color: C.text,
   },
 };
