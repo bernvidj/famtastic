@@ -112,11 +112,13 @@ export async function generateShoppingList({ mealPlan, familyId, memberId }) {
     listId = newList.id;
   }
 
-  // Remove old auto-generated items
+  // Remove old auto-generated items that haven't been handled yet
+  // (keep 'handlat', 'finns_hemma', 'ej_aktuellt' — those are confirmed results)
   await supabase.from('shopping_items')
     .delete()
     .eq('list_id', listId)
-    .eq('from_meal_plan', true);
+    .eq('from_meal_plan', true)
+    .eq('item_status', 'active');
 
   // Insert merged items
   const rows = items.map(item => ({

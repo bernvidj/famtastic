@@ -1,48 +1,78 @@
 // ============================================
 // FamTastic — ShoppingItemList
-// Varuraderna, kategorigruppering, totalkort, avbockade
+// Varuraderna med tre-status: active / handlat / finns_hemma / ej_aktuellt
 // Placeras i: src/shopping/ShoppingItemList.jsx
 // ============================================
 
 import React, { useState } from 'react';
 import { C, F } from '../data';
 import { estimateListCost, formatPrice } from '../priceDb';
-import { Trash2, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+
+// ─── Status helpers ────────────────────────────────────────────────────────────
+const STATUS_CONFIG = {
+  active:      { icon: null,  label: 'Inte handlat', color: C.border,    bg: 'transparent' },
+  handlat:     { icon: '✅',  label: 'Handlat',      color: '#16A34A',   bg: '#F0FDF4' },
+  finns_hemma: { icon: '🏠',  label: 'Finns hemma',  color: '#2563EB',   bg: '#EFF6FF' },
+  ej_aktuellt: { icon: '✕',   label: 'Ej aktuellt',  color: C.textMuted, bg: C.bg },
+};
+
+function StatusDot({ status }) {
+  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.active;
+  if (status === 'active' || !status) {
+    return (
+      <div style={{
+        width: 22, height: 22, borderRadius: 11,
+        border: `2px solid ${C.border}`,
+        flexShrink: 0,
+      }} />
+    );
+  }
+  return (
+    <div style={{
+      width: 22, height: 22, borderRadius: 11,
+      background: cfg.bg,
+      border: `2px solid ${cfg.color}33`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 12, flexShrink: 0,
+      color: cfg.color, fontWeight: 700,
+    }}>
+      {cfg.icon === '✕' ? '✕' : cfg.icon}
+    </div>
+  );
+}
 
 function PriceChip({ min, max }) {
   return (
     <span style={{
-      fontSize: 11,
-      fontWeight: 700,
-      color: C.secondary,
-      background: '#E1F5F3',
-      borderRadius: 8,
-      padding: '2px 6px',
-      whiteSpace: 'nowrap',
-      flexShrink: 0,
+      fontSize: 11, fontWeight: 700,
+      color: C.secondary, background: '#E1F5F3',
+      borderRadius: 8, padding: '2px 6px',
+      whiteSpace: 'nowrap', flexShrink: 0,
     }}>
       {formatPrice(min, max)}
     </span>
   );
 }
 
-export function ShoppingItemList({ items, members, onToggle, onRemove, onClearChecked }) {
-  const [showChecked, setShowChecked] = useState(false);
+// ─── Huvud-komponent ──────────────────────────────────────────────────────────
+export function ShoppingItemList({ items, members, onPick, onRemove }) {
+  const [showHandled, setShowHandled] = useState(false);
 
-  const uncheckedItems = items.filter(i => !i.checked);
-  const checkedItems   = items.filter(i => i.checked);
-  const costEstimate   = estimateListCost(items);
-  const hasUnchecked   = uncheckedItems.length > 0;
+  const activeItems  = items.filter(i => !i.item_status || i.item_status === 'active');
+  const handledItems = items.filter(i => i.item_status && i.item_status !== 'active');
 
-  // Gruppera avbockade per kategori
+  const costEstimate = estimateListCost(activeItems);
+
+  // Gruppera aktiva per kategori
   const groups = {};
-  uncheckedItems.forEach(item => {
+  activeItems.forEach(item => {
     const cat = item.category || 'Övrigt';
     if (!groups[cat]) groups[cat] = [];
     groups[cat].push(item);
   });
 
-  if (!hasUnchecked && checkedItems.length === 0) {
+  if (activeItems.length === 0 && handledItems.length === 0) {
     return (
       <div style={styles.emptyList}>
         <span style={{ fontSize: 36 }}>✨</span>
@@ -53,19 +83,24 @@ export function ShoppingItemList({ items, members, onToggle, onRemove, onClearCh
 
   return (
     <>
-      {/* ── Varor per kategori ── */}
+      {/* ── Aktiva varor per kategori ── */}
       {Object.entries(groups).map(([cat, catItems]) => (
         <div key={cat}>
-          <h3 style={styles.catTitle}>{cat}</h3>
+          {Object.keys(groups).length > 1 && (
+            <h3 style={styles.catTitle}>{cat}</h3>
+          )}
           {catItems.map(item => {
             const itemPrice = costEstimate.perItem[item.id];
-            const addedBy   = members && item.added_by ? members.find(m => m.id === item.added_by) : null;
+            const addedBy   = members && item.added_by
+              ? members.find(m => m.id === item.added_by) : null;
             const byChild   = addedBy && addedBy.role === 'child';
             return (
-              <div key={item.id} style={styles.itemRow}>
-                <button onClick={() => onToggle(item)} style={styles.itemCheck}>
-                  <div style={styles.checkCircle} />
-                </button>
+              <button
+                key={item.id}
+                onClick={() => onPick(item)}
+                style={styles.itemRow}
+              >
+                <StatusDot status={item.item_status} />
                 <div style={styles.itemContent}>
                   <span style={styles.itemName}>{item.name}</span>
                   {item.quantity && (
@@ -87,17 +122,20 @@ export function ShoppingItemList({ items, members, onToggle, onRemove, onClearCh
                   </span>
                 )}
                 {itemPrice && <PriceChip min={itemPrice[0]} max={itemPrice[1]} />}
-                <button onClick={() => onRemove(item.id)} style={styles.removeBtn}>
-                  <X size={14} color={C.textMuted} />
-                </button>
-              </div>
+                <div
+                  onClick={e => { e.stopPropagation(); onRemove(item.id); }}
+                  style={styles.removeBtn}
+                >
+                  <Trash2 size={14} color={C.textMuted} />
+                </div>
+              </button>
             );
           })}
         </div>
       ))}
 
       {/* ── Totalsumma-kort ── */}
-      {hasUnchecked && (
+      {activeItems.length > 0 && costEstimate.min > 0 && (
         <div style={styles.totalCard}>
           <span style={styles.totalLabel}>Uppskattad totalkostnad</span>
           <span style={styles.totalAmount}>
@@ -106,35 +144,50 @@ export function ShoppingItemList({ items, members, onToggle, onRemove, onClearCh
         </div>
       )}
 
-      {/* ── Avbockade ── */}
-      {checkedItems.length > 0 && (
-        <div style={styles.checkedSection}>
+      {/* ── Hanterade varor (collapsible) ── */}
+      {handledItems.length > 0 && (
+        <div style={styles.handledSection}>
           <button
-            onClick={() => setShowChecked(s => !s)}
-            style={styles.checkedToggle}
+            onClick={() => setShowHandled(s => !s)}
+            style={styles.handledToggle}
           >
-            {showChecked ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            Avbockade ({checkedItems.length})
+            {showHandled ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            Hanterade ({handledItems.length})
           </button>
 
-          {showChecked && (
-            <>
-              {checkedItems.map(item => (
-                <div key={item.id} style={{ ...styles.itemRow, opacity: 0.5 }}>
-                  <button onClick={() => onToggle(item)} style={styles.itemCheck}>
-                    <Check size={16} color={C.success} />
+          {showHandled && (
+            <div>
+              {handledItems.map(item => {
+                const cfg = STATUS_CONFIG[item.item_status] || STATUS_CONFIG.handlat;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onPick(item)}
+                    style={{ ...styles.itemRow, opacity: 0.65, background: cfg.bg }}
+                  >
+                    <StatusDot status={item.item_status} />
+                    <div style={styles.itemContent}>
+                      <span style={{
+                        ...styles.itemName,
+                        textDecoration: item.item_status === 'ej_aktuellt' ? 'line-through' : 'none',
+                        color: item.item_status === 'ej_aktuellt' ? C.textMuted : C.text,
+                      }}>
+                        {item.name}
+                      </span>
+                      <span style={{ fontSize: 11, color: cfg.color, fontWeight: 600, flexShrink: 0 }}>
+                        {cfg.label}
+                      </span>
+                    </div>
+                    <div
+                      onClick={e => { e.stopPropagation(); onRemove(item.id); }}
+                      style={styles.removeBtn}
+                    >
+                      <Trash2 size={14} color={C.textMuted} />
+                    </div>
                   </button>
-                  <div style={styles.itemContent}>
-                    <span style={{ ...styles.itemName, textDecoration: 'line-through', color: C.textMuted }}>
-                      {item.name}
-                    </span>
-                  </div>
-                </div>
-              ))}
-              <button onClick={onClearChecked} style={styles.clearBtn}>
-                <Trash2 size={14} /> Rensa avbockade
-              </button>
-            </>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
@@ -170,19 +223,10 @@ const styles = {
     borderRadius: 10,
     border: `1px solid ${C.borderLight}`,
     marginBottom: 4,
-  },
-  itemCheck: {
-    background: 'none',
-    border: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
     cursor: 'pointer',
-    padding: 2,
-    flexShrink: 0,
-  },
-  checkCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    border: `2px solid ${C.border}`,
+    textAlign: 'left',
   },
   itemContent: {
     flex: 1,
@@ -214,6 +258,8 @@ const styles = {
     cursor: 'pointer',
     padding: 4,
     flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
   },
   totalCard: {
     display: 'flex',
@@ -238,10 +284,10 @@ const styles = {
     color: C.secondary,
     fontFamily: F.heading,
   },
-  checkedSection: {
+  handledSection: {
     marginTop: 16,
   },
-  checkedToggle: {
+  handledToggle: {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
@@ -253,20 +299,5 @@ const styles = {
     fontFamily: F.heading,
     cursor: 'pointer',
     padding: '8px 0',
-  },
-  clearBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 4,
-    margin: '8px 0',
-    padding: '8px 14px',
-    borderRadius: 8,
-    border: 'none',
-    background: C.errorLight,
-    color: C.error,
-    fontSize: F.sizes.sm,
-    fontWeight: F.weights.semi,
-    cursor: 'pointer',
-    fontFamily: F.body,
   },
 };

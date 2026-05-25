@@ -10,9 +10,16 @@ import { C, F, S, safeArray } from '../data';
 import { formatPrice, estimateListCost } from '../priceDb';
 import { ShoppingAddItem } from './ShoppingAddItem';
 import { ShoppingItemList } from './ShoppingItemList';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, RefreshCw } from 'lucide-react';
 import { BgShapes } from '../BgShapes';
 
+// ─── Status-picker sheet ───────────────────────────────────────────────────────
+const STATUS_OPTIONS = [
+  { status: 'active',      label: '○ Inte handlat',  color: C.text,      bg: C.bg },
+  { status: 'handlat',     label: '✅ Handlat',       color: '#16A34A',   bg: '#F0FDF4' },
+  { status: 'finns_hemma', label: '🏠 Finns hemma',   color: '#2563EB',   bg: '#EFF6FF' },
+  { status: 'ej_aktuellt', label: '✕ Ej aktuellt',   color: C.textMuted, bg: C.bg },
+];
 
 // ─── Huvud-vy ─────────────────────────────────────────────────────────────────
 export function ShoppingView({ familyId, member, members, stacked }) {
@@ -23,11 +30,20 @@ export function ShoppingView({ familyId, member, members, stacked }) {
   const [showAddItem,  setShowAddItem]  = useState(false);
   const [newListName,  setNewListName]  = useState('');
   const [showNewList,  setShowNewList]  = useState(false);
+  const [pickingItem,  setPickingItem]  = useState(null);   // item currently being status-picked
+  const [confirming,   setConfirming]   = useState(false);
 
-  const isParent   = member.role === 'admin' || member.role === 'parent';
-  const hasUnchecked = items.some(i => !i.checked);
-  const costEstimate = hasUnchecked ? estimateListCost(items) : null;
+  const isParent     = member.role === 'admin' || member.role === 'parent';
+  const activeItems  = items.filter(i => !i.item_status || i.item_status === 'active');
+  const handledItems = items.filter(i => i.item_status && i.item_status !== 'active');
+  const costEstimate = activeItems.length > 0 ? estimateListCost(activeItems) : null;
   const currentList  = lists.find(l => l.id === selectedList);
+
+  // Auto-refresh every 15 s — picks up items added by children
+  useEffect(() => {
+    const iv = setInterval(() => { if (selectedList) loadItems(); }, 15000);
+    return () => clearInterval(iv);
+  }, [selectedList]);
 
   useEffect(() => { loadLists(); }, [familyId]);
   useEffect(() => { if (selectedList) loadItems(); }, [selectedList]);
@@ -36,7 +52,7 @@ export function ShoppingView({ familyId, member, members, stacked }) {
     setLoading(true);
     const { data } = await supabase
       .from('shopping_lists')
-      .select('*, shopping_items(id, checked)')
+      .select('*, shopping_items(id, item_status)')
       .eq('family_id', familyId)
       .order('is_default', { ascending: false })
       .order('created_at');
@@ -52,7 +68,6 @@ export function ShoppingView({ familyId, member, members, stacked }) {
       .from('shopping_items')
       .select('*')
       .eq('list_id', selectedList)
-      .order('checked')
       .order('category')
       .order('created_at');
     setItems(data || []);
@@ -84,44 +99,95 @@ export function ShoppingView({ familyId, member, members, stacked }) {
       family_id: familyId,
       name, quantity, category,
       added_by: member.id,
+      item_status: 'active',
     });
     setShowAddItem(false);
     loadItems();
   }
 
-  async function handleToggle(item) {
+  // Set status on a single item
+  async function handleSetStatus(item, status) {
     await supabase.from('shopping_items')
-      .update({ checked: !item.checked, checked_by: !item.checked ? member.id : null })
+      .update({ item_status: status })
       .eq('id', item.id);
+    setPickingItem(null);
     loadItems();
   }
 
   async function handleRemove(itemId) {
     await supabase.from('shopping_items').delete().eq('id', itemId);
+    setPickingItem(null);
     loadItems();
   }
 
-  async function handleClearChecked() {
+  // Confirm shopping trip done — delete all non-active items
+  async function handleConfirmDone() {
+    setConfirming(true);
     await supabase.from('shopping_items')
-      .delete().eq('list_id', selectedList).eq('checked', true);
+      .delete()
+      .eq('list_id', selectedList)
+      .neq('item_status', 'active');
+    setConfirming(false);
     loadItems();
+    loadLists();
   }
 
   function getListBadge(list) {
     const listItems = safeArray(list.shopping_items);
-    const unchecked = listItems.filter(i => !i.checked).length;
-    return unchecked > 0 ? unchecked : null;
+    const active = listItems.filter(i => !i.item_status || i.item_status === 'active').length;
+    return active > 0 ? active : null;
   }
 
   return (
     <div style={{ ...styles.page, ...(stacked && { minHeight: 'auto', paddingBottom: 0 }) }}>
       <BgShapes variant="shopping" />
+
+      {/* ── Status-picker bottom sheet ── */}
+      {pickingItem && (
+        <div style={styles.overlay} onClick={() => setPickingItem(null)}>
+          <div style={styles.pickerSheet} onClick={e => e.stopPropagation()}>
+            <p style={styles.pickerTitle}>{pickingItem.name}</p>
+            <div style={styles.pickerOptions}>
+              {STATUS_OPTIONS.map(opt => {
+                const isActive = (pickingItem.item_status || 'active') === opt.status;
+                return (
+                  <button
+                    key={opt.status}
+                    onClick={() => handleSetStatus(pickingItem, opt.status)}
+                    style={{
+                      ...styles.pickerBtn,
+                      background: isActive ? opt.bg : 'transparent',
+                      color: opt.color,
+                      fontWeight: isActive ? 700 : 500,
+                      border: isActive
+                        ? `2px solid ${opt.color}44`
+                        : `2px solid transparent`,
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => { if (pickingItem) handleRemove(pickingItem.id); }}
+              style={styles.pickerRemove}
+            >
+              🗑️ Ta bort vara
+            </button>
+            <button onClick={() => setPickingItem(null)} style={styles.pickerCancel}>
+              Avbryt
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={styles.headerZone}>
         {/* ── Header ── */}
         <div style={styles.header}>
           <div>
             <h1 style={styles.pageTitle}>🛒 Handla</h1>
-            {hasUnchecked && costEstimate && (
+            {costEstimate && activeItems.length > 0 && (
               <p style={styles.costSummary}>
                 Uppskattad kostnad:{' '}
                 <strong style={{ color: C.secondary }}>
@@ -130,12 +196,21 @@ export function ShoppingView({ familyId, member, members, stacked }) {
               </p>
             )}
           </div>
-          <button
-            onClick={() => setShowNewList(s => !s)}
-            style={{ ...S.button, ...S.buttonSecondary, padding: '8px 14px' }}
-          >
-            <Plus size={16} /> Ny lista
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => { loadLists(); if (selectedList) loadItems(); }}
+              style={{ ...S.button, ...S.buttonSecondary, padding: '8px 12px' }}
+              title="Uppdatera lista"
+            >
+              <RefreshCw size={16} />
+            </button>
+            <button
+              onClick={() => setShowNewList(s => !s)}
+              style={{ ...S.button, ...S.buttonSecondary, padding: '8px 14px' }}
+            >
+              <Plus size={16} /> Ny lista
+            </button>
+          </div>
         </div>
 
         {/* ── Ny lista-formulär ── */}
@@ -153,7 +228,11 @@ export function ShoppingView({ familyId, member, members, stacked }) {
             <button
               onClick={createList}
               disabled={!newListName.trim()}
-              style={{ ...S.button, ...S.buttonPrimary, padding: '10px 14px', opacity: newListName.trim() ? 1 : 0.5 }}
+              style={{
+                ...S.button, ...S.buttonPrimary,
+                padding: '10px 14px',
+                opacity: newListName.trim() ? 1 : 0.5,
+              }}
             >
               Skapa
             </button>
@@ -174,7 +253,9 @@ export function ShoppingView({ familyId, member, members, stacked }) {
                     ...styles.listTab,
                     background: isActive ? C.primary : C.bgCard,
                     color:      isActive ? '#fff'    : C.text,
-                    border:     isActive ? `2px solid ${C.primary}` : `2px solid ${C.border}`,
+                    border:     isActive
+                      ? `2px solid ${C.primary}`
+                      : `2px solid ${C.border}`,
                   }}
                 >
                   {list.name}
@@ -206,6 +287,20 @@ export function ShoppingView({ familyId, member, members, stacked }) {
       ) : (
         <div style={styles.content}>
 
+          {/* ── Bekräfta klar — visas när handlade varor finns ── */}
+          {handledItems.length > 0 && (
+            <button
+              onClick={handleConfirmDone}
+              disabled={confirming}
+              style={styles.confirmDoneBtn}
+            >
+              ✅ Bekräfta handlingen klar
+              <span style={styles.confirmDoneSub}>
+                Rensar {handledItems.length} hanterade {handledItems.length === 1 ? 'vara' : 'varor'}
+              </span>
+            </button>
+          )}
+
           {/* ── Lägg till vara ── */}
           {!showAddItem ? (
             <button onClick={() => setShowAddItem(true)} style={styles.addItemBtn}>
@@ -222,9 +317,8 @@ export function ShoppingView({ familyId, member, members, stacked }) {
           <ShoppingItemList
             items={items}
             members={members}
-            onToggle={handleToggle}
+            onPick={setPickingItem}
             onRemove={handleRemove}
-            onClearChecked={handleClearChecked}
           />
 
           {/* ── Ta bort lista ── */}
@@ -249,6 +343,76 @@ const styles = {
     position: 'relative',
     paddingBottom: 'calc(90px + env(safe-area-inset-bottom, 0px))',
   },
+  // ── Overlay + picker sheet ──
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 200,
+    background: 'rgba(0,0,0,0.35)',
+    display: 'flex',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  pickerSheet: {
+    width: '100%',
+    maxWidth: 480,
+    background: '#fff',
+    borderRadius: '20px 20px 0 0',
+    padding: '20px 16px calc(24px + env(safe-area-inset-bottom, 0px))',
+    boxShadow: '0 -4px 32px rgba(0,0,0,0.15)',
+  },
+  pickerTitle: {
+    fontFamily: F.heading,
+    fontSize: F.sizes.lg,
+    fontWeight: F.weights.extra,
+    color: C.text,
+    margin: '0 0 16px',
+    textAlign: 'center',
+  },
+  pickerOptions: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    marginBottom: 12,
+  },
+  pickerBtn: {
+    width: '100%',
+    padding: '13px 16px',
+    borderRadius: 12,
+    fontSize: F.sizes.md,
+    fontFamily: F.heading,
+    cursor: 'pointer',
+    textAlign: 'left',
+  },
+  pickerRemove: {
+    width: '100%',
+    padding: '12px 16px',
+    borderRadius: 12,
+    fontSize: F.sizes.sm,
+    fontFamily: F.body,
+    fontWeight: F.weights.semi,
+    cursor: 'pointer',
+    background: 'none',
+    border: 'none',
+    color: C.error,
+    textAlign: 'left',
+    marginBottom: 4,
+  },
+  pickerCancel: {
+    width: '100%',
+    padding: '12px 16px',
+    borderRadius: 12,
+    fontSize: F.sizes.md,
+    fontFamily: F.heading,
+    fontWeight: F.weights.bold,
+    cursor: 'pointer',
+    background: C.bg,
+    border: 'none',
+    color: C.textMuted,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  // ── Sticky header ──
   headerZone: {
     position: 'sticky',
     top: 52,
@@ -311,17 +475,36 @@ const styles = {
     fontSize: F.sizes.xs,
     fontWeight: F.weights.extra,
   },
+  // ── Content ──
   content: {
     padding: '8px 16px',
     position: 'relative',
     zIndex: 1,
   },
-  loadingText: {
-    textAlign: 'center',
-    color: C.textMuted,
-    padding: 32,
-    position: 'relative',
-    zIndex: 1,
+  confirmDoneBtn: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 2,
+    width: '100%',
+    padding: '14px 16px',
+    background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)',
+    borderRadius: 14,
+    border: '2px solid #16A34A44',
+    cursor: 'pointer',
+    marginBottom: 10,
+    boxSizing: 'border-box',
+    fontFamily: F.heading,
+    fontWeight: F.weights.bold,
+    fontSize: F.sizes.md,
+    color: '#16A34A',
+    textAlign: 'left',
+  },
+  confirmDoneSub: {
+    fontSize: F.sizes.xs,
+    fontWeight: F.weights.regular,
+    color: '#4ADE80',
+    fontFamily: F.body,
   },
   addItemBtn: {
     display: 'flex',
@@ -339,6 +522,13 @@ const styles = {
     cursor: 'pointer',
     marginBottom: 12,
     boxSizing: 'border-box',
+  },
+  loadingText: {
+    textAlign: 'center',
+    color: C.textMuted,
+    padding: 32,
+    position: 'relative',
+    zIndex: 1,
   },
   emptyState: {
     textAlign: 'center',
