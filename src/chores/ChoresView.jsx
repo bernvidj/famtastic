@@ -192,7 +192,14 @@ export function ChoresView({ familyId, member, members, stacked }) {
   }
 
   async function handleDelete(choreId) {
-    await supabase.from('chores').delete().eq('id', choreId);
+    const { data, error } = await supabase.rpc('parent_delete_chore', {
+      p_family_id: familyId,
+      p_chore_id:  choreId,
+    });
+    if (error || !data?.success) {
+      showToast('❌ Kunde inte radera: ' + (error?.message || data?.error || 'okänt fel'));
+      return;
+    }
     setEditing(null);
     loadData();
   }

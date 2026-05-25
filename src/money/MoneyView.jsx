@@ -7,7 +7,7 @@
 // • parent_confirm_allocations RPC (SECURITY DEFINER)
 // ============================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F, S, formatKr } from '../data';
 import { FamilyGoalCard } from './FamilyGoalCard';
@@ -62,6 +62,9 @@ export function MoneyView({ familyId, member, members, stacked }) {
   const [showAllTx,      setShowAllTx]      = useState(false);
   const [showCreateGoal, setShowCreateGoal] = useState(false);
   const [refreshKey,     setRefreshKey]     = useState(0);
+
+  // Guard mot dubbeltryck — useRef ändras synkront, till skillnad från useState
+  const isPayingRef = useRef(false);
 
   const children = members.filter(m => m.role === 'child');
   const monday   = weekStart();
@@ -222,17 +225,23 @@ export function MoneyView({ familyId, member, members, stacked }) {
   }
 
   async function handlePayOne(childId) {
+    if (isPayingRef.current) return;
+    isPayingRef.current = true;
     setSaving(true); setTxError('');
     try   { await payAllowanceFor(childId); loadAll(); }
     catch (e) { setTxError(e.message); }
     setSaving(false);
+    isPayingRef.current = false;
   }
 
   async function handlePayAll() {
+    if (isPayingRef.current) return;
+    isPayingRef.current = true;
     setPayingAll(true); setTxError('');
     try   { await Promise.all(unpaidChildren.map(c => payAllowanceFor(c.id))); loadAll(); }
     catch (e) { setTxError(e.message); }
     setPayingAll(false);
+    isPayingRef.current = false;
   }
 
   // ── Lägg till manuell transaktion (förälder) ─────────────────────────────────
