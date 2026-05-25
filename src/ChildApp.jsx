@@ -96,6 +96,11 @@ export function ChildApp({ familyId, member, onLogout }) {
     loadSchoolData();
   }, [familyId, member.id]);
 
+  // Ladda om pengar-data varje gång barnet öppnar pengar-tabben
+  useEffect(() => {
+    if (page === 'money') reload();
+  }, [page]);  // eslint-disable-line
+
   // Läs family features via SECURITY DEFINER RPC (barn saknar auth-session)
   useEffect(() => {
     if (!familyId) return;

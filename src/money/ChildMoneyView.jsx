@@ -4,12 +4,12 @@
 // sparmål med "X kr kvar", motiverande text
 // ============================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F, S, formatKr } from '../data';
 import { Celebration } from '../Celebrations';
 import { Wallet, PiggyBank, Target, ArrowRight, Check, ArrowLeft,
-         ArrowUpCircle, Plus, Trash2, ChevronRight, TrendingUp } from 'lucide-react';
+         ArrowUpCircle, Plus, Trash2, ChevronRight, TrendingUp, RotateCcw } from 'lucide-react';
 
 const GOAL_ICONS = ['🎯','🎮','⚽','🎸','👟','📱','🚲','🎨','✈️','🎁','💻','🏀'];
 
@@ -21,6 +21,9 @@ function weekMonday() {
 }
 
 export function ChildMoneyView({ familyId, memberId, transactions, goals, familyGoals, members, onReload }) {
+  // Ladda om färsk data varje gång tabben öppnas
+  useEffect(() => { onReload(); }, []);  // eslint-disable-line
+
   const [mode,          setMode]          = useState('jars');
   const [moveTo,        setMoveTo]        = useState(null);
   const [selectedGoal,  setSelectedGoal]  = useState(null);
@@ -297,8 +300,17 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
         <div style={styles.balanceHeroTop}>
           <div style={styles.balanceWalletIcon}><Wallet size={22} color="#fff" /></div>
           <span style={styles.balanceHeroLabel}>Min plånbok</span>
+          <button onClick={onReload} style={styles.reloadBtn} title="Uppdatera">
+            <RotateCcw size={15} color="rgba(255,255,255,0.75)" />
+          </button>
         </div>
         <span className="money-balance-amount" style={styles.balanceHeroAmount}>{formatKr(totalBalance)}</span>
+
+        {totalBalance === 0 && transactions.length === 0 && (
+          <div style={styles.emptyHeroMsg}>
+            💤 Inga pengar ännu — be en förälder betala din veckopeng!
+          </div>
+        )}
 
         {weekEarned > 0 && (
           <div style={styles.weekEarnedBadge}>
@@ -491,7 +503,13 @@ const styles = {
     position: 'relative',
     overflow: 'hidden',
   },
-  balanceHeroTop: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 },
+  balanceHeroTop: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, width: '100%' },
+  reloadBtn: { marginLeft: 'auto', background: 'rgba(255,255,255,0.15)', border: 'none',
+               borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex',
+               alignItems: 'center', justifyContent: 'center', minWidth: 32, minHeight: 32,
+               WebkitTapHighlightColor: 'transparent' },
+  emptyHeroMsg: { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontFamily: "'Nunito', sans-serif",
+                  fontWeight: 600, marginTop: 10, lineHeight: 1.4 },
   balanceWalletIcon: { width: 36, height: 36, borderRadius: 10,
     background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   balanceHeroLabel: { fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading,
