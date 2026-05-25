@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    let query = supabase.from('push_subscriptions').select('subscription_json');
+    let query = supabase.from('push_subscriptions').select('id, member_id, subscription_json');
     if (reqBody.member_id) {
       // Single-member targeting (e.g. notify the child who got paid)
       query = query.eq('member_id', reqBody.member_id);
@@ -85,7 +85,13 @@ Deno.serve(async (req) => {
           });
           const resText = await res.text();
           console.log('[push] test_empty status:', res.status, resText.slice(0, 100));
-          res.ok ? sent++ : failed++;
+          if (res.status === 410 || res.status === 404) {
+            console.log('[push] stale sub — deleting row id:', row.id, 'member:', row.member_id);
+            await supabase.from('push_subscriptions').delete().eq('id', row.id);
+            failed++;
+          } else {
+            res.ok ? sent++ : failed++;
+          }
         } else {
           // npm:web-push handles RFC 8030/8291/8188 compliant aes128gcm encryption
           const payload = JSON.stringify({
@@ -106,7 +112,14 @@ Deno.serve(async (req) => {
           });
           const resText = await res.text();
           console.log('[push] push service status:', res.status, 'body:', resText.slice(0, 200));
-          res.ok ? sent++ : failed++;
+          if (res.status === 410 || res.status === 404) {
+            // Subscription expired or revoked — remove from DB so we stop sending to it
+            console.log('[push] stale sub — deleting row id:', row.id, 'member:', row.member_id);
+            await supabase.from('push_subscriptions').delete().eq('id', row.id);
+            failed++;
+          } else {
+            res.ok ? sent++ : failed++;
+          }
         }
       } catch (e) {
         console.error('[push] error for sub:', String(e));

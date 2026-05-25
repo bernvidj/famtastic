@@ -7,8 +7,9 @@ import { supabase } from '../supabaseClient';
 import { C, F, S } from '../data';
 import { MemberRow } from './MemberRow';
 import { AllowanceRow } from './AllowanceRow';
-import { Save, UserPlus, LogOut } from 'lucide-react';
+import { Save, UserPlus, LogOut, Send } from 'lucide-react';
 import { usePushNotifications } from '../notifications/usePushNotifications';
+import { sendPushToMember } from '../notifications/sendPush';
 
 const AVATARS = ['😀','😎','🦊','🐻','🦄','🌟','🎨','⚽','🎵','🌈','🍕','🐱','🐶','🦋','🚀','💪'];
 const MEMBER_COLORS = C.memberColors;
@@ -477,6 +478,31 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout, on
                 <div style={{ ...styles.toggleKnob, transform: pushSubscribed ? 'translateX(22px)' : 'translateX(2px)' }} />
               </button>
             </div>
+
+            {/* Test notification button — only show when subscribed */}
+            {pushSubscribed && (
+              <button
+                onClick={async () => {
+                  const result = await sendPushToMember({
+                    memberId: member.id,
+                    title: '🔔 FamTastic',
+                    body: 'Testnotis fungerar! Du får notiser på den här enheten.',
+                  });
+                  showToast('Testnotis skickad!');
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  marginTop: 10, width: '100%',
+                  padding: '10px 14px', borderRadius: 12,
+                  background: C.primaryLight, border: `1px solid ${C.primary}`,
+                  color: C.primary, fontSize: F.sizes.sm, fontWeight: F.weights.bold,
+                  fontFamily: F.heading, cursor: 'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <Send size={14} /> Skicka testnotis till den här enheten
+              </button>
+            )}
           </div>
         )}
 

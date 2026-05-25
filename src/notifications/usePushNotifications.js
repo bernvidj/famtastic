@@ -68,22 +68,48 @@ export function usePushNotifications(familyId, memberId) {
   }
 
   // Check current subscription status on mount and re-sync to DB.
-  // iOS can silently rotate the push token (reinstall, Safari cache clear) so the DB
-  // endpoint may differ from what the browser has. Always upsert on load to keep them in sync.
+  // If permission is already granted but the browser subscription is gone (app reinstalled,
+  // PWA removed from home screen, etc.) — auto-resubscribe silently so the user doesn't
+  // need to tap the bell again.
   useEffect(() => {
     if (!supported || !memberId || !familyId) return;
-    navigator.serviceWorker.ready.then(reg =>
-      reg.pushManager.getSubscription().then(sub => {
-        setSubscribed(!!sub);
+    navigator.serviceWorker.ready.then(async reg => {
+      try {
+        const sub = await reg.pushManager.getSubscription();
         if (sub) {
+          // Existing subscription — re-sync endpoint to DB in case it rotated
+          setSubscribed(true);
           supabase.rpc('upsert_push_subscription', {
             p_member_id:    memberId,
             p_family_id:    familyId,
             p_subscription: JSON.stringify(sub),
           }).catch(err => console.warn('Push re-sync failed:', err));
+        } else if ('Notification' in window && Notification.permission === 'granted') {
+          // Permission already granted but no active subscription (e.g. app reinstalled) —
+          // silently re-subscribe without prompting the user again.
+          try {
+            const newSub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+            });
+            await supabase.rpc('upsert_push_subscription', {
+              p_member_id:    memberId,
+              p_family_id:    familyId,
+              p_subscription: JSON.stringify(newSub),
+            });
+            setSubscribed(true);
+            console.log('[push] auto-resubscribed after reinstall/reset');
+          } catch (resubErr) {
+            console.warn('Push auto-resubscribe failed:', resubErr);
+            setSubscribed(false);
+          }
+        } else {
+          setSubscribed(false);
         }
-      })
-    );
+      } catch (err) {
+        console.warn('Push status check failed:', err);
+      }
+    });
   }, [supported, memberId, familyId]);
 
   return { supported, subscribed, permission, loading, subscribe, unsubscribe };
