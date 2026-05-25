@@ -63,11 +63,13 @@ export function AllowanceRow({ child, rule, onSave, saving }) {
       {/* Automatisk utbetalning */}
       <div style={styles.autoRow}>
         <div style={{ flex: 1 }}>
-          <span style={styles.autoLabel}>⚡ Automatisk utbetalning</span>
+          <span style={styles.autoLabel}>
+            {autoAllowance ? '⚡ Automatisk utbetalning' : '🖐️ Manuell utbetalning'}
+          </span>
           <span style={styles.autoDesc}>
             {autoAllowance
-              ? `Betalas automatiskt varje ${WEEKDAY_LABELS[payday].toLowerCase()}`
-              : 'Kräver manuell utbetalning från förälder'}
+              ? `Betalas ut automatiskt varje ${WEEKDAY_LABELS[payday].toLowerCase()}`
+              : 'Du betalar ut manuellt från startsidan'}
           </span>
         </div>
         <button
