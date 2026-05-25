@@ -138,16 +138,19 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout, on
     setSaving(false);
   }
 
-  async function saveAllowance(childId, baseAmount, payday) {
+  async function saveAllowance(childId, baseAmount, payday, autoAllowance = false) {
     setSaving(true);
     const existing = allowanceRules.find(r => r.member_id === childId);
     const amountOre = Math.round(Number(baseAmount) * 100);
     if (existing) {
-      await supabase.from('allowance_rules').update({ base_amount: amountOre, payday }).eq('id', existing.id);
+      await supabase.from('allowance_rules')
+        .update({ base_amount: amountOre, payday, auto_allowance: autoAllowance })
+        .eq('id', existing.id);
     } else {
-      await supabase.from('allowance_rules').insert({ family_id: familyId, member_id: childId, base_amount: amountOre, payday });
+      await supabase.from('allowance_rules')
+        .insert({ family_id: familyId, member_id: childId, base_amount: amountOre, payday, auto_allowance: autoAllowance });
     }
-    showToast('Veckopeng sparad!');
+    showToast(autoAllowance ? '⚡ Automatisk veckopeng sparad!' : 'Veckopeng sparad!');
     setSaving(false);
     loadSettings();
   }

@@ -9,23 +9,31 @@ import { C, F, S, formatKr } from '../data';
 const WEEKDAY_LABELS = ['Måndag','Tisdag','Onsdag','Torsdag','Fredag','Lördag','Söndag'];
 
 export function AllowanceRow({ child, rule, onSave, saving }) {
-  const [amount, setAmount] = useState(rule ? (rule.base_amount / 100).toString() : '');
-  const [payday, setPayday] = useState(rule ? rule.payday : 6);
+  const [amount,        setAmount]        = useState(rule ? (rule.base_amount / 100).toString() : '');
+  const [payday,        setPayday]        = useState(rule ? rule.payday : 4); // 4 = Fredag
+  const [autoAllowance, setAutoAllowance] = useState(rule ? !!rule.auto_allowance : false);
 
   useEffect(() => {
     if (rule) {
       setAmount((rule.base_amount / 100).toString());
       setPayday(rule.payday);
+      setAutoAllowance(!!rule.auto_allowance);
     }
   }, [rule]);
 
   return (
     <div style={styles.card}>
+      <style>{`
+        @media (max-width: 400px) {
+          .allowance-row { flex-direction: column !important; }
+          .allowance-input { width: 100% !important; }
+        }
+      `}</style>
       <div style={styles.header}>
         <span style={styles.name}>{child.avatar} {child.name}</span>
         {rule && <span style={styles.current}>{formatKr(rule.base_amount)}/vecka</span>}
       </div>
-      <div style={styles.row}>
+      <div className="allowance-row" style={styles.row}>
         <div style={{ flex: 1 }}>
           <label style={styles.label}>Belopp (kr/vecka)</label>
           <input
@@ -34,6 +42,7 @@ export function AllowanceRow({ child, rule, onSave, saving }) {
             onChange={e => setAmount(e.target.value)}
             placeholder="50"
             min="0"
+            className="allowance-input"
             style={S.input}
           />
         </div>
@@ -50,12 +59,42 @@ export function AllowanceRow({ child, rule, onSave, saving }) {
           </select>
         </div>
       </div>
+
+      {/* Automatisk utbetalning */}
+      <div style={styles.autoRow}>
+        <div style={{ flex: 1 }}>
+          <span style={styles.autoLabel}>⚡ Automatisk utbetalning</span>
+          <span style={styles.autoDesc}>
+            {autoAllowance
+              ? `Betalas automatiskt varje ${WEEKDAY_LABELS[payday].toLowerCase()}`
+              : 'Kräver manuell utbetalning från förälder'}
+          </span>
+        </div>
+        <button
+          onClick={() => setAutoAllowance(v => !v)}
+          style={{
+            width: 48, height: 26, borderRadius: 13, border: 'none',
+            background: autoAllowance ? C.secondary : C.border,
+            cursor: 'pointer', position: 'relative', flexShrink: 0,
+            transition: 'background 0.2s', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <div style={{
+            width: 22, height: 22, borderRadius: 11, background: '#fff',
+            position: 'absolute', top: 2,
+            transform: autoAllowance ? 'translateX(22px)' : 'translateX(2px)',
+            transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+          }} />
+        </button>
+      </div>
+
       <button
-        onClick={() => onSave(child.id, amount, payday)}
+        onClick={() => onSave(child.id, amount, payday, autoAllowance)}
         disabled={saving || !amount}
         style={{
           ...S.button, ...S.buttonPrimary, width: '100%', marginTop: 8,
-          opacity: saving || !amount ? 0.5 : 1,
+          opacity: saving || !amount ? 0.5 : 1, minHeight: 44,
+          WebkitTapHighlightColor: 'transparent',
         }}
       >
         <Save size={14} /> Spara veckopeng

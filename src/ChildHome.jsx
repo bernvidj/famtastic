@@ -26,6 +26,7 @@ export function ChildHome({
   locationFeatureEnabled, locationSharing, onToggleLocationSharing,
   kidsShoppingEnabled, shoppingListReady, onAddShoppingItem,
   weekChoresDone, weekEarned,
+  nextAchievement,
 }) {
   const [shopInput,   setShopInput]   = useState('');
   const [shopAdding,  setShopAdding]  = useState(false);
@@ -76,15 +77,22 @@ export function ChildHome({
 
   return (
     <div style={styles.wrapper}>
+      <style>{`
+        @media (max-width: 400px) {
+          .ch-greeting { font-size: 22px !important; }
+          .ch-streak-num { font-size: 20px !important; }
+          .ch-next-ach { padding: 10px 12px !important; }
+        }
+      `}</style>
       <BgShapes variant="home" />
       <div style={{ position: 'relative', zIndex: 1 }}>
       <div style={styles.headerZone}>
-        <h1 style={styles.greeting}>{getGreeting(member.name)}</h1>
+        <h1 className="ch-greeting" style={styles.greeting}>{getGreeting(member.name)}</h1>
         {streak > 0 && (
           <div style={styles.streakPill}>
-            <Flame size={18} color={C.primary} />
-            <span style={styles.streakNum}>{streak}</span>
-            <span style={styles.streakLabel}>{streak === 1 ? 'dag' : 'dagar'} i rad {streakEmoji(streak)}</span>
+            <Flame size={22} color="#FF4500" fill="#FF7A59" />
+            <span className="ch-streak-num" style={styles.streakNum}>{streak}</span>
+            <span style={styles.streakLabel}>{streak === 1 ? 'dag i rad' : 'dagar i rad'} {streakEmoji(streak)}</span>
           </div>
         )}
       </div>
@@ -110,6 +118,28 @@ export function ChildHome({
                 }} />
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Nästa achievement */}
+        {nextAchievement && (
+          <div className="ch-next-ach" style={styles.nextAchCard}>
+            <div style={styles.nextAchLeft}>
+              <span style={styles.nextAchIcon}>{nextAchievement.icon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={styles.nextAchLabel}>Nästa 🏆</span>
+                <span style={styles.nextAchTitle}>{nextAchievement.title}</span>
+                <div style={styles.nextAchBarBg}>
+                  <div style={{
+                    ...styles.nextAchBarFill,
+                    width: `${Math.min(100, (nextAchievement.current / nextAchievement.target) * 100)}%`,
+                  }} />
+                </div>
+              </div>
+            </div>
+            <span style={styles.nextAchCount}>
+              {nextAchievement.current}<span style={styles.nextAchTarget}>/{nextAchievement.target}</span>
+            </span>
           </div>
         )}
 
@@ -353,9 +383,30 @@ const styles = {
   },
   content: { padding: '12px 16px', position: 'relative', zIndex: 1 },
   greeting: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: '0 0 8px' },
-  streakPill: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 99, background: 'rgba(255,255,255,0.7)', border: `1.5px solid ${C.primary}`, marginBottom: 0 },
-  streakNum: { fontSize: F.sizes.lg, fontWeight: F.weights.extra, fontFamily: F.heading, color: C.primaryDark },
-  streakLabel: { fontSize: F.sizes.sm, fontWeight: F.weights.semi, fontFamily: F.heading, color: C.primaryDark },
+  streakPill: { display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 99,
+    background: 'rgba(255,255,255,0.85)', border: `2px solid ${C.primary}`,
+    boxShadow: `0 2px 8px rgba(255,122,89,0.25)`, marginBottom: 4 },
+  streakNum: { fontSize: F.sizes.xl, fontWeight: F.weights.extra, fontFamily: F.heading, color: C.primaryDark },
+  streakLabel: { fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.primaryDark },
+
+  // Nästa achievement
+  nextAchCard: { display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '12px 14px', borderRadius: 16,
+    background: `linear-gradient(135deg, #F5F3FF, #EDE9FE)`,
+    border: `1.5px solid #C4B5FD`, marginBottom: 12 },
+  nextAchLeft: { display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 },
+  nextAchIcon: { fontSize: 28, flexShrink: 0 },
+  nextAchLabel: { display: 'block', fontSize: F.sizes.xs, fontWeight: F.weights.bold,
+    fontFamily: F.heading, color: '#7C3AED', textTransform: 'uppercase', letterSpacing: 0.5 },
+  nextAchTitle: { display: 'block', fontSize: F.sizes.sm, fontWeight: F.weights.extra,
+    fontFamily: F.heading, color: '#4C1D95', marginBottom: 6, whiteSpace: 'nowrap',
+    overflow: 'hidden', textOverflow: 'ellipsis' },
+  nextAchBarBg: { height: 6, background: '#DDD6FE', borderRadius: 99, overflow: 'hidden' },
+  nextAchBarFill: { height: '100%', background: 'linear-gradient(90deg, #8B5CF6, #A78BFA)',
+    borderRadius: 99, transition: 'width 0.4s ease' },
+  nextAchCount: { fontSize: F.sizes.lg, fontWeight: F.weights.extra, fontFamily: F.heading,
+    color: '#7C3AED', flexShrink: 0, marginLeft: 10 },
+  nextAchTarget: { fontSize: F.sizes.sm, color: '#A78BFA' },
   progressCard: { display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 16, border: '1.5px solid', marginBottom: 12 },
   progressInfo: { flex: 1 },
   progressTitle: { display: 'block', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, marginBottom: 8 },

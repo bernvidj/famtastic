@@ -22,6 +22,7 @@ import { useAchievements } from './achievements/useAchievements';
 import { unlockAchievement } from './achievements/unlock';
 import { C, TOPBAR_H } from './data';
 import { InAppToast } from './InAppToast';
+import { Onboarding } from './Onboarding';
 import { Home as HomeIcon } from 'lucide-react';
 
 // ── Lösenordsåterställning (visas när användaren klickar reset-länk i mail) ──
@@ -109,6 +110,7 @@ export function App() {
     catch { return {}; }
   });
   const [page,           setPage]           = useState('home');
+  const [onboardingDone, setOnboardingDone] = useState(false);
 
   function navigateTo(newPage) {
     setPage(newPage);
@@ -251,6 +253,21 @@ export function App() {
         familyId={familyId}
         member={activeMember}
         onLogout={handleLogout}
+      />
+    );
+  }
+
+  // ── Onboarding för ny familj (inga barn ännu) ──────────────────────────────
+  const hasChildren = allMembers.some(m => m.role === 'child');
+  if (isParent && !hasChildren && !onboardingDone && allMembers.length > 0) {
+    return (
+      <Onboarding
+        familyId={familyId}
+        member={activeMember}
+        onComplete={async () => {
+          await loadAllMembers(familyId);
+          setOnboardingDone(true);
+        }}
       />
     );
   }

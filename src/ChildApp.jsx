@@ -20,6 +20,7 @@ import { TOPBAR_H } from './data';
 import { useAchievements } from './achievements/useAchievements';
 import { unlockAchievement } from './achievements/unlock';
 import { AchievementsView } from './achievements/AchievementsView';
+import { ACHIEVEMENT_MAP } from './achievements/achievementDefs';
 import { usePushNotifications } from './notifications/usePushNotifications';
 import { sendPushToFamily } from './notifications/sendPush';
 import { InAppToast } from './InAppToast';
@@ -330,10 +331,43 @@ export function ChildApp({ familyId, member, onLogout }) {
     }
   }
 
+  // --- Nästa achievement (progress-baserade) ---
+  function computeNextAchievement() {
+    const streak       = calcStreak();
+    const totalDone    = completions.length;
+    const unlockedCount = Object.keys(achievementsUnlocked).length;
+
+    const candidates = [
+      { id: 'chore_streak_3',  current: streak,        target: 3   },
+      { id: 'chore_streak_7',  current: streak,        target: 7   },
+      { id: 'chore_streak_30', current: streak,        target: 30  },
+      { id: 'chores_10',       current: totalDone,     target: 10  },
+      { id: 'chores_50',       current: totalDone,     target: 50  },
+      { id: 'chores_100',      current: totalDone,     target: 100 },
+      { id: 'achievements_10', current: unlockedCount, target: 10  },
+      { id: 'achievements_25', current: unlockedCount, target: 25  },
+    ].filter(c => !achievementsUnlocked[c.id] && c.current < c.target);
+
+    if (!candidates.length) return null;
+    // Sortera på högst procentuell progress — visar den närmaste
+    candidates.sort((a, b) => (b.current / b.target) - (a.current / a.target));
+    const best = candidates[0];
+    const def  = ACHIEVEMENT_MAP[best.id];
+    return { ...best, title: def?.title || best.id, icon: def?.icon || '🏆' };
+  }
+
   // --- Actions ---
   function triggerCelebration(type) {
     setCelebrationType(type);
     setCelebrationActive(true);
+  }
+
+  // Visar confetti med fördröjning efter syssla-celebration
+  function triggerAchievementConfetti() {
+    setTimeout(() => {
+      setCelebrationType('confetti');
+      setCelebrationActive(true);
+    }, 1400);
   }
 
   async function toggleChore(choreId) {
@@ -367,19 +401,22 @@ export function ChildApp({ familyId, member, onLogout }) {
         });
       }
 
-      // Achievement triggers
-      await unlockAchievement(familyId, member.id, 'first_chore');
-      await unlockAchievement(familyId, member.id, 'explore_chores');
+      // Achievement triggers — confetti om något nytt låses upp
       const totalDone = completions.length + 1;
-      if (totalDone >= 10)  await unlockAchievement(familyId, member.id, 'chores_10');
-      if (totalDone >= 50)  await unlockAchievement(familyId, member.id, 'chores_50');
-      if (totalDone >= 100) await unlockAchievement(familyId, member.id, 'chores_100');
       const hour = new Date().getHours();
-      if (hour < 7) await unlockAchievement(familyId, member.id, 'early_bird');
-      const dow = new Date().getDay();
-      if (dow === 0 || dow === 6) await unlockAchievement(familyId, member.id, 'weekend_warrior');
-      if (nowDone >= todayList.length && todayList.length > 0)
-        await unlockAchievement(familyId, member.id, 'all_today_chores');
+      const dow  = new Date().getDay();
+      const achResults = await Promise.all([
+        unlockAchievement(familyId, member.id, 'first_chore'),
+        unlockAchievement(familyId, member.id, 'explore_chores'),
+        totalDone >= 10  ? unlockAchievement(familyId, member.id, 'chores_10')       : false,
+        totalDone >= 50  ? unlockAchievement(familyId, member.id, 'chores_50')       : false,
+        totalDone >= 100 ? unlockAchievement(familyId, member.id, 'chores_100')      : false,
+        hour < 7         ? unlockAchievement(familyId, member.id, 'early_bird')      : false,
+        (dow === 0 || dow === 6) ? unlockAchievement(familyId, member.id, 'weekend_warrior') : false,
+        (nowDone >= todayList.length && todayList.length > 0)
+          ? unlockAchievement(familyId, member.id, 'all_today_chores') : false,
+      ]);
+      if (achResults.some(Boolean)) triggerAchievementConfetti();
       reloadAchievements();
     }
     reload();
@@ -396,7 +433,11 @@ export function ChildApp({ familyId, member, onLogout }) {
       title: `🤝 ${member.name} tog en syssla`,
       body:  claimedChore?.title || 'Poulsyssla plockat',
     });
-    await unlockAchievement(familyId, member.id, 'pool_chore');
+    const achResults = await Promise.all([
+      unlockAchievement(familyId, member.id, 'pool_chore'),
+      unlockAchievement(familyId, member.id, 'pool_chore_5'),
+    ]);
+    if (achResults.some(Boolean)) triggerAchievementConfetti();
     reloadAchievements();
     reload();
   }
@@ -475,6 +516,7 @@ export function ChildApp({ familyId, member, onLogout }) {
           onAddShoppingItem={handleAddShoppingItem}
           weekChoresDone={weekChoresDone}
           weekEarned={weekEarned}
+          nextAchievement={computeNextAchievement()}
         />
       )}
 

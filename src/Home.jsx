@@ -13,6 +13,7 @@ import { ChevronLeft, ChevronRight, Flame } from 'lucide-react';
 import { ParentNotes } from './ParentNotes';
 import { AppIcon } from './AppIcon';
 import { BgShapes } from './BgShapes';
+import { TOTAL_ACHIEVEMENTS } from './achievements/achievementDefs';
 
 function getWeekDates(offset) {
   const now = new Date();
@@ -45,6 +46,7 @@ export function Home({ familyId, member, members }) {
   const [schoolSubjects, setSchoolSubjects] = useState([]);
   const [schoolSpecialEvents, setSchoolSpecialEvents] = useState([]);
   const [schoolExams, setSchoolExams] = useState([]);
+  const [achievementsSummary, setAchievementsSummary] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const weekDates = getWeekDates(weekOffset);
@@ -107,6 +109,11 @@ export function Home({ familyId, member, members }) {
       pMap[g.id] = data || 0;
     }
     setGoalProgress(pMap);
+
+    // Achievements summary per barn
+    const { data: achData } = await supabase.rpc('get_family_achievements_summary', { p_family_id: familyId });
+    setAchievementsSummary(achData || []);
+
     setLoading(false);
   }
 
@@ -265,6 +272,30 @@ export function Home({ familyId, member, members }) {
             })}
           </div>
 
+          {/* 3b. Achievements per barn */}
+          {achievementsSummary.length > 0 && (
+            <div style={styles.section}>
+              <p style={S.sectionLabel}>🏆 Achievements per barn</p>
+              <div style={styles.achSummaryRow}>
+                {achievementsSummary.map(child => {
+                  const pct = Math.min(100, Math.round((child.count / TOTAL_ACHIEVEMENTS) * 100));
+                  return (
+                    <div key={child.member_id} style={styles.achSummaryCard}>
+                      <div style={{ ...styles.achChildAvatar, background: child.member_color ? `${child.member_color}22` : C.primaryLight }}>
+                        <span style={{ fontSize: 18 }}>{child.member_avatar}</span>
+                      </div>
+                      <span style={styles.achChildName}>{child.member_name}</span>
+                      <div style={styles.achBarBg}>
+                        <div style={{ ...styles.achBarFill, width: `${pct}%` }} />
+                      </div>
+                      <span style={styles.achCount}>{child.count}<span style={styles.achTotal}>/{TOTAL_ACHIEVEMENTS}</span></span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* 4. School today */}
           <HomeSchoolSection
             children={children}
@@ -399,4 +430,19 @@ const styles = {
   wsName: { fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, color: C.text, textAlign: 'center' },
   wsStats: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 },
   wsStat: { fontSize: F.sizes.xs, fontFamily: F.heading, color: C.textMuted, whiteSpace: 'nowrap' },
+
+  // Achievements per barn
+  achSummaryRow: { display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 },
+  achSummaryCard: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+    padding: '14px 12px', background: C.bgCard, borderRadius: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+    border: `1.5px solid ${C.borderLight}`, minWidth: 100, flexShrink: 0 },
+  achChildAvatar: { width: 40, height: 40, borderRadius: '50%', display: 'flex',
+    alignItems: 'center', justifyContent: 'center' },
+  achChildName: { fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading,
+    color: C.text, textAlign: 'center' },
+  achBarBg: { width: '100%', height: 6, background: C.borderLight, borderRadius: 99, overflow: 'hidden' },
+  achBarFill: { height: '100%', background: `linear-gradient(90deg, #8B5CF6, #A78BFA)`,
+    borderRadius: 99, transition: 'width 0.4s ease' },
+  achCount: { fontSize: F.sizes.md, fontWeight: F.weights.extra, fontFamily: F.heading, color: '#7C3AED' },
+  achTotal: { fontSize: F.sizes.xs, color: C.textMuted },
 };
