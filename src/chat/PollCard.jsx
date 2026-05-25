@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F } from '../data';
 import { unlockAchievement } from '../achievements/unlock';
+import { sendPushToFamily } from '../notifications/sendPush';
 
 export function PollCard({ familyId, member, members, onAchievement }) {
   const [poll,     setPoll]     = useState(null);
@@ -61,18 +62,39 @@ export function PollCard({ familyId, member, members, onAchievement }) {
       p_question:  question.trim(),
       p_options:   valid,
     });
+    const q = question.trim();
     setQuestion('');
     setOptions(['', '']);
     setCreating(false);
     setSaving(false);
     const isNew = await unlockAchievement(familyId, member.id, 'created_poll');
     if (isNew && onAchievement) onAchievement();
+    sendPushToFamily({
+      familyId,
+      excludeMemberId: member.id,
+      title: `📊 ${member.name} startade omröstning`,
+      body:  q.slice(0, 100),
+    });
     load();
   }
 
   async function handleClose() {
     if (!poll) return;
     await supabase.rpc('close_family_poll', { p_poll_id: poll.id });
+    const pollOpts = Array.isArray(poll.options) ? poll.options : JSON.parse(poll.options);
+    let resultText = `"${poll.question}"`;
+    if (votes.length > 0) {
+      const winnerIdx = pollOpts.reduce((best, _, i) => {
+        const cnt = votes.filter(v => v.option_index === i).length;
+        return cnt > votes.filter(v => v.option_index === best).length ? i : best;
+      }, 0);
+      resultText = `Vann: "${pollOpts[winnerIdx]}" (${votes.length} röster)`;
+    }
+    sendPushToFamily({
+      familyId,
+      title: `📊 Omröstningen är avslutad`,
+      body:  resultText,
+    });
     setPoll(null);
     setVotes([]);
   }

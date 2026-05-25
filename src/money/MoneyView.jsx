@@ -11,6 +11,7 @@ import { FamilyGoalCard } from './FamilyGoalCard';
 import { CreateFamilyGoal } from './CreateFamilyGoal';
 import { PiggyBank, Plus, ChevronDown, ChevronUp, Wallet, Target, CreditCard, CheckCircle, Circle } from 'lucide-react';
 import { BgShapes } from '../BgShapes';
+import { sendPushToMember } from '../notifications/sendPush';
 
 const TX_LABELS = {
   base_allowance: { icon: '💰', label: 'Veckopeng' },
@@ -133,6 +134,14 @@ export function MoneyView({ familyId, member, members, stacked }) {
       amount: isNeg ? -ore : ore, type: txForm.type,
       description: txForm.description.trim() || null,
     });
+    const pushedKr = Math.round(ore / 100);
+    if (txForm.type === 'base_allowance') {
+      sendPushToMember({ memberId: selectedChild, title: `💰 Veckopeng!`, body: `Du fick ${pushedKr} kr` });
+    } else if (txForm.type === 'gift') {
+      sendPushToMember({ memberId: selectedChild, title: `🎁 Du fick en gåva`, body: `${pushedKr} kr har lagts till ditt konto` });
+    } else if (txForm.type === 'chore_bonus') {
+      sendPushToMember({ memberId: selectedChild, title: `⭐ Syssla-bonus!`, body: `+${pushedKr} kr` });
+    }
     setTxForm({ amount: '', type: 'gift', description: '' });
     setShowAddTx(false);
     setSaving(false);

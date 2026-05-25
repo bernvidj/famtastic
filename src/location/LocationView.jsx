@@ -10,6 +10,7 @@ import { C, F, TOPBAR_H } from '../data';
 import { FamilyMap } from './FamilyMap';
 import { MemberLocationCard } from './MemberLocationCard';
 import { PlacesEditor } from './PlacesEditor';
+import { sendPushToFamily } from '../notifications/sendPush';
 
 export function LocationView({ familyId, member, members }) {
   const [locations, setLocations]   = useState([]);
@@ -134,6 +135,12 @@ export function LocationView({ familyId, member, members }) {
             p_longitude: pos.coords.longitude,
             p_accuracy:  Math.round(pos.coords.accuracy),
             p_battery:   null,
+          });
+          sendPushToFamily({
+            familyId,
+            excludeMemberId: member.id,
+            title: `📍 ${member.name} delar sin plats`,
+            body:  'Öppna appen för att se var de är',
           });
           setMySharing(true); // triggar useEffect ovan → startar watchPosition + interval
           setToggling(false);

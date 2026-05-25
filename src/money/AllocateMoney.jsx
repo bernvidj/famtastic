@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F, S, formatKr } from '../data';
 import { PiggyBank, ArrowUpCircle, Target, ArrowLeft, Check, Plus } from 'lucide-react';
+import { sendPushToFamily } from '../notifications/sendPush';
 
 export function AllocateMoney({ familyId, memberId, balance, goals, onComplete, onClose }) {
   const [step, setStep] = useState('choose'); // choose | amount | confirm | done
@@ -91,6 +92,13 @@ export function AllocateMoney({ familyId, memberId, balance, goals, onComplete, 
 
     setSaving(false);
     if (!error) {
+      if (selectedGoal && getProgressAfter() >= 100) {
+        sendPushToFamily({
+          familyId,
+          title: `🎉 Sparmål uppnått!`,
+          body:  `${selectedGoal.icon || '🎯'} ${selectedGoal.title} är fullt!`,
+        });
+      }
       setStep('done');
     }
   }

@@ -21,6 +21,7 @@ import { useAchievements } from './achievements/useAchievements';
 import { unlockAchievement } from './achievements/unlock';
 import { AchievementsView } from './achievements/AchievementsView';
 import { usePushNotifications } from './notifications/usePushNotifications';
+import { sendPushToFamily } from './notifications/sendPush';
 import { InAppToast } from './InAppToast';
 
 const BASE_NAV = [
@@ -349,6 +350,23 @@ export function ChildApp({ familyId, member, onLogout }) {
       else if (result?.points_earned > 0) { triggerCelebration('sparkle'); }
       else { triggerCelebration('confetti'); }
 
+      const doneChore = todayList.find(c => c.id === choreId);
+      if (nowDone >= todayList.length && todayList.length > 0) {
+        sendPushToFamily({
+          familyId,
+          excludeMemberId: member.id,
+          title: `✅ ${member.name} klart för idag!`,
+          body:  `Alla sysslor är gjorda 🎉`,
+        });
+      } else if (doneChore) {
+        sendPushToFamily({
+          familyId,
+          excludeMemberId: member.id,
+          title: `✅ ${member.name} gjorde en syssla`,
+          body:  doneChore.title,
+        });
+      }
+
       // Achievement triggers
       await unlockAchievement(familyId, member.id, 'first_chore');
       await unlockAchievement(familyId, member.id, 'explore_chores');
@@ -370,6 +388,14 @@ export function ChildApp({ familyId, member, onLogout }) {
   async function claimPoolChore(choreId) {
     await supabase.rpc('child_claim_pool_chore', { p_family_id: familyId, p_member_id: member.id, p_chore_id: choreId });
     triggerCelebration('sparkle');
+    const poolList = getPoolChores();
+    const claimedChore = poolList.find(c => c.id === choreId);
+    sendPushToFamily({
+      familyId,
+      excludeMemberId: member.id,
+      title: `🤝 ${member.name} tog en syssla`,
+      body:  claimedChore?.title || 'Poulsyssla plockat',
+    });
     await unlockAchievement(familyId, member.id, 'pool_chore');
     reloadAchievements();
     reload();
@@ -476,7 +502,7 @@ export function ChildApp({ familyId, member, onLogout }) {
 
       {page === 'calendar' && (
         <ChildCalendar
-          today={today} familyId={familyId} memberId={member.id}
+          today={today} familyId={familyId} memberId={member.id} memberName={member.name}
           getMyEvents={getMyEvents}
           getChoresForDate={getChoresForDate} isCompletedOnDate={isCompletedOnDate}
           schoolSchedule={schoolSchedule} schoolSubjects={schoolSubjects}

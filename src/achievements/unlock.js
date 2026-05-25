@@ -1,5 +1,7 @@
 // Shared utility — fire-and-forget achievement unlock
 import { supabase } from '../supabaseClient';
+import { ACHIEVEMENTS } from './achievementDefs';
+import { sendPushToMember } from '../notifications/sendPush';
 
 export async function unlockAchievement(familyId, memberId, achievementId) {
   if (!familyId || !memberId || !achievementId) return false;
@@ -8,5 +10,15 @@ export async function unlockAchievement(familyId, memberId, achievementId) {
     p_member_id:      memberId,
     p_achievement_id: achievementId,
   });
+  if (data === true) {
+    const def = ACHIEVEMENTS.find(a => a.id === achievementId);
+    if (def) {
+      sendPushToMember({
+        memberId,
+        title: `🏆 Achievement upplåst!`,
+        body:  `${def.icon} ${def.title}`,
+      });
+    }
+  }
   return data === true;
 }

@@ -48,12 +48,18 @@ Deno.serve(async (req) => {
 
     const reqBody = await req.json();
     const testEmpty = !!reqBody.test_empty;
-    console.log('[push] family_id:', reqBody.family_id, 'exclude:', reqBody.exclude_member_id, 'test_empty:', testEmpty);
+    console.log('[push] family_id:', reqBody.family_id, 'member_id:', reqBody.member_id, 'exclude:', reqBody.exclude_member_id, 'test_empty:', testEmpty);
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    let query = supabase.from('push_subscriptions').select('subscription_json').eq('family_id', reqBody.family_id);
-    if (reqBody.exclude_member_id) query = query.neq('member_id', reqBody.exclude_member_id);
+    let query = supabase.from('push_subscriptions').select('subscription_json');
+    if (reqBody.member_id) {
+      // Single-member targeting (e.g. notify the child who got paid)
+      query = query.eq('member_id', reqBody.member_id);
+    } else {
+      query = query.eq('family_id', reqBody.family_id);
+      if (reqBody.exclude_member_id) query = query.neq('member_id', reqBody.exclude_member_id);
+    }
 
     const { data: subs, error: dbErr } = await query;
     console.log('[push] subs found:', subs?.length ?? 0, 'db error:', dbErr?.message ?? 'none');

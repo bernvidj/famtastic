@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { supabase } from './supabaseClient';
 import { C, F, safeArray } from './data';
 import { Plus, BookOpen } from 'lucide-react';
+import { sendPushToFamily } from './notifications/sendPush';
 
 const WEEKDAYS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
 
@@ -22,7 +23,7 @@ function todayPlus(n) {
 }
 
 export function ChildCalendar({
-  today, familyId, memberId,
+  today, familyId, memberId, memberName,
   getMyEvents, getChoresForDate, isCompletedOnDate,
   schoolSchedule, schoolSubjects, schoolSpecialEvents, exams,
   onReload,
@@ -92,6 +93,12 @@ export function ChildCalendar({
     } else {
       setShowExamForm(false);
       showToast(`📝 Prov sparat! ${examForm.study_days} pluggdag${examForm.study_days > 1 ? 'ar' : ''} skapade.`);
+      sendPushToFamily({
+        familyId,
+        excludeMemberId: memberId,
+        title: `📝 ${memberName || 'Barn'} lade till ett prov`,
+        body:  examForm.title.trim(),
+      });
       if (onReload) onReload();
     }
   }

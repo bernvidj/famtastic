@@ -12,6 +12,7 @@ import { ChorePoolCard } from './ChorePoolCard';
 import { ChoreEditor } from './ChoreEditor';
 import { Plus, List, CalendarDays, Trophy, HandMetal } from 'lucide-react';
 import { BgShapes } from '../BgShapes';
+import { sendPushToMember } from '../notifications/sendPush';
 
 
 export function ChoresView({ familyId, member, members, stacked }) {
@@ -178,6 +179,13 @@ export function ChoresView({ familyId, member, members, stacked }) {
       await supabase.from('chores').update(data).eq('id', editing.id);
     } else {
       await supabase.from('chores').insert(data);
+      if (data.assigned_to) {
+        sendPushToMember({
+          memberId: data.assigned_to,
+          title:    `📋 Ny syssla tilldelad`,
+          body:     data.title || 'Kolla dina sysslor!',
+        });
+      }
     }
     setEditing(null);
     loadData();
