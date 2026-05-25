@@ -13,7 +13,7 @@ const BASE_ITEMS = [
   { id: 'meals',    label: 'Mat',     icon: UtensilsCrossed },
 ];
 
-const MAX_VISIBLE = 5;
+const MAX_VISIBLE = 6;
 
 function MerSheet({ items, active, onNavigate, onClose }) {
   return (
@@ -76,13 +76,13 @@ export function Nav({ active, onNavigate, locationEnabled, chatEnabled }) {
         <div style={{
           ...styles.iconWrap,
           background:   isActive ? C.primary : 'transparent',
-          borderRadius: isActive ? 12 : 0,
-          padding:      isActive ? '5px 14px' : '5px 6px',
+          borderRadius: isActive ? 10 : 0,
+          padding:      isActive ? '4px 10px' : '4px 4px',
           transition:   'all 0.18s ease',
         }}>
           {Icon
-            ? <Icon size={22} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#fff' : C.textMuted} />
-            : <span style={{ fontSize: 20, lineHeight: 1 }}>{item.emoji}</span>
+            ? <Icon size={20} strokeWidth={isActive ? 2.5 : 2} color={isActive ? '#fff' : C.textMuted} />
+            : <span style={{ fontSize: 18, lineHeight: 1 }}>{item.emoji}</span>
           }
         </div>
         <span style={{ ...styles.navLabel, color: isActive ? C.primary : C.textMuted, fontWeight: isActive ? F.weights.bold : F.weights.normal }}>
@@ -110,11 +110,11 @@ export function Nav({ active, onNavigate, locationEnabled, chatEnabled }) {
             <div style={{
               ...styles.iconWrap,
               background:   overflowActive || showMer ? C.primary : 'transparent',
-              borderRadius: overflowActive || showMer ? 12 : 0,
-              padding:      overflowActive || showMer ? '5px 14px' : '5px 6px',
+              borderRadius: overflowActive || showMer ? 10 : 0,
+              padding:      overflowActive || showMer ? '4px 10px' : '4px 4px',
               transition:   'all 0.18s ease',
             }}>
-              <MoreHorizontal size={22} strokeWidth={2} color={overflowActive || showMer ? '#fff' : C.textMuted} />
+              <MoreHorizontal size={20} strokeWidth={2} color={overflowActive || showMer ? '#fff' : C.textMuted} />
             </div>
             <span style={{ ...styles.navLabel, color: overflowActive || showMer ? C.primary : C.textMuted, fontWeight: overflowActive || showMer ? F.weights.bold : F.weights.normal }}>
               Mer
@@ -150,12 +150,13 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: 2,
+    gap: 1,
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    padding: '2px 2px',
-    minWidth: 44,
+    padding: '2px 0',
+    minWidth: 0,
+    flex: 1,
     fontFamily: F.heading,
   },
   iconWrap: {
@@ -164,8 +165,9 @@ const styles = {
     justifyContent: 'center',
   },
   navLabel: {
-    fontSize: F.sizes.xs,
+    fontSize: 10,
     fontFamily: F.heading,
+    lineHeight: 1,
   },
 };
 
