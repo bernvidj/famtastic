@@ -1,4 +1,4 @@
-const CACHE = 'famtastic-v7';
+const CACHE = 'famtastic-v8';
 
 // Only pre-cache immutable assets (not index.html — it changes on every deploy)
 const STATIC = [
@@ -60,6 +60,10 @@ self.addEventListener('notificationclick', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+
+  // Never cache cross-origin requests (Supabase API, Google Fonts, CDN, etc.)
+  // Only cache same-origin assets (JS/CSS bundles with content hashes)
+  if (!e.request.url.startsWith(self.location.origin)) return;
 
   // Network-first for HTML — user always gets the latest app shell
   if (e.request.headers.get('accept')?.includes('text/html')) {
