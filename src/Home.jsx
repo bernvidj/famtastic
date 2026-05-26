@@ -383,7 +383,8 @@ export function Home({ familyId, member, members, onNavigate, onViewChild }) {
               <div style={styles.infoRow}><span style={{ fontSize: 18 }}>🍽️</span><span style={styles.infoText}>{todayMeal()}</span></div>
             )}
             {todayEvents().map(ev => {
-              const evM = safeArray(ev.member_ids).length === 1 ? members.find(m => m.id === ev.member_ids[0]) : null;
+              const evMids = safeArray(ev.member_ids);
+              const evM = evMids.length === 1 ? members.find(m => m.id === evMids[0]) : null;
               return (
                 <div key={ev.id} style={styles.infoRow}>
                   <span style={{ fontSize: 18 }}>📅</span>

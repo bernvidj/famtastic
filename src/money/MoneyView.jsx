@@ -266,6 +266,8 @@ export function MoneyView({ familyId, member, members, stacked }) {
       sendPushToMember({ memberId: selectedChild, title: '🎁 Du fick en gåva!', body: `+${kr} kr` });
     if (modal.txType === 'chore_bonus')
       sendPushToMember({ memberId: selectedChild, title: '⭐ Syssla-bonus!', body: `+${kr} kr` });
+    if (modal.txType === 'swish')
+      sendPushToMember({ memberId: selectedChild, title: '💸 Du har fått en Swish-betalning 💸', body: `+${kr} kr` });
     closeModal(); loadAll();
   }
 
@@ -587,7 +589,7 @@ export function MoneyView({ familyId, member, members, stacked }) {
           </>
         )}
 
-        <div style={{ height: 80 }} />
+        <div style={{ height: 'calc(90px + env(safe-area-inset-bottom, 0px))' }} />
       </div>
 
       {/* ══ MODAL: LÄGG TILL TRANSAKTION ════════════════════════════════════ */}

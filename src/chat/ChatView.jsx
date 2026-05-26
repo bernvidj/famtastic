@@ -4,7 +4,7 @@
 // Barn läser/skriver via SECURITY DEFINER RPCs
 // ============================================
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F, TOPBAR_H } from '../data';
 import { MoodCard } from './MoodCard';
@@ -83,8 +83,11 @@ export function ChatView({ familyId, member, members, moodEnabled, pollEnabled, 
   const bottomRef = useRef(null);
   const pollRef   = useRef(null);
 
-  const memberMap = {};
-  (members || []).forEach(m => { memberMap[m.id] = m; });
+  const memberMap = useMemo(() => {
+    const map = {};
+    (members || []).forEach(m => { map[m.id] = m; });
+    return map;
+  }, [members]);
 
   const load = useCallback(async () => {
     const { data } = await supabase.rpc('get_family_messages', { p_family_id: familyId, p_limit: 50 });

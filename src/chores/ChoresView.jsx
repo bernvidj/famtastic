@@ -427,7 +427,7 @@ export function ChoresView({ familyId, member, members, stacked }) {
         </div>
       )}
 
-      <div style={{ height: 80 }} />
+      <div style={{ height: 'calc(90px + env(safe-area-inset-bottom, 0px))' }} />
 
       {editing && (
         <ChoreEditor
