@@ -3,7 +3,7 @@
 // Fetches data via RPC for child sessions (no RLS)
 // ============================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from './supabaseClient';
 
 function getWeekBounds() {
@@ -26,6 +26,10 @@ function fmtDate(d) {
 export function useChildData(familyId, memberId, isChild) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Spårar om vi har laddat klart minst en gång. Efterföljande reloads körs
+  // i bakgrunden utan att flagga `loading` — annars byts hela vyn ut mot
+  // fullskärmsladdaren vid varje uppdatering och "glitchar".
+  const hasLoaded = useRef(false);
 
   const load = useCallback(async () => {
     if (!isChild || !familyId || !memberId) {
@@ -33,7 +37,7 @@ export function useChildData(familyId, memberId, isChild) {
       return;
     }
 
-    setLoading(true);
+    if (!hasLoaded.current) setLoading(true);
     const { start, end } = getWeekBounds();
 
     const { data: result, error } = await supabase.rpc('get_child_dashboard', {
@@ -45,6 +49,7 @@ export function useChildData(familyId, memberId, isChild) {
 
     if (!error && result) {
       setData(result);
+      hasLoaded.current = true;
     }
     setLoading(false);
   }, [familyId, memberId, isChild]);
