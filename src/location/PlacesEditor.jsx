@@ -21,14 +21,15 @@ export function PlacesEditor({ familyId, member, places, onClose }) {
   const [deleting, setDeleting] = useState(null);
   const [locating, setLocating] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [errMsg, setErrMsg]     = useState('');
 
   async function savePlace() {
     const lat = parseFloat(form.lat);
     const lng = parseFloat(form.lng);
     if (!form.name.trim() || isNaN(lat) || isNaN(lng)) return;
 
-    setSaving(true);
-    await supabase.from('family_places').insert({
+    setSaving(true); setErrMsg('');
+    const { error } = await supabase.from('family_places').insert({
       family_id:     familyId,
       name:          form.name.trim(),
       emoji:         form.emoji,
@@ -37,16 +38,18 @@ export function PlacesEditor({ familyId, member, places, onClose }) {
       radius_meters: Number(form.radius) || DEFAULT_RADIUS,
       created_by:    member.id,
     });
+    setSaving(false);
+    if (error) { setErrMsg('Kunde inte spara platsen: ' + error.message); return; }
     setForm(emptyForm());
     setShowForm(false);
-    setSaving(false);
     onClose();
   }
 
   async function deletePlace(id) {
     setDeleting(id);
-    await supabase.from('family_places').delete().eq('id', id);
+    const { error } = await supabase.from('family_places').delete().eq('id', id);
     setDeleting(null);
+    if (error) { setErrMsg('Kunde inte ta bort platsen: ' + error.message); return; }
     onClose();
   }
 
@@ -77,6 +80,8 @@ export function PlacesEditor({ familyId, member, places, onClose }) {
             <X size={20} />
           </button>
         </div>
+
+        {errMsg && <div style={styles.errBanner}>{errMsg}</div>}
 
         {/* Befintliga platser */}
         <div style={styles.list}>
@@ -208,6 +213,11 @@ const styles = {
   title: {
     fontFamily: F.heading, fontSize: F.sizes.lg, fontWeight: F.weights.extra,
     color: C.text, margin: 0,
+  },
+  errBanner: {
+    padding: '10px 14px', marginBottom: 12, background: C.errorLight,
+    border: `1.5px solid ${C.error}`, borderRadius: 10, color: C.error,
+    fontSize: F.sizes.sm, fontFamily: F.heading, fontWeight: F.weights.bold,
   },
   closeBtn: {
     background: C.borderLight, border: 'none', borderRadius: 10,

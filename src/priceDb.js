@@ -59,7 +59,6 @@ const PRICE_DB = {
   'spenat':           [18, 28],
   'majs':             [6, 14],
   'avokado':          [10, 20],
-  'lime':             [6, 12],
   'jordgubbar':       [20, 45],
   'blåbär':           [22, 40],
   'hallon':           [22, 45],
@@ -229,7 +228,7 @@ export function estimateListCost(items) {
   const perItem = {};
 
   for (const item of items) {
-    if (item.checked) continue; // räkna bara avbockade
+    if (item.checked) continue; // hoppa över avbockade — räkna bara det som återstår att handla
     const [min, max] = lookupPrice(item.name, item.category);
 
     // Tolka mängd: "2 st", "3", "500g" → multiplicera om heltal

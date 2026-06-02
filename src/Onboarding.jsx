@@ -81,15 +81,16 @@ export function Onboarding({ familyId, member, onComplete }) {
         family_id:   familyId,
         title:       def.title,
         icon:        def.icon,
-        chore_type:  'regular',
+        chore_type:  'base',
         is_recurring: true,
         recurrence_rule: { days: [1, 2, 3, 4, 5] }, // mån–fre
         assigned_to: createdChild?.id || null,
         created_by:  member.id,
       };
     });
-    await supabase.from('chores').insert(rows);
+    const { error } = await supabase.from('chores').insert(rows);
     setSaving(false);
+    if (error) { alert('Kunde inte skapa sysslorna: ' + error.message); return; }
     setStep(3);
   }
 
@@ -97,13 +98,14 @@ export function Onboarding({ familyId, member, onComplete }) {
   async function handleSetAllowance() {
     setSaving(true);
     if (allowance > 0 && createdChild) {
-      await supabase.from('allowance_rules').insert({
+      const { error } = await supabase.from('allowance_rules').insert({
         family_id:     familyId,
         member_id:     createdChild.id,
         base_amount:   allowance * 100,
         payday,
         auto_allowance: autoAllowance,
       });
+      if (error) { setSaving(false); alert('Kunde inte spara veckopengen: ' + error.message); return; }
     }
     setSaving(false);
     setShowConfetti(true);

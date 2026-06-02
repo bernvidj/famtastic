@@ -104,11 +104,14 @@ export async function generateShoppingList({ mealPlan, familyId, memberId }) {
   if (lists && lists.length > 0) {
     listId = lists[0].id;
   } else {
-    const { data: newList } = await supabase
+    const { data: newList, error: listErr } = await supabase
       .from('shopping_lists')
       .insert({ family_id: familyId, name: 'Mathandling', is_default: true })
       .select()
       .single();
+    if (listErr || !newList) {
+      throw new Error(listErr?.message || 'Kunde inte skapa handlingslista');
+    }
     listId = newList.id;
   }
 
@@ -131,5 +134,6 @@ export async function generateShoppingList({ mealPlan, familyId, memberId }) {
     added_by: memberId,
   }));
 
-  await supabase.from('shopping_items').insert(rows);
+  const { error: insErr } = await supabase.from('shopping_items').insert(rows);
+  if (insErr) throw new Error(insErr.message);
 }

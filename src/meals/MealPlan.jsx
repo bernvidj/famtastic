@@ -140,8 +140,12 @@ export function MealPlan({ familyId, member, members, onGenerateShopping, stacke
   }
 
   async function handleGenerateShopping() {
-    await generateShoppingList({ mealPlan, familyId, memberId: member.id });
-    if (onGenerateShopping) onGenerateShopping();
+    try {
+      await generateShoppingList({ mealPlan, familyId, memberId: member.id });
+      if (onGenerateShopping) onGenerateShopping();
+    } catch (e) {
+      showErr('Kunde inte generera handlingslista: ' + e.message);
+    }
   }
 
   return (
