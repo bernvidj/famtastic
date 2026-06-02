@@ -168,6 +168,45 @@ export function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // ── Sessions-vakt ──────────────────────────────────────────────────────────
+  // En utgången/ogiltig auth-session gör att auth.uid() blir null, vilket får
+  // RLS (has_family_access) att neka läsning/skrivning tyst — t.ex. "kan inte
+  // lägga in i kalendern". Här förnyar vi sessionen när appen återfår fokus
+  // (vanligt i en PWA som legat i bakgrunden); om förnyelsen misslyckas loggas
+  // användaren ut rent och får logga in på nytt istället för att fastna i ett
+  // halvtrasigt läge.
+  useEffect(() => {
+    let running = false;
+    async function revalidate() {
+      if (running) return;
+      running = true;
+      try {
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (s) {
+          const expiresMs = (s.expires_at || 0) * 1000;
+          // Förnya om token gått ut eller går ut inom 2 min
+          if (expiresMs && expiresMs - Date.now() < 120_000) {
+            const { error } = await supabase.auth.refreshSession();
+            if (error) await supabase.auth.signOut(); // ogiltig refresh-token → ren omstart
+          }
+        }
+      } catch {
+        /* nätverksfel e.d. — låt nästa fokus försöka igen */
+      } finally {
+        running = false;
+      }
+    }
+
+    function onVisible() { if (document.visibilityState === 'visible') revalidate(); }
+    revalidate();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', revalidate);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', revalidate);
+    };
+  }, []);
+
   async function loadAllMembers(fid) {
     const [membRes, featRes] = await Promise.all([
       supabase
