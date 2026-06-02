@@ -72,26 +72,38 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout, on
 
   async function saveFamilyName() {
     setSaving(true);
-    await supabase.from('families').update({ name: familyName.trim() }).eq('id', familyId);
-    showToast('Familjenamn sparat!');
+    const { error } = await supabase.from('families').update({ name: familyName.trim() }).eq('id', familyId);
+    showToast(error ? '❌ Kunde inte spara: ' + error.message : 'Familjenamn sparat!');
     setSaving(false);
   }
 
   async function toggleSetting(key) {
+    const prev = familySettings;
     const updated = { ...familySettings, [key]: !familySettings[key] };
     setFamilySettings(updated);
-    await supabase.from('families').update({ settings: updated }).eq('id', familyId);
+    const { error } = await supabase.from('families').update({ settings: updated }).eq('id', familyId);
+    if (error) {
+      setFamilySettings(prev); // återställ optimistisk ändring vid fel
+      showToast('❌ Kunde inte spara: ' + error.message);
+      return;
+    }
     showToast('Inställning sparad!');
   }
 
   async function toggleFeature(key) {
+    const prev = familySettings;
     const features = familySettings.features || {};
     const updated = {
       ...familySettings,
       features: { ...features, [key]: !features[key] },
     };
     setFamilySettings(updated);
-    await supabase.from('families').update({ settings: updated }).eq('id', familyId);
+    const { error } = await supabase.from('families').update({ settings: updated }).eq('id', familyId);
+    if (error) {
+      setFamilySettings(prev); // återställ optimistisk ändring vid fel
+      showToast('❌ Kunde inte spara: ' + error.message);
+      return;
+    }
     showToast('Inställning sparad!');
     if (onUpdate) onUpdate();
   }
@@ -102,17 +114,19 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout, on
 
   async function saveMember(m) {
     setSaving(true);
-    await supabase.from('family_members')
+    const { error } = await supabase.from('family_members')
       .update({ name: m.name, avatar: m.avatar, color: m.color })
       .eq('id', m.id);
-    showToast(`${m.name} uppdaterad!`);
     setSaving(false);
+    if (error) { showToast('❌ Kunde inte uppdatera: ' + error.message); return; }
+    showToast(`${m.name} uppdaterad!`);
     if (onUpdate) onUpdate();
   }
 
   async function deleteMember(id, name) {
     if (!window.confirm(`Vill du verkligen ta bort ${name}?`)) return;
-    await supabase.from('family_members').delete().eq('id', id);
+    const { error } = await supabase.from('family_members').delete().eq('id', id);
+    if (error) { showToast('❌ Kunde inte ta bort: ' + error.message); return; }
     setEditMembers(prev => prev.filter(m => m.id !== id));
     showToast(`${name} borttagen`);
     if (onUpdate) onUpdate();
@@ -135,6 +149,8 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout, on
       setShowAddMember(false);
       if (onUpdate) onUpdate();
       loadSettings();
+    } else {
+      showToast('❌ Kunde inte lägga till: ' + error.message);
     }
     setSaving(false);
   }
@@ -143,16 +159,15 @@ export function SettingsView({ familyId, member, members, onUpdate, onLogout, on
     setSaving(true);
     const existing = allowanceRules.find(r => r.member_id === childId);
     const amountOre = Math.round(Number(baseAmount) * 100);
-    if (existing) {
-      await supabase.from('allowance_rules')
-        .update({ base_amount: amountOre, payday, auto_allowance: autoAllowance })
-        .eq('id', existing.id);
-    } else {
-      await supabase.from('allowance_rules')
-        .insert({ family_id: familyId, member_id: childId, base_amount: amountOre, payday, auto_allowance: autoAllowance });
-    }
-    showToast(autoAllowance ? '⚡ Automatisk veckopeng sparad!' : 'Veckopeng sparad!');
+    const { error } = existing
+      ? await supabase.from('allowance_rules')
+          .update({ base_amount: amountOre, payday, auto_allowance: autoAllowance })
+          .eq('id', existing.id)
+      : await supabase.from('allowance_rules')
+          .insert({ family_id: familyId, member_id: childId, base_amount: amountOre, payday, auto_allowance: autoAllowance });
     setSaving(false);
+    if (error) { showToast('❌ Kunde inte spara veckopeng: ' + error.message); return; }
+    showToast(autoAllowance ? '⚡ Automatisk veckopeng sparad!' : 'Veckopeng sparad!');
     loadSettings();
   }
 

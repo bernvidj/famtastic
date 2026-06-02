@@ -36,6 +36,7 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
   const [editingSlot, setEditingSlot] = useState(null);
   const [slotForm, setSlotForm] = useState({ subject_id: '', start_time: '', end_time: '' });
   const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState('');
   const [customSubject, setCustomSubject] = useState('');
   const [showSubjects, setShowSubjects] = useState(false);
 
@@ -169,10 +170,21 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
   }
 
   async function handleSave() {
-    setSaving(true);
+    setSaving(true); setSaveErr('');
+    // Hjälpare: avbryt tidigt om något steg misslyckas, så vi inte fortsätter
+    // radera/infoga efter ett fel (annars riskeras halvsparat/raderat schema).
+    const fail = (msg, error) => {
+      setSaveErr((msg) + (error?.message ? ': ' + error.message : ''));
+      setSaving(false);
+    };
+
     const scheduleRows = schedule.map(s => ({ family_id: familyId, member_id: memberId, subject_id: s.subject_id, day_of_week: s.day_of_week, start_time: s.start_time, end_time: s.end_time }));
-    await supabase.from('school_schedule').delete().eq('member_id', memberId);
-    if (scheduleRows.length > 0) await supabase.from('school_schedule').insert(scheduleRows);
+    { const { error } = await supabase.from('school_schedule').delete().eq('member_id', memberId);
+      if (error) return fail('Kunde inte spara schemat', error); }
+    if (scheduleRows.length > 0) {
+      const { error } = await supabase.from('school_schedule').insert(scheduleRows);
+      if (error) return fail('Kunde inte spara schemat', error);
+    }
 
     const ruleRows = rules.map(r => ({
       family_id: familyId, member_id: memberId, subject_id: r.subject_id,
@@ -180,11 +192,17 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
       days_before: r.days_before, time_of_day: r.time_of_day, is_active: r.is_active,
       due_day: r.due_day || null,
     }));
-    await supabase.from('school_rules').delete().eq('member_id', memberId);
+    { const { error } = await supabase.from('school_rules').delete().eq('member_id', memberId);
+      if (error) return fail('Kunde inte spara påminnelserna', error); }
     let savedRules = [];
-    if (ruleRows.length > 0) { const { data } = await supabase.from('school_rules').insert(ruleRows).select(); savedRules = data || []; }
+    if (ruleRows.length > 0) {
+      const { data, error } = await supabase.from('school_rules').insert(ruleRows).select();
+      if (error) return fail('Kunde inte spara påminnelserna', error);
+      savedRules = data || [];
+    }
 
-    await supabase.from('chores').delete().eq('family_id', familyId).eq('assigned_to', memberId).not('reference_id', 'is', null);
+    { const { error } = await supabase.from('chores').delete().eq('family_id', familyId).eq('assigned_to', memberId).not('reference_id', 'is', null);
+      if (error) return fail('Kunde inte uppdatera påminnelse-sysslor', error); }
 
     const newChores = [];
     for (const rule of savedRules.filter(r => r.is_active)) {
@@ -219,7 +237,10 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
         }
       }
     }
-    if (newChores.length > 0) await supabase.from('chores').insert(newChores);
+    if (newChores.length > 0) {
+      const { error } = await supabase.from('chores').insert(newChores);
+      if (error) return fail('Kunde inte skapa påminnelse-sysslor', error);
+    }
 
     setSaving(false);
     if (onDone) onDone();
@@ -431,6 +452,7 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
           )}
         </div>
 
+        {saveErr && <div style={styles.saveErr}>{saveErr}</div>}
         <div style={styles.footer}>
           <button onClick={() => setStep(1)} style={styles.backBtn}><ChevronLeft size={18} /> Tillbaka</button>
           <div style={{ flex: 1 }} />
@@ -490,4 +512,5 @@ const styles = {
   nextBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '12px 24px', borderRadius: 12, border: 'none', background: C.primary, color: '#fff', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', minHeight: 48 },
   backBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '10px 16px', borderRadius: 12, border: `1.5px solid ${C.border}`, background: C.bgCard, color: C.text, fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', minHeight: 44 },
   doneBtn: { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '12px 24px', borderRadius: 12, border: 'none', background: C.success, color: '#fff', fontSize: F.sizes.md, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', minHeight: 48 },
+  saveErr: { position: 'fixed', bottom: 128, left: 16, right: 16, zIndex: 51, padding: '10px 14px', background: C.error, color: '#fff', borderRadius: 12, fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading, textAlign: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.2)' },
 };

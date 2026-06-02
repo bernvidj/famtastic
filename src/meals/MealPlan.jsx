@@ -41,6 +41,12 @@ export function MealPlan({ familyId, member, members, onGenerateShopping, stacke
   const [pickingDay, setPickingDay] = useState(null);
   const [editingMeal, setEditingMeal] = useState(null);
   const [quickText, setQuickText] = useState('');
+  const [errMsg, setErrMsg] = useState(null);
+
+  function showErr(msg) {
+    setErrMsg(msg);
+    setTimeout(() => setErrMsg(null), 4000);
+  }
 
   const weekDates = getWeekDates(weekOffset);
   const weekNum = getWeekNumber(weekDates[0]);
@@ -69,11 +75,10 @@ export function MealPlan({ familyId, member, members, onGenerateShopping, stacke
 
   async function assignMeal(dateStr, meal) {
     const existing = getPlanForDate(dateStr);
-    if (existing) {
-      await supabase.from('meal_plan').update({ meal_id: meal.id, free_text: null }).eq('id', existing.id);
-    } else {
-      await supabase.from('meal_plan').insert({ family_id: familyId, plan_date: dateStr, slot: 'dinner', meal_id: meal.id, free_text: null });
-    }
+    const { error } = existing
+      ? await supabase.from('meal_plan').update({ meal_id: meal.id, free_text: null }).eq('id', existing.id)
+      : await supabase.from('meal_plan').insert({ family_id: familyId, plan_date: dateStr, slot: 'dinner', meal_id: meal.id, free_text: null });
+    if (error) { showErr('Kunde inte spara måltiden: ' + error.message); return; }
     setPickingDay(null);
     loadData();
   }
@@ -81,11 +86,10 @@ export function MealPlan({ familyId, member, members, onGenerateShopping, stacke
   async function assignFreeText(dateStr) {
     if (!quickText.trim()) return;
     const existing = getPlanForDate(dateStr);
-    if (existing) {
-      await supabase.from('meal_plan').update({ meal_id: null, free_text: quickText.trim() }).eq('id', existing.id);
-    } else {
-      await supabase.from('meal_plan').insert({ family_id: familyId, plan_date: dateStr, slot: 'dinner', meal_id: null, free_text: quickText.trim() });
-    }
+    const { error } = existing
+      ? await supabase.from('meal_plan').update({ meal_id: null, free_text: quickText.trim() }).eq('id', existing.id)
+      : await supabase.from('meal_plan').insert({ family_id: familyId, plan_date: dateStr, slot: 'dinner', meal_id: null, free_text: quickText.trim() });
+    if (error) { showErr('Kunde inte spara måltiden: ' + error.message); return; }
     setQuickText('');
     setPickingDay(null);
     loadData();
@@ -93,7 +97,11 @@ export function MealPlan({ familyId, member, members, onGenerateShopping, stacke
 
   async function removePlan(dateStr) {
     const existing = getPlanForDate(dateStr);
-    if (existing) { await supabase.from('meal_plan').delete().eq('id', existing.id); loadData(); }
+    if (existing) {
+      const { error } = await supabase.from('meal_plan').delete().eq('id', existing.id);
+      if (error) { showErr('Kunde inte ta bort måltiden: ' + error.message); return; }
+      loadData();
+    }
   }
 
   async function randomMeal(dateStr) {
@@ -105,28 +113,29 @@ export function MealPlan({ familyId, member, members, onGenerateShopping, stacke
   }
 
   async function handleSaveMeal(data) {
-    if (editingMeal && editingMeal !== 'new' && editingMeal.id) {
-      await supabase.from('meals').update(data).eq('id', editingMeal.id);
-    } else {
-      await supabase.from('meals').insert(data);
-    }
+    const { error } = (editingMeal && editingMeal !== 'new' && editingMeal.id)
+      ? await supabase.from('meals').update(data).eq('id', editingMeal.id)
+      : await supabase.from('meals').insert(data);
+    if (error) { showErr('Kunde inte spara receptet: ' + error.message); return; }
     setEditingMeal(null);
     loadData();
   }
 
   async function handleDeleteMeal(mealId) {
-    await supabase.from('meals').delete().eq('id', mealId);
+    const { error } = await supabase.from('meals').delete().eq('id', mealId);
+    if (error) { showErr('Kunde inte ta bort receptet: ' + error.message); return; }
     setEditingMeal(null);
     loadData();
   }
 
   async function handleAddFromTemplate(template) {
-    await supabase.from('meals').insert({
+    const { error } = await supabase.from('meals').insert({
       family_id: familyId, title: template.title, description: template.description || '',
       tags: Array.isArray(template.tags) ? template.tags : [],
       ingredients: Array.isArray(template.ingredients) ? template.ingredients : [],
       recipe_url: template.recipe_url || '', recipe_notes: '', rating: 0, created_by: member.id,
     });
+    if (error) { showErr('Kunde inte lägga till receptet: ' + error.message); return; }
     loadData();
   }
 
@@ -138,6 +147,7 @@ export function MealPlan({ familyId, member, members, onGenerateShopping, stacke
   return (
     <div style={{ ...styles.page, ...(stacked && { minHeight: 'auto', paddingBottom: 0 }) }}>
       <BgShapes variant="meals" />
+      {errMsg && <div style={styles.errToast}>{errMsg}</div>}
       <div style={styles.headerZone}>
         {/* Header */}
         <div style={styles.header}>
@@ -270,6 +280,12 @@ export function MealPlan({ familyId, member, members, onGenerateShopping, stacke
 
 const styles = {
   page: { minHeight: '100vh', background: C.bg, fontFamily: F.body, position: 'relative', paddingBottom: 'calc(90px + env(safe-area-inset-bottom, 0px))' },
+  errToast: {
+    position: 'fixed', top: 16, left: 16, right: 16, maxWidth: 480, margin: '0 auto',
+    background: C.error, color: '#fff', padding: '12px 16px', borderRadius: 12,
+    fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading,
+    zIndex: 300, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', textAlign: 'center',
+  },
   headerZone: {
     position: 'sticky',
     top: 52,
