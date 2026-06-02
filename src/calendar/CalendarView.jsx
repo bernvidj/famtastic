@@ -171,22 +171,27 @@ export function CalendarView({ familyId, member, members }) {
   async function handleSave() {
     if (!form.title.trim() || saving) return;
     setSaving(true); setSaveError('');
-    const data = {
-      family_id: familyId, title: form.title.trim(),
-      description: form.description.trim() || null,
-      event_date: form.event_date,
-      start_time: form.start_time || null, end_time: form.end_time || null,
-      category: form.category, member_ids: form.member_ids,
-      color: form.color || null, is_recurring: form.is_recurring,
-      recurrence_rule: form.is_recurring ? form.recurrence_rule : null,
-      created_by: member.id,
-    };
-    const { error } = (editing && editing !== 'new' && editing.id)
-      ? await supabase.from('calendar_events').update(data).eq('id', editing.id)
-      : await supabase.from('calendar_events').insert(data);
+    const editingId = (editing && editing !== 'new' && editing.id) ? editing.id : null;
+    // SECURITY DEFINER-RPC istället för direkt tabellåtkomst — fungerar för
+    // vilken aktiv förälder som helst, även om auth-sessionen är utgången
+    // (kalender-RLS:en kräver annars en levande, länkad auth.uid()).
+    const { error } = await supabase.rpc('parent_upsert_calendar_event', {
+      p_family_id:       familyId,
+      p_member_id:       member.id,
+      p_title:           form.title.trim(),
+      p_event_date:      form.event_date,
+      p_description:     form.description.trim() || null,
+      p_start_time:      form.start_time || null,
+      p_end_time:        form.end_time || null,
+      p_category:        form.category,
+      p_member_ids:      form.member_ids,
+      p_color:           form.color || null,
+      p_is_recurring:    form.is_recurring,
+      p_recurrence_rule: form.is_recurring ? form.recurrence_rule : null,
+      p_event_id:        editingId,
+    });
     setSaving(false);
     if (error) {
-      // Visa felet istället för att tyst stänga modalen (t.ex. RLS-blockering).
       setSaveError('Kunde inte spara händelsen: ' + error.message);
       return;
     }
@@ -196,7 +201,11 @@ export function CalendarView({ familyId, member, members }) {
 
   async function handleDelete(eventId) {
     setSaveError('');
-    const { error } = await supabase.from('calendar_events').delete().eq('id', eventId);
+    const { error } = await supabase.rpc('parent_delete_calendar_event', {
+      p_family_id: familyId,
+      p_member_id: member.id,
+      p_event_id:  eventId,
+    });
     if (error) {
       setSaveError('Kunde inte ta bort händelsen: ' + error.message);
       return;
