@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
-import { C, F } from '../data';
+import { C, F, todayStr } from '../data';
 import { unlockAchievement } from '../achievements/unlock';
 
 const MOODS = [
@@ -20,17 +20,19 @@ export function MoodCard({ familyId, member, members, onAchievement }) {
   const [picking, setPicking] = useState(false);
   const [saving,  setSaving]  = useState(false);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Lokalt datum (samma som resten av appen) — inte UTC, annars hamnar
+  // stämningen på fel dag sent på kvällen i svensk tid.
+  const today = todayStr();
 
   const load = useCallback(async () => {
     const { data } = await supabase.rpc('get_family_moods', {
       p_family_id: familyId,
-      p_date:      todayStr,
+      p_date:      today,
     });
     const map = {};
     (data || []).forEach(row => { map[row.member_id] = row.mood; });
     setMoods(map);
-  }, [familyId, todayStr]);
+  }, [familyId, today]);
 
   useEffect(() => { load(); }, [load]);
 

@@ -43,6 +43,12 @@ export function SchoolView({ familyId, member, members }) {
   const [eventForm, setEventForm] = useState({ title: '', event_date: '', period: 'full_day' });
   const [addingExam, setAddingExam] = useState(null);
   const [examForm, setExamForm] = useState({ subject_id: '', title: '', exam_date: '', study_days: 2, notes: '' });
+  const [errMsg, setErrMsg] = useState(null);
+
+  function showErr(msg) {
+    setErrMsg(msg);
+    setTimeout(() => setErrMsg(null), 4000);
+  }
 
   const today = todayStr();
   const todayDow = (() => { const d = new Date().getDay(); return d === 0 || d === 6 ? 1 : d; })();
@@ -111,11 +117,12 @@ export function SchoolView({ familyId, member, members }) {
 
   async function saveSpecialEvent() {
     if (!addingEvent || !eventForm.title.trim() || !eventForm.event_date) return;
-    await supabase.from('school_special_events').insert({
+    const { error } = await supabase.from('school_special_events').insert({
       family_id: familyId, member_id: addingEvent.id,
       event_date: eventForm.event_date, period: eventForm.period,
       title: eventForm.title.trim(), icon: '🎒', replaces_schedule: true,
     });
+    if (error) { showErr('Kunde inte spara händelsen: ' + error.message); return; }
     setAddingEvent(null);
     setEventForm({ title: '', event_date: '', period: 'full_day' });
     loadData();
@@ -133,7 +140,7 @@ export function SchoolView({ familyId, member, members }) {
       notes: examForm.notes || null,
     }).select().single();
 
-    if (error || !examData) return;
+    if (error || !examData) { showErr('Kunde inte spara provet: ' + (error?.message || 'okänt fel')); return; }
 
     const studyDays = Math.max(1, Math.min(7, examForm.study_days));
     const examDate = new Date(examForm.exam_date + 'T12:00:00');
@@ -155,7 +162,8 @@ export function SchoolView({ familyId, member, members }) {
     }
 
     if (choresToInsert.length > 0) {
-      await supabase.from('chores').insert(choresToInsert);
+      const { error: choreErr } = await supabase.from('chores').insert(choresToInsert);
+      if (choreErr) { showErr('Provet sparades men pluggsysslorna kunde inte skapas: ' + choreErr.message); }
     }
 
     setAddingExam(null);
@@ -165,17 +173,25 @@ export function SchoolView({ familyId, member, members }) {
 
   async function deleteExam(examId) {
     if (!window.confirm('Ta bort provet och kopplade pluggsysslor?')) return;
-    await supabase.from('chores').delete().eq('family_id', familyId).eq('reference_id', examId);
-    await supabase.from('school_exams').delete().eq('id', examId);
+    const { error: cErr } = await supabase.from('chores').delete().eq('family_id', familyId).eq('reference_id', examId);
+    if (cErr) { showErr('Kunde inte ta bort pluggsysslorna: ' + cErr.message); return; }
+    const { error } = await supabase.from('school_exams').delete().eq('id', examId);
+    if (error) { showErr('Kunde inte ta bort provet: ' + error.message); return; }
     loadData();
   }
 
   async function handleDeleteSchedule(child) {
     if (!window.confirm(`Ta bort ${child.name}s hela schema? Kopplade påminnelser och auto-sysslor tas också bort.`)) return;
-    await supabase.from('chores').delete().eq('family_id', familyId).eq('assigned_to', child.id).not('reference_id', 'is', null);
-    await supabase.from('school_rules').delete().eq('member_id', child.id);
-    await supabase.from('school_schedule').delete().eq('member_id', child.id);
-    await supabase.from('school_special_events').delete().eq('member_id', child.id);
+    const steps = [
+      () => supabase.from('chores').delete().eq('family_id', familyId).eq('assigned_to', child.id).not('reference_id', 'is', null),
+      () => supabase.from('school_rules').delete().eq('member_id', child.id),
+      () => supabase.from('school_schedule').delete().eq('member_id', child.id),
+      () => supabase.from('school_special_events').delete().eq('member_id', child.id),
+    ];
+    for (const step of steps) {
+      const { error } = await step();
+      if (error) { showErr('Kunde inte ta bort schemat helt: ' + error.message); break; }
+    }
     loadData();
   }
 
@@ -194,6 +210,7 @@ export function SchoolView({ familyId, member, members }) {
   return (
     <div style={styles.page}>
       <BgShapes />
+      {errMsg && <div style={styles.errToast}>{errMsg}</div>}
 
       <div style={{ position: 'relative', zIndex: 1 }}>
         <div style={styles.headerRow}>
@@ -443,6 +460,12 @@ export function SchoolView({ familyId, member, members }) {
 
 const styles = {
   page: { background: C.bg, fontFamily: F.body, position: 'relative', overflow: 'hidden', minHeight: '100vh' },
+  errToast: {
+    position: 'fixed', top: 16, left: 16, right: 16, maxWidth: 480, margin: '0 auto',
+    background: C.error, color: '#fff', padding: '12px 16px', borderRadius: 12,
+    fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading,
+    zIndex: 300, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', textAlign: 'center',
+  },
   headerRow: { padding: '16px 16px 8px' },
   pageTitle: { fontFamily: F.heading, fontSize: F.sizes.xl, fontWeight: F.weights.extra, color: C.text, margin: 0 },
   dayPicker: { display: 'flex', gap: 6, padding: '4px 16px 12px' },

@@ -115,7 +115,7 @@ export function ChildCalendar({
     const afternoonSpecial = daySpecials.find(se => se.period === 'afternoon');
 
     const dayLessons = schedule
-      .filter(sl => sl.day_of_week === dow)
+      .filter(sl => sl.day_of_week === dow && (!sl.member_id || sl.member_id === memberId))
       .sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
 
     return dayLessons.map(sl => {

@@ -4,7 +4,7 @@
 // Förälder bekräftar → Sparkonto uppdateras
 // ============================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F, S, formatKr } from '../data';
 import { Celebration } from '../Celebrations';
@@ -24,8 +24,8 @@ function weekMonday() {
 }
 
 export function ChildMoneyView({ familyId, memberId, transactions, goals, familyGoals, members, onReload }) {
-  // Ladda om färsk data varje gång vyn öppnas
-  useEffect(() => { onReload(); }, []); // eslint-disable-line
+  // OBS: ChildApp laddar om pengar-data när tabben öppnas (page === 'money'),
+  // så ingen egen mount-reload här — annars dubbla RPC-anrop.
 
   const [mode,          setMode]          = useState(null); // null|'request'|'done'|'new_goal'
   const [reqType,       setReqType]       = useState(null); // 'saving'|'swish'

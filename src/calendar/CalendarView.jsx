@@ -81,6 +81,8 @@ export function CalendarView({ familyId, member, members }) {
   const [selectedDate, setSelectedDate] = useState(null);
   const [editing,      setEditing]      = useState(null);
   const [form,         setForm]         = useState(EMPTY_EVENT);
+  const [saving,       setSaving]       = useState(false);
+  const [saveError,    setSaveError]    = useState('');
 
   const weekDates = getWeekDates(weekOffset);
   const weekNum   = getWeekNumber(weekDates[0]);
@@ -141,9 +143,10 @@ export function CalendarView({ familyId, member, members }) {
     return m?.color || C.secondary;
   }
 
-  function openNewEvent(dateStr) { setForm({ ...EMPTY_EVENT, event_date: dateStr }); setEditing('new'); }
+  function openNewEvent(dateStr) { setForm({ ...EMPTY_EVENT, event_date: dateStr }); setSaveError(''); setEditing('new'); }
 
   function openEditEvent(event) {
+    setSaveError('');
     setForm({
       title: event.title || '', description: event.description || '',
       event_date: event.event_date || '',
@@ -166,28 +169,47 @@ export function CalendarView({ familyId, member, members }) {
   }
 
   async function handleSave() {
-    if (!form.title.trim()) return;
-    const data = {
-      family_id: familyId, title: form.title.trim(),
-      description: form.description.trim() || null,
-      event_date: form.event_date,
-      start_time: form.start_time || null, end_time: form.end_time || null,
-      category: form.category, member_ids: form.member_ids,
-      color: form.color || null, is_recurring: form.is_recurring,
-      recurrence_rule: form.is_recurring ? form.recurrence_rule : null,
-      created_by: member.id,
-    };
-    if (editing && editing !== 'new' && editing.id) {
-      await supabase.from('calendar_events').update(data).eq('id', editing.id);
-    } else {
-      await supabase.from('calendar_events').insert(data);
+    if (!form.title.trim() || saving) return;
+    setSaving(true); setSaveError('');
+    const editingId = (editing && editing !== 'new' && editing.id) ? editing.id : null;
+    // SECURITY DEFINER-RPC istället för direkt tabellåtkomst — fungerar för
+    // vilken aktiv förälder som helst, även om auth-sessionen är utgången
+    // (kalender-RLS:en kräver annars en levande, länkad auth.uid()).
+    const { error } = await supabase.rpc('parent_upsert_calendar_event', {
+      p_family_id:       familyId,
+      p_member_id:       member.id,
+      p_title:           form.title.trim(),
+      p_event_date:      form.event_date,
+      p_description:     form.description.trim() || null,
+      p_start_time:      form.start_time || null,
+      p_end_time:        form.end_time || null,
+      p_category:        form.category,
+      p_member_ids:      form.member_ids,
+      p_color:           form.color || null,
+      p_is_recurring:    form.is_recurring,
+      p_recurrence_rule: form.is_recurring ? form.recurrence_rule : null,
+      p_event_id:        editingId,
+    });
+    setSaving(false);
+    if (error) {
+      setSaveError('Kunde inte spara händelsen: ' + error.message);
+      return;
     }
     setEditing(null);
     loadData();
   }
 
   async function handleDelete(eventId) {
-    await supabase.from('calendar_events').delete().eq('id', eventId);
+    setSaveError('');
+    const { error } = await supabase.rpc('parent_delete_calendar_event', {
+      p_family_id: familyId,
+      p_member_id: member.id,
+      p_event_id:  eventId,
+    });
+    if (error) {
+      setSaveError('Kunde inte ta bort händelsen: ' + error.message);
+      return;
+    }
     setEditing(null);
     loadData();
   }
@@ -454,13 +476,17 @@ export function CalendarView({ familyId, member, members }) {
               <input type="text" placeholder="Extra info..." value={form.description} onChange={e => setForm(prev => ({ ...prev, description: e.target.value }))} style={S.input} />
             </div>
 
+            {saveError && (
+              <div style={styles.saveError}>{saveError}</div>
+            )}
+
             <div style={styles.modalFooter}>
               {editing !== 'new' && editing.id && (
                 <button onClick={() => handleDelete(editing.id)} style={styles.deleteBtn}><Trash2 size={16} /> Ta bort</button>
               )}
               <div style={{ flex: 1 }} />
-              <button onClick={handleSave} disabled={!form.title.trim() || !form.event_date} style={{ ...S.button, ...S.buttonPrimary, opacity: form.title.trim() && form.event_date ? 1 : 0.5 }}>
-                <Save size={16} /> {editing === 'new' ? 'Skapa' : 'Spara'}
+              <button onClick={handleSave} disabled={saving || !form.title.trim() || !form.event_date} style={{ ...S.button, ...S.buttonPrimary, opacity: !saving && form.title.trim() && form.event_date ? 1 : 0.5 }}>
+                <Save size={16} /> {saving ? 'Sparar...' : editing === 'new' ? 'Skapa' : 'Spara'}
               </button>
             </div>
           </div>
@@ -539,4 +565,5 @@ const styles = {
   dayPickBtn: { flex: 1, padding: '8px 2px', borderRadius: 8, fontSize: F.sizes.xs, fontWeight: F.weights.bold, fontFamily: F.heading, cursor: 'pointer', textAlign: 'center' },
   modalFooter: { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 20px env(safe-area-inset-bottom, 12px)', borderTop: `1px solid ${C.borderLight}` },
   deleteBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, padding: '8px 14px', borderRadius: 10, border: 'none', background: C.errorLight, color: C.error, fontSize: F.sizes.sm, fontWeight: F.weights.semi, cursor: 'pointer' },
+  saveError: { margin: '0 20px', padding: '10px 14px', background: C.errorLight, border: `1.5px solid ${C.error}`, borderRadius: 10, color: C.error, fontSize: F.sizes.sm, fontFamily: F.heading },
 };

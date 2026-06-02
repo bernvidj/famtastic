@@ -164,8 +164,19 @@ export function ChildApp({ familyId, member, onLogout }) {
   const weekMonday = (() => {
     const d = new Date(); d.setDate(d.getDate() - (d.getDay() || 7) + 1); d.setHours(0,0,0,0); return d;
   })();
+  // "Intjänat denna vecka" — samma definition som ChildMoneyView (veckopeng + bonus)
+  // så hemvyn och plånboken visar samma siffra.
   const weekEarned = transactions
-    .filter(tx => tx.type === 'chore_bonus' && new Date(tx.created_at) >= weekMonday)
+    .filter(tx =>
+      (tx.type === 'base_allowance' || tx.type === 'chore_bonus') &&
+      tx.amount > 0 &&
+      new Date(tx.created_at) >= weekMonday
+    )
+    .reduce((s, tx) => s + tx.amount, 0);
+  // Veckans syssla-bonus (öre) från transaktionsliggaren — samma källa som plånboken,
+  // istället för completions.points_earned, så barnet ser samma bonus överallt.
+  const weekBonus = transactions
+    .filter(tx => tx.type === 'chore_bonus' && tx.amount > 0 && new Date(tx.created_at) >= weekMonday)
     .reduce((s, tx) => s + tx.amount, 0);
   const personalGoals = goals.filter(g => !g.is_family_goal);
   const familyGoals   = goals.filter(g => g.is_family_goal);
@@ -534,6 +545,7 @@ export function ChildApp({ familyId, member, onLogout }) {
           isCompleted={isCompleted}
           weekDone={weekDone}
           weekTotal={weekTotal}
+          weekBonus={weekBonus}
           toggleChore={toggleChore}
           claimPoolChore={claimPoolChore}
         />

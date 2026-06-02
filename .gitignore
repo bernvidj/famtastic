@@ -1,0 +1,16 @@
+# dependencies
+/node_modules
+
+# production build
+/build
+
+# generated lockfile (not tracked in this repo)
+/package-lock.json
+
+# misc
+.DS_Store
+*.log
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

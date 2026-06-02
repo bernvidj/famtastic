@@ -117,7 +117,11 @@ export function ChatView({ familyId, member, members, moodEnabled, pollEnabled, 
         event: 'INSERT', schema: 'public', table: 'family_messages',
         filter: `family_id=eq.${familyId}`,
       }, (payload) => {
-        setMessages(prev => [...prev, payload.new]);
+        // Dedupe — meddelandet kan redan finnas via poll/handleSend (annars
+        // dubbla bubblor + dubbla React-keys).
+        setMessages(prev =>
+          prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new]
+        );
       })
       .subscribe();
     return () => supabase.removeChannel(channel);

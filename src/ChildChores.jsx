@@ -4,23 +4,20 @@
 // ============================================
 
 import React from 'react';
-import { C, F, S } from './data';
+import { C, F, S, formatKr } from './data';
 import { CheckCircle, Star } from 'lucide-react';
 
 export function ChildChores({
   member, todayChores, poolChores, completions,
-  isCompleted, weekDone, weekTotal, toggleChore, claimPoolChore,
+  isCompleted, weekDone, weekTotal, weekBonus = 0, toggleChore, claimPoolChore,
 }) {
-  const weekBonus = completions
-    .filter(c => c.member_id === member.id)
-    .reduce((sum, c) => sum + (c.points_earned || 0), 0);
-
+  // weekBonus kommer som öre från ChildApp (samma källa som plånboken).
   return (
     <div style={styles.content}>
       <h1 style={styles.pageTitle}>Mina sysslor</h1>
       <p style={styles.subtitle}>
         {completions.filter(c => c.member_id === member.id).length} gjorda denna vecka
-        {weekBonus > 0 && ` · ${weekBonus} kr bonus`}
+        {weekBonus > 0 && ` · ${formatKr(weekBonus)} bonus`}
       </p>
 
       {todayChores.length === 0 && poolChores.length === 0 ? (

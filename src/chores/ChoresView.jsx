@@ -175,17 +175,22 @@ export function ChoresView({ familyId, member, members, stacked }) {
   }
 
   async function handleSave(data) {
+    let error;
     if (editing && editing !== 'new' && editing.id) {
-      await supabase.from('chores').update(data).eq('id', editing.id);
+      ({ error } = await supabase.from('chores').update(data).eq('id', editing.id));
     } else {
-      await supabase.from('chores').insert(data);
-      if (data.assigned_to) {
+      ({ error } = await supabase.from('chores').insert(data));
+      if (!error && data.assigned_to) {
         sendPushToMember({
           memberId: data.assigned_to,
           title:    `📋 Ny syssla tilldelad`,
           body:     data.title || 'Kolla dina sysslor!',
         });
       }
+    }
+    if (error) {
+      showToast('❌ Kunde inte spara: ' + error.message);
+      return;
     }
     setEditing(null);
     loadData();

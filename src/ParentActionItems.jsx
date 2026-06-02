@@ -39,14 +39,23 @@ export function ParentActionItems({ familyId, members, onUpdate }) {
     const pending = (data || []).filter(tx => !tx.description?.includes('[BEKRÄFTAD]'));
     const grouped = [];
 
+    // Gruppera per familjemål (savings_goal_id) — annars slås flera olika mål
+    // ihop till en rad med fel namn och en kombinerad summa.
     const fgItems = pending.filter(tx => tx.type === 'family_goal');
-    if (fgItems.length > 0) {
+    const fgByGoal = {};
+    for (const tx of fgItems) {
+      const key = tx.savings_goal_id || 'general';
+      if (!fgByGoal[key]) fgByGoal[key] = { txs: [], amount: 0, desc: tx.description };
+      fgByGoal[key].txs.push(tx);
+      fgByGoal[key].amount += Math.abs(tx.amount);
+    }
+    for (const group of Object.values(fgByGoal)) {
       grouped.push({
         type: 'family_goal',
-        txIds: fgItems.map(tx => tx.id),
-        amount: fgItems.reduce((s, tx) => s + Math.abs(tx.amount), 0),
-        memberIds: [...new Set(fgItems.map(tx => tx.member_id))],
-        label: fgItems[0]?.description?.replace('Bidrag till ', '') || 'Familjemål',
+        txIds: group.txs.map(tx => tx.id),
+        amount: group.amount,
+        memberIds: [...new Set(group.txs.map(tx => tx.member_id))],
+        label: group.desc?.replace('Bidrag till ', '') || 'Familjemål',
       });
     }
 

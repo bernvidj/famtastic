@@ -32,6 +32,12 @@ export function ShoppingView({ familyId, member, members, stacked }) {
   const [showNewList,  setShowNewList]  = useState(false);
   const [pickingItem,  setPickingItem]  = useState(null);   // item currently being status-picked
   const [confirming,   setConfirming]   = useState(false);
+  const [errMsg,       setErrMsg]       = useState(null);
+
+  function showErr(msg) {
+    setErrMsg(msg);
+    setTimeout(() => setErrMsg(null), 4000);
+  }
 
   const isParent     = member.role === 'admin' || member.role === 'parent';
   const activeItems  = items.filter(i => !i.item_status || i.item_status === 'active');
@@ -75,47 +81,50 @@ export function ShoppingView({ familyId, member, members, stacked }) {
 
   async function createList() {
     if (!newListName.trim()) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('shopping_lists')
       .insert({ family_id: familyId, name: newListName.trim(), is_default: lists.length === 0 })
       .select().single();
-    if (data) {
-      setSelectedList(data.id);
-      setNewListName('');
-      setShowNewList(false);
-      loadLists();
-    }
+    if (error || !data) { showErr('Kunde inte skapa listan: ' + (error?.message || 'okänt fel')); return; }
+    setSelectedList(data.id);
+    setNewListName('');
+    setShowNewList(false);
+    loadLists();
   }
 
   async function deleteList(listId) {
-    await supabase.from('shopping_lists').delete().eq('id', listId);
+    const { error } = await supabase.from('shopping_lists').delete().eq('id', listId);
+    if (error) { showErr('Kunde inte ta bort listan: ' + error.message); return; }
     setSelectedList(null);
     loadLists();
   }
 
   async function handleAddItem({ name, quantity, category }) {
-    await supabase.from('shopping_items').insert({
+    const { error } = await supabase.from('shopping_items').insert({
       list_id: selectedList,
       family_id: familyId,
       name, quantity, category,
       added_by: member.id,
       item_status: 'active',
     });
+    if (error) { showErr('Kunde inte lägga till varan: ' + error.message); return; }
     setShowAddItem(false);
     loadItems();
   }
 
   // Set status on a single item
   async function handleSetStatus(item, status) {
-    await supabase.from('shopping_items')
+    const { error } = await supabase.from('shopping_items')
       .update({ item_status: status })
       .eq('id', item.id);
+    if (error) { showErr('Kunde inte uppdatera varan: ' + error.message); return; }
     setPickingItem(null);
     loadItems();
   }
 
   async function handleRemove(itemId) {
-    await supabase.from('shopping_items').delete().eq('id', itemId);
+    const { error } = await supabase.from('shopping_items').delete().eq('id', itemId);
+    if (error) { showErr('Kunde inte ta bort varan: ' + error.message); return; }
     setPickingItem(null);
     loadItems();
   }
@@ -123,11 +132,12 @@ export function ShoppingView({ familyId, member, members, stacked }) {
   // Confirm shopping trip done — delete all non-active items
   async function handleConfirmDone() {
     setConfirming(true);
-    await supabase.from('shopping_items')
+    const { error } = await supabase.from('shopping_items')
       .delete()
       .eq('list_id', selectedList)
       .neq('item_status', 'active');
     setConfirming(false);
+    if (error) { showErr('Kunde inte rensa varorna: ' + error.message); return; }
     loadItems();
     loadLists();
   }
@@ -141,6 +151,7 @@ export function ShoppingView({ familyId, member, members, stacked }) {
   return (
     <div style={{ ...styles.page, ...(stacked && { minHeight: 'auto', paddingBottom: 0 }) }}>
       <BgShapes variant="shopping" />
+      {errMsg && <div style={styles.errToast}>{errMsg}</div>}
 
       {/* ── Status-picker bottom sheet ── */}
       {pickingItem && (
@@ -342,6 +353,12 @@ const styles = {
     fontFamily: F.body,
     position: 'relative',
     paddingBottom: 'calc(90px + env(safe-area-inset-bottom, 0px))',
+  },
+  errToast: {
+    position: 'fixed', top: 16, left: 16, right: 16, maxWidth: 480, margin: '0 auto',
+    background: C.error, color: '#fff', padding: '12px 16px', borderRadius: 12,
+    fontSize: F.sizes.sm, fontWeight: F.weights.bold, fontFamily: F.heading,
+    zIndex: 300, boxShadow: '0 4px 16px rgba(0,0,0,0.2)', textAlign: 'center',
   },
   // ── Overlay + picker sheet ──
   overlay: {
