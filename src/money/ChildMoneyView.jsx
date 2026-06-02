@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F, S, formatKr } from '../data';
 import { Celebration } from '../Celebrations';
+import { Portal } from '../Portal';
 import {
   Wallet, PiggyBank, Smartphone, Clock,
   RotateCcw, ArrowLeft, Check, TrendingUp,
@@ -487,6 +488,7 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
 
       {/* ══ MODAL: TA BORT MÅL ══════════════════════════════════════════════ */}
       {deleteGoalId && (
+        <Portal>
         <div style={styles.overlay} onClick={() => setDeleteGoalId(null)}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
             <span style={{ fontSize: 40, display: 'block', textAlign: 'center', marginBottom: 8 }}>🗑️</span>
@@ -502,6 +504,7 @@ export function ChildMoneyView({ familyId, memberId, transactions, goals, family
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </div>
   );

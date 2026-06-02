@@ -12,6 +12,7 @@ import { supabase } from '../supabaseClient';
 import { C, F, S, formatKr } from '../data';
 import { FamilyGoalCard } from './FamilyGoalCard';
 import { CreateFamilyGoal } from './CreateFamilyGoal';
+import { Portal } from '../Portal';
 import {
   CheckCircle, AlertCircle, X, RotateCcw,
   ChevronDown, ChevronUp, Target,
@@ -594,6 +595,7 @@ export function MoneyView({ familyId, member, members, stacked }) {
 
       {/* ══ MODAL: LÄGG TILL TRANSAKTION ════════════════════════════════════ */}
       {modal && (
+        <Portal>
         <div style={styles.overlay} onClick={closeModal}>
           <div style={styles.sheet} onClick={e => e.stopPropagation()}>
             <div style={styles.sheetHandle} />
@@ -657,10 +659,13 @@ export function MoneyView({ familyId, member, members, stacked }) {
             </button>
           </div>
         </div>
+        </Portal>
       )}
 
       {showCreateGoal && (
-        <CreateFamilyGoal familyId={familyId} onCreated={loadAll} onClose={() => setShowCreateGoal(false)} />
+        <Portal>
+          <CreateFamilyGoal familyId={familyId} onCreated={loadAll} onClose={() => setShowCreateGoal(false)} />
+        </Portal>
       )}
     </div>
   );

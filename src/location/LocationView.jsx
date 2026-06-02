@@ -10,6 +10,7 @@ import { C, F, TOPBAR_H } from '../data';
 import { FamilyMap } from './FamilyMap';
 import { MemberLocationCard } from './MemberLocationCard';
 import { PlacesEditor } from './PlacesEditor';
+import { Portal } from '../Portal';
 import { sendPushToFamily } from '../notifications/sendPush';
 
 export function LocationView({ familyId, member, members }) {
@@ -220,12 +221,14 @@ export function LocationView({ familyId, member, members }) {
       <div style={{ height: 90 }} />
 
       {showPlaces && (
+        <Portal>
         <PlacesEditor
           familyId={familyId}
           member={member}
           places={places}
           onClose={() => { setShowPlaces(false); load(); }}
         />
+        </Portal>
       )}
     </div>
   );

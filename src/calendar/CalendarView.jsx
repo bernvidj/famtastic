@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { C, F, S, getWeekNumber, todayStr, safeArray } from '../data';
+import { Portal } from '../Portal';
 import { ChevronLeft, ChevronRight, Plus, X, Save, Clock, Users, CheckSquare, Trash2, Repeat } from 'lucide-react';
 
 const WEEKDAYS_SHORT = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
@@ -410,6 +411,7 @@ export function CalendarView({ familyId, member, members }) {
 
       {/* Event editor modal */}
       {editing && (
+        <Portal>
         <div style={styles.overlay}>
           <div style={styles.modal}>
             <div style={styles.modalHeader}>
@@ -491,6 +493,7 @@ export function CalendarView({ familyId, member, members }) {
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </div>
   );
