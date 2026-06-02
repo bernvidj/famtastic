@@ -8,6 +8,7 @@ import { C, F, S, safeArray, getWeekNumber } from '../data';
 import { MealBank } from './MealBank';
 import { MealEditor } from './MealEditor';
 import { generateShoppingList } from './generateShoppingList';
+import { Portal } from '../Portal';
 import { ChevronLeft, ChevronRight, Plus, X, Shuffle, BookOpen, CalendarDays, ShoppingCart } from 'lucide-react';
 import { BgShapes } from '../BgShapes';
 
@@ -251,6 +252,7 @@ export function MealPlan({ familyId, member, members, onGenerateShopping, stacke
 
       {/* Meal picker modal */}
       {pickingDay && (
+        <Portal>
         <div style={styles.overlay}>
           <div style={styles.pickerModal}>
             <div style={styles.pickerHeader}>
@@ -271,12 +273,15 @@ export function MealPlan({ familyId, member, members, onGenerateShopping, stacke
               onSelect={meal => assignMeal(pickingDay, meal)} onEdit={null} onAddFromTemplate={handleAddFromTemplate} />
           </div>
         </div>
+        </Portal>
       )}
 
       {/* Meal editor modal */}
       {editingMeal && (
-        <MealEditor meal={editingMeal === 'new' ? null : editingMeal} familyId={familyId} memberId={member.id}
-          onSave={handleSaveMeal} onDelete={isParent ? handleDeleteMeal : null} onClose={() => setEditingMeal(null)} />
+        <Portal>
+          <MealEditor meal={editingMeal === 'new' ? null : editingMeal} familyId={familyId} memberId={member.id}
+            onSave={handleSaveMeal} onDelete={isParent ? handleDeleteMeal : null} onClose={() => setEditingMeal(null)} />
+        </Portal>
       )}
     </div>
   );

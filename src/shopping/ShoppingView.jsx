@@ -10,6 +10,7 @@ import { C, F, S, safeArray } from '../data';
 import { formatPrice, estimateListCost } from '../priceDb';
 import { ShoppingAddItem } from './ShoppingAddItem';
 import { ShoppingItemList } from './ShoppingItemList';
+import { Portal } from '../Portal';
 import { Plus, Trash2, RefreshCw } from 'lucide-react';
 import { BgShapes } from '../BgShapes';
 
@@ -155,6 +156,7 @@ export function ShoppingView({ familyId, member, members, stacked }) {
 
       {/* ── Status-picker bottom sheet ── */}
       {pickingItem && (
+        <Portal>
         <div style={styles.overlay} onClick={() => setPickingItem(null)}>
           <div style={styles.pickerSheet} onClick={e => e.stopPropagation()}>
             <p style={styles.pickerTitle}>{pickingItem.name}</p>
@@ -191,6 +193,7 @@ export function ShoppingView({ familyId, member, members, stacked }) {
             </button>
           </div>
         </div>
+        </Portal>
       )}
 
       <div style={styles.headerZone}>

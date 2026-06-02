@@ -7,6 +7,7 @@ import { supabase } from './supabaseClient';
 import { C, F, safeArray } from './data';
 import { Plus, BookOpen } from 'lucide-react';
 import { sendPushToFamily } from './notifications/sendPush';
+import { Portal } from './Portal';
 
 const WEEKDAYS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön'];
 
@@ -218,6 +219,7 @@ export function ChildCalendar({
 
       {/* ── Exam form modal ───────────────────────────────────────────────────── */}
       {showExamForm && (
+        <Portal>
         <div style={styles.overlay}>
           <div style={styles.modal}>
             <h3 style={styles.modalTitle}>📝 Lägg till prov</h3>
@@ -284,6 +286,7 @@ export function ChildCalendar({
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </div>
   );

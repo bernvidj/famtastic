@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { C, F, S, safeArray } from '../data';
 import { Search, Star, ExternalLink, BookOpen, Plus } from 'lucide-react';
 import { MealLibrary } from './MealLibrary';
+import { Portal } from '../Portal';
 
 export function MealBank({ meals, familyId, memberId, onSelect, onEdit, onAddFromTemplate }) {
   const [search, setSearch] = useState('');
@@ -161,11 +162,13 @@ export function MealBank({ meals, familyId, memberId, onSelect, onEdit, onAddFro
 
       {/* Library modal */}
       {showLibrary && (
+        <Portal>
         <MealLibrary
           familyId={familyId}
           onSelect={handleTemplateSelect}
           onClose={() => setShowLibrary(false)}
         />
+        </Portal>
       )}
     </div>
   );

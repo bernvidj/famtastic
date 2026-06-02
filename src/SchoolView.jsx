@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { C, F, S, todayStr, safeArray } from './data';
 import { SchoolSetup } from './SchoolSetup';
+import { Portal } from './Portal';
 import { Plus, Edit3, Calendar, Trash2, BookOpen } from 'lucide-react';
 
 const DAYS = [
@@ -355,6 +356,7 @@ export function SchoolView({ familyId, member, members }) {
 
       {/* Exam modal */}
       {addingExam && (
+        <Portal>
         <div style={styles.overlay}>
           <div style={styles.modal}>
             <h3 style={styles.modalTitle}>📝 Nytt prov — {addingExam.name}</h3>
@@ -414,10 +416,12 @@ export function SchoolView({ familyId, member, members }) {
             </div>
           </div>
         </div>
+        </Portal>
       )}
 
       {/* Special event modal */}
       {addingEvent && (
+        <Portal>
         <div style={styles.overlay}>
           <div style={styles.modal}>
             <h3 style={styles.modalTitle}>Specialdag för {addingEvent.name}</h3>
@@ -451,6 +455,7 @@ export function SchoolView({ familyId, member, members }) {
             </div>
           </div>
         </div>
+        </Portal>
       )}
 
       <div style={{ height: 80 }} />

@@ -10,6 +10,7 @@ import { C, F, S, todayStr, safeArray } from '../data';
 import { ChoreCard } from './ChoreCard';
 import { ChorePoolCard } from './ChorePoolCard';
 import { ChoreEditor } from './ChoreEditor';
+import { Portal } from '../Portal';
 import { Plus, List, CalendarDays, Trophy, HandMetal } from 'lucide-react';
 import { BgShapes } from '../BgShapes';
 import { sendPushToMember } from '../notifications/sendPush';
@@ -435,6 +436,7 @@ export function ChoresView({ familyId, member, members, stacked }) {
       <div style={{ height: 'calc(90px + env(safe-area-inset-bottom, 0px))' }} />
 
       {editing && (
+        <Portal>
         <ChoreEditor
           chore={editing === 'new' ? null : editing}
           members={members}
@@ -444,6 +446,7 @@ export function ChoresView({ familyId, member, members, stacked }) {
           onDelete={isParent ? handleDelete : null}
           onClose={() => setEditing(null)}
         />
+        </Portal>
       )}
     </div>
   );

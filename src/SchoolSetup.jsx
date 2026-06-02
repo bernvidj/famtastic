@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 import { C, F, S, safeArray } from './data';
 import { SchoolSlotModal } from './SchoolSlotModal';
+import { Portal } from './Portal';
 import { X, ChevronRight, ChevronLeft, Check, Plus, Trash2 } from 'lucide-react';
 
 const DAYS = [
@@ -336,6 +337,7 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
           })}
         </div>
 
+        <Portal>
         <SchoolSlotModal
           editingSlot={editingSlot}
           slotForm={slotForm}
@@ -344,6 +346,7 @@ export function SchoolSetup({ familyId, memberId, childName, onClose, onDone }) 
           onSave={saveSlot}
           onCancel={() => setEditingSlot(null)}
         />
+        </Portal>
 
         <div style={styles.footer}>
           <div style={{ flex: 1 }} />
