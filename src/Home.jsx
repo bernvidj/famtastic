@@ -20,6 +20,7 @@ function getWeekDates(offset) {
   const day = now.getDay() || 7;
   const monday = new Date(now);
   monday.setDate(now.getDate() - day + 1 + offset * 7);
+  monday.setHours(0, 0, 0, 0); // veckostart = lokal midnatt (annars läcker timmar in i veckofiltret)
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
@@ -103,15 +104,17 @@ export function Home({ familyId, member, members, onNavigate, onViewChild }) {
     setSchoolExams(examRes.data || []);
     const goals = goalRes.data || [];
     setSavingsGoals(goals);
-    const pMap = {};
-    for (const g of goals) {
-      const { data } = await supabase.rpc('get_family_goal_progress', { p_goal_id: g.id });
-      pMap[g.id] = data || 0;
-    }
-    setGoalProgress(pMap);
 
-    // Achievements summary per barn
-    const { data: achData } = await supabase.rpc('get_family_achievements_summary', { p_family_id: familyId });
+    // Hämta måls-progress parallellt + achievements-summering samtidigt
+    // (tidigare N+1 sekventiella anrop som gjorde varje veckobyte segt).
+    const [progressList, { data: achData }] = await Promise.all([
+      Promise.all(goals.map(g =>
+        supabase.rpc('get_family_goal_progress', { p_goal_id: g.id })
+          .then(({ data }) => [g.id, data || 0])
+      )),
+      supabase.rpc('get_family_achievements_summary', { p_family_id: familyId }),
+    ]);
+    setGoalProgress(Object.fromEntries(progressList));
     setAchievementsSummary(achData || []);
 
     setLoading(false);
