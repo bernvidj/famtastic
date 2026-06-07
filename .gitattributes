@@ -1,0 +1,13 @@
+# Normalisera radslut: spara alltid LF i repot, undvik CRLF-flipp på Windows.
+# Detta stoppar "hela filen ändrad"-diffar som egentligen bara är radslut.
+* text=auto eol=lf
+
+# Binärfiler ska inte radslutsnormaliseras
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg text
+*.ico binary
+*.woff binary
+*.woff2 binary
