@@ -5,6 +5,8 @@
 // Format: [min, max] i kronor per typisk enhet
 // ============================================
 
+import { resolveItem, consolidateItems } from './consolidate';
+
 const PRICE_DB = {
   // ── Mejeri ────────────────────────────────
   'mjölk':            [14, 18],
@@ -202,18 +204,24 @@ const CATEGORY_FALLBACK = {
  * Returnerar [min, max] i SEK.
  * Matchar på exakt namn, delvis namn (lowercase), annars kategori-fallback.
  */
+export const PRICE_KEYS = Object.keys(PRICE_DB);
+
 export function lookupPrice(name, category = 'Övrigt') {
   const key = name.toLowerCase().trim();
 
-  // Exakt match
+  // 1) Exakt match
   if (PRICE_DB[key]) return PRICE_DB[key];
 
-  // Partiell match — letar om något DB-nyckelord finns i varunamnet
-  for (const [dbKey, price] of Object.entries(PRICE_DB)) {
-    if (key.includes(dbKey) || dbKey.includes(key)) return price;
+  // 2) Säker resolver: normalisering + synonymlexikon + fuzzy mot DB-nycklar.
+  //    Ersätter den gamla oriktade includes-matchningen som blandade ihop
+  //    t.ex. "grädde" och "gräddfil". needsReview-fall hoppar vi över här och
+  //    låter falla igenom till kategori-fallback istället för att gissa pris.
+  const r = resolveItem(name, PRICE_KEYS);
+  if (!r.needsReview && PRICE_DB[r.canonical]) {
+    return PRICE_DB[r.canonical];
   }
 
-  // Kategori-fallback
+  // 3) Kategori-fallback
   return CATEGORY_FALLBACK[category] || CATEGORY_FALLBACK['Övrigt'];
 }
 
@@ -227,27 +235,37 @@ export function estimateListCost(items) {
   let totalMax = 0;
   const perItem = {};
 
-  for (const item of items) {
-    if (item.checked) continue; // hoppa över avbockade — räkna bara det som återstår att handla
-    const [min, max] = lookupPrice(item.name, item.category);
+  // Räkna bara på aktiva (ej hanterade) varor. Stödjer både gamla `checked`
+  // och nya `item_status`-modellen.
+  const active = (items || []).filter(i => !i.checked && (!i.item_status || i.item_status === 'active'));
 
-    // Tolka mängd: "2 st", "3", "500g" → multiplicera om heltal
-    let multiplier = 1;
-    if (item.quantity) {
-      const parsed = parseInt(item.quantity, 10);
-      if (!isNaN(parsed) && parsed > 0 && parsed <= 20) {
-        multiplier = parsed;
-      }
+  // Konsolidera först: varor som menar samma sak grupperas så att t.ex.
+  // tre "majs"-rader prissätts som EN majs-post med summerad mängd, inte tre.
+  const groups = consolidateItems(active, PRICE_KEYS);
+
+  for (const g of groups) {
+    const repName = g.members[0] ? g.members[0].name : g.canonical;
+    const [min, max] = lookupPrice(repName, g.category);
+
+    // Hur många "enheter" gruppen utgör. Använd summerad styck-mängd om den
+    // finns, annars antal rader i gruppen (varje rad = minst 1).
+    let multiplier = g.totalByUnit && g.totalByUnit.st ? g.totalByUnit.st : g.members.length;
+    if (!(multiplier > 0)) multiplier = g.members.length || 1;
+    if (multiplier > 40) multiplier = 40; // skydd mot orimliga värden
+
+    const groupMin = min * multiplier;
+    const groupMax = max * multiplier;
+    totalMin += groupMin;
+    totalMax += groupMax;
+
+    // Fördela priset på alla original-items så befintlig per-item-UI funkar
+    const share = g.members.length || 1;
+    for (const m of g.members) {
+      perItem[m.id] = [Math.round(groupMin / share), Math.round(groupMax / share)];
     }
-
-    const itemMin = min * multiplier;
-    const itemMax = max * multiplier;
-    totalMin += itemMin;
-    totalMax += itemMax;
-    perItem[item.id] = [itemMin, itemMax];
   }
 
-  return { min: Math.round(totalMin), max: Math.round(totalMax), perItem };
+  return { min: Math.round(totalMin), max: Math.round(totalMax), perItem, groups };
 }
 
 /**

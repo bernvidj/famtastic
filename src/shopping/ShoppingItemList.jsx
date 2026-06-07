@@ -6,8 +6,9 @@
 
 import React, { useState } from 'react';
 import { C, F } from '../data';
-import { estimateListCost, formatPrice } from '../priceDb';
-import { Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { estimateListCost, formatPrice, PRICE_KEYS } from '../priceDb';
+import { consolidateItems, formatTotalQuantity } from '../consolidate';
+import { Trash2, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 
 // ─── Status helpers ────────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -83,30 +84,64 @@ export function ShoppingItemList({ items, members, onPick, onRemove }) {
 
   return (
     <>
-      {/* ── Aktiva varor per kategori ── */}
+      {/* ── Aktiva varor per kategori (konsoliderade) ── */}
       {Object.entries(groups).map(([cat, catItems]) => (
         <div key={cat}>
           {Object.keys(groups).length > 1 && (
             <h3 style={styles.catTitle}>{cat}</h3>
           )}
-          {catItems.map(item => {
-            const itemPrice = costEstimate.perItem[item.id];
-            const addedBy   = members && item.added_by
-              ? members.find(m => m.id === item.added_by) : null;
-            const byChild   = addedBy && addedBy.role === 'child';
+          {consolidateItems(catItems, PRICE_KEYS).map(group => {
+            const first    = group.members[0];
+            const isMerged = group.members.length > 1;
+            const label    = isMerged ? group.display : first.name;
+            const totalQty = formatTotalQuantity(group.totalByUnit);
+
+            // Pris: summera per-item-andelarna för gruppens medlemmar.
+            let pMin = 0, pMax = 0;
+            for (const m of group.members) {
+              const p = costEstimate.perItem[m.id];
+              if (p) { pMin += p[0]; pMax += p[1]; }
+            }
+            const groupPrice = (pMin || pMax) ? [pMin, pMax] : null;
+
+            // Avatar visas bara för enskilda rader (hopslagna kan ha olika upphov).
+            const addedBy = !isMerged && members && first.added_by
+              ? members.find(m => m.id === first.added_by) : null;
+            const byChild = addedBy && addedBy.role === 'child';
+
+            // Klick öppnar status-pickern. För en hopslagen rad skickas alla
+            // medlemmar med (_members) så att vald status/borttagning gäller
+            // hela gruppen. Ta bort agerar likaså på alla underliggande items.
+            const pickTarget = isMerged
+              ? { ...first, name: group.display, _members: group.members }
+              : first;
+            const removeTarget = isMerged ? group.members.map(m => m.id) : first.id;
+
+            // Flagga bara genuint osäkra fuzzy-matchningar (inte varje okänd
+            // vara) för att slippa varningsikon på halva listan.
+            const showReview = group.needsReview && group.reason
+              && group.reason.startsWith('Osäker');
+
             return (
               <button
-                key={item.id}
-                onClick={() => onPick(item)}
+                key={group.canonical + '_' + first.id}
+                onClick={() => onPick(pickTarget)}
                 style={styles.itemRow}
+                title={isMerged ? group.members.map(m => m.name).join(', ') : undefined}
               >
-                <StatusDot status={item.item_status} />
+                <StatusDot status="active" />
                 <div style={styles.itemContent}>
-                  <span style={styles.itemName}>{item.name}</span>
-                  {item.quantity && (
-                    <span style={styles.itemQty}>{item.quantity}</span>
+                  <span style={styles.itemName}>{label}</span>
+                  {isMerged && (
+                    <span style={styles.mergeBadge}>×{group.members.length}</span>
                   )}
-                  {item.from_meal_plan && <span style={{ fontSize: 12 }}>🍽️</span>}
+                  {(totalQty || (!isMerged && first.quantity)) && (
+                    <span style={styles.itemQty}>{totalQty || first.quantity}</span>
+                  )}
+                  {showReview && (
+                    <AlertCircle size={13} color={C.textMuted} aria-label={group.reason} />
+                  )}
+                  {group.members.some(m => m.from_meal_plan) && <span style={{ fontSize: 12 }}>🍽️</span>}
                 </div>
                 {byChild && (
                   <span
@@ -121,9 +156,9 @@ export function ShoppingItemList({ items, members, onPick, onRemove }) {
                     {addedBy.avatar}
                   </span>
                 )}
-                {itemPrice && <PriceChip min={itemPrice[0]} max={itemPrice[1]} />}
+                {groupPrice && <PriceChip min={groupPrice[0]} max={groupPrice[1]} />}
                 <div
-                  onClick={e => { e.stopPropagation(); onRemove(item.id); }}
+                  onClick={e => { e.stopPropagation(); onRemove(removeTarget); }}
                   style={styles.removeBtn}
                 >
                   <Trash2 size={14} color={C.textMuted} />
@@ -250,6 +285,15 @@ const styles = {
     background: C.bg,
     padding: '2px 6px',
     borderRadius: 4,
+    flexShrink: 0,
+  },
+  mergeBadge: {
+    fontSize: F.sizes.xs,
+    fontWeight: F.weights.extra,
+    color: C.primary,
+    background: C.primaryLight,
+    padding: '1px 6px',
+    borderRadius: 8,
     flexShrink: 0,
   },
   removeBtn: {

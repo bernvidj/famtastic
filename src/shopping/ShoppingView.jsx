@@ -113,18 +113,21 @@ export function ShoppingView({ familyId, member, members, stacked }) {
     loadItems();
   }
 
-  // Set status on a single item
+  // Set status on an item — eller på alla medlemmar i en hopslagen rad (_members)
   async function handleSetStatus(item, status) {
+    const ids = item._members ? item._members.map(m => m.id) : [item.id];
     const { error } = await supabase.from('shopping_items')
       .update({ item_status: status })
-      .eq('id', item.id);
+      .in('id', ids);
     if (error) { showErr('Kunde inte uppdatera varan: ' + error.message); return; }
     setPickingItem(null);
     loadItems();
   }
 
-  async function handleRemove(itemId) {
-    const { error } = await supabase.from('shopping_items').delete().eq('id', itemId);
+  // Tar bort en eller flera varor (id eller array av id:n)
+  async function handleRemove(itemIdOrIds) {
+    const ids = Array.isArray(itemIdOrIds) ? itemIdOrIds : [itemIdOrIds];
+    const { error } = await supabase.from('shopping_items').delete().in('id', ids);
     if (error) { showErr('Kunde inte ta bort varan: ' + error.message); return; }
     setPickingItem(null);
     loadItems();
@@ -183,7 +186,12 @@ export function ShoppingView({ familyId, member, members, stacked }) {
               })}
             </div>
             <button
-              onClick={() => { if (pickingItem) handleRemove(pickingItem.id); }}
+              onClick={() => {
+                if (!pickingItem) return;
+                handleRemove(pickingItem._members
+                  ? pickingItem._members.map(m => m.id)
+                  : pickingItem.id);
+              }}
               style={styles.pickerRemove}
             >
               🗑️ Ta bort vara
